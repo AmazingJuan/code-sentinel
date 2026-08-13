@@ -2,7 +2,7 @@
 name: "Requirement"
 about: "Registrar un requisito funcional o no funcional de CodeSentinel"
 title: "[REQ] "
-labels: "requirement"
+labels: "propuesta"
 assignees: ""
 ---
 
@@ -61,26 +61,6 @@ The system shall...
 
 ---
 
-## Priority
+## Labels
 
-- [ ] High
-- [ ] Medium
-- [ ] Low
-
----
-
-## Dependencies
-
-- 
-
----
-
-## Validation / Evidence
-
-Describe how the requirement will be verified.
-
----
-
-## References
-
--
+propuesta
