@@ -29,7 +29,3 @@
 ## Settings
 
 <img width="1876" height="802" alt="image" src="https://github.com/user-attachments/assets/33d27a90-d2ba-43fe-a814-b576b5cead6e" />
-
-## settings
-
-// imagen
