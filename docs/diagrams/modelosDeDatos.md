@@ -1,3 +1,4 @@
 # Data model Diagram
 
-<img width="1600" height="704" alt="Modelo de datos " src="https://github.com/user-attachments/assets/792afd76-9abb-44e1-847b-99edc5bd5412" />
+<img width="2295" height="712" alt="modelo de datos-corregido" src="https://github.com/user-attachments/assets/f23a0f88-7186-4736-9e1b-71592d659cc3" />
+
