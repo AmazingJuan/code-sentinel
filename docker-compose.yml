@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-code_sentinel}
+      POSTGRES_USER: ${POSTGRES_USER:-code_sentinel}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-code_sentinel}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  back:
+    build:
+      context: ./apps/backend
+    ports:
+      - "8000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  front:
+    build:
+      context: ./apps/frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - back
+
+volumes:
+  postgres_data:
