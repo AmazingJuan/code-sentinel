@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Documentation and workspace files
+DOCUMENTACION_TECNICA.md

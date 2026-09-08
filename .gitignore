@@ -48,6 +48,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.sublime-workspace
 *.launch
 
+# Documentation
+DOCUMENTACION_TECNICA.md
+
 # TypeScript and lint caches
 *.tsbuildinfo
 .eslintcache
