@@ -13,5 +13,5 @@ const colorMap: Record<FindingSeverity, string> = {
 </script>
 
 <template>
-  <span class="font-semibold uppercase" :class="colorMap[severity]">{{ severity }}</span>
+  <span class="font-mono text-xs font-semibold uppercase" :class="colorMap[severity]">{{ severity }}</span>
 </template>
