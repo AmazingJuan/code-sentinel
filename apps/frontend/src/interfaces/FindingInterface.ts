@@ -12,10 +12,3 @@ export interface FindingInterface {
   description: string | null
   recommendation: string | null
 }
-
-export interface FindingFiltersInterface {
-  type?: string
-  severity?: string
-  scanId?: string
-  sourceTool?: string
-}

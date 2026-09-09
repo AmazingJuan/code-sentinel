@@ -18,11 +18,3 @@ export interface ScanInterface {
   lowCount: number
   totalCount: number
 }
-
-export interface ScanFiltersInterface {
-  projectId?: string
-  dateFrom?: string
-  dateTo?: string
-  status?: string
-  severity?: 'critical' | 'high' | 'medium' | 'low'
-}
