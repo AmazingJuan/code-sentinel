@@ -5,13 +5,19 @@ import { RouterLink, useRoute } from 'vue-router'
 
 const route = useRoute()
 
-const navItems = [
-  { name: 'overview', label: 'Overview', icon: LayoutGrid, to: { name: 'overview' } },
-  { name: 'project.index', label: 'Projects', icon: FolderKanban, to: { name: 'project.index' } },
-  { name: 'scan.index', label: 'Scan Reports', icon: FileText, to: { name: 'scan.index' } },
-  { name: 'finding.index', label: 'Findings', icon: ShieldAlert, to: { name: 'finding.index' } },
-  { name: 'security-tools', label: 'Security Tools', icon: Wrench, to: { name: 'security-tools' } },
-  { name: 'settings', label: 'Settings', icon: Settings, to: { name: 'settings' } },
+interface NavItem {
+  label: string
+  icon: typeof LayoutGrid
+  routeName: string | null // null = ruta aún no existe (otro módulo)
+}
+
+const navItems: NavItem[] = [
+  { label: 'Overview', icon: LayoutGrid, routeName: null },
+  { label: 'Projects', icon: FolderKanban, routeName: null },
+  { label: 'Scan Reports', icon: FileText, routeName: 'scan.index' },
+  { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index' },
+  { label: 'Security Tools', icon: Wrench, routeName: null },
+  { label: 'Settings', icon: Settings, routeName: null },
 ]
 
 function isActive(routeName: string): boolean {
@@ -36,16 +42,26 @@ function isActive(routeName: string): boolean {
 
       <p class="mb-2 px-2 text-[10px] font-medium tracking-wider text-gray-500">NAVIGATION</p>
       <nav class="flex flex-col gap-0.5">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.name"
-          :to="item.to"
-          class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors"
-          :class="isActive(item.name) ? 'bg-gray-800/70 text-white' : 'text-gray-400 hover:bg-gray-800/40 hover:text-gray-200'"
-        >
-          <component :is="item.icon" class="size-4" />
-          {{ item.label }}
-        </RouterLink>
+        <template v-for="item in navItems" :key="item.label">
+          <RouterLink
+            v-if="item.routeName"
+            :to="{ name: item.routeName }"
+            class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors"
+            :class="isActive(item.routeName) ? 'bg-gray-800/70 text-white' : 'text-gray-400 hover:bg-gray-800/40 hover:text-gray-200'"
+          >
+            <component :is="item.icon" class="size-4" />
+            {{ item.label }}
+          </RouterLink>
+
+          <span
+            v-else
+            class="flex cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-gray-600"
+            title="Coming soon"
+          >
+            <component :is="item.icon" class="size-4" />
+            {{ item.label }}
+          </span>
+        </template>
       </nav>
     </div>
 
