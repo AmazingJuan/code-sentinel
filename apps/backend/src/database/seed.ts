@@ -24,9 +24,9 @@ async function seed() {
   const findingRepo = dataSource.getRepository(Finding);
 
   // Limpiar (orden importa por FKs)
-  await findingRepo.delete({});
-  await scanRepo.delete({});
-  await projectRepo.delete({});
+  await dataSource.createQueryBuilder().delete().from(Finding).execute();
+  await dataSource.createQueryBuilder().delete().from(Scan).execute();
+  await dataSource.createQueryBuilder().delete().from(Project).execute();
 
   const projectNames = ['code-sentinel', 'backend-api', 'frontend-app', 'payments-service'];
   const projects: Record<string, Project> = {};
