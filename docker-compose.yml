@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16-alpine
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-code_sentinel}
       POSTGRES_USER: ${POSTGRES_USER:-code_sentinel}

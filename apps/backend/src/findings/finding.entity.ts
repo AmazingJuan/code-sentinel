@@ -28,7 +28,7 @@ export class Finding {
   @Column({ type: 'varchar' })
   severity: FindingSeverity;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   filePath: string | null;
 
   @Column({ type: 'int', nullable: true })
