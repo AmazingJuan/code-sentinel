@@ -1,6 +1,7 @@
 // apps/frontend/src/services/ScanService.ts
+import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
+import type { ScanInterface } from '@/interfaces/ScanInterface'
 import { httpClient } from '@/services/httpClient'
-import type { ScanFiltersInterface, ScanInterface } from '@/interfaces/ScanInterface'
 
 export class ScanService {
   static async getScans(filters: ScanFiltersInterface = {}): Promise<ScanInterface[]> {
