@@ -50,7 +50,7 @@ export class ScansService {
   async findOne(id: string): Promise<Scan> {
     const scan = await this.scanRepository.findOne({
       where: { id },
-      relations: ['findings'],
+      relations: { findings: true },
     });
     if (!scan) throw new NotFoundException(`Scan ${id} not found`);
     return scan;
