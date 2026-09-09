@@ -1,7 +1,7 @@
 <!-- apps/frontend/src/components/AppHeader.vue -->
 <script setup lang="ts">
 import { LogOut } from 'lucide-vue-next'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 // Datos mockeados — el módulo de autenticación real no es responsabilidad de este módulo.
 const mockUser = {
@@ -13,6 +13,11 @@ const mockUser = {
 const mockEngineStatus: 'online' | 'offline' = 'online'
 
 const route = useRoute()
+const router = useRouter()
+
+function handleLogout(): void {
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
@@ -43,7 +48,10 @@ const route = useRoute()
         </div>
       </div>
 
-      <button class="flex items-center gap-1.5 rounded-md border border-gray-800 px-2.5 py-1.5 text-xs text-gray-400 hover:text-gray-200">
+      <button
+        class="flex items-center gap-1.5 rounded-md border border-gray-800 px-2.5 py-1.5 text-xs text-gray-400 hover:text-gray-200"
+        @click="handleLogout"
+      >
         <LogOut class="size-3.5" />
         Logout
       </button>
