@@ -2,59 +2,76 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FindingService } from '@/services/FindingService'
-import type { FindingFiltersInterface, FindingInterface } from '@/interfaces/FindingInterface'
+
+import FindingFilterBar from '@/components/FindingFilterBar.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
+import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
+import type { FindingInterface } from '@/interfaces/FindingInterface'
+import { FindingService } from '@/services/FindingService'
 
 const findings = ref<FindingInterface[]>([])
 const filters = ref<FindingFiltersInterface>({})
+const errorMessage = ref<string | null>(null)
 
 async function loadFindings(): Promise<void> {
-  findings.value = await FindingService.getFindings(filters.value)
+  errorMessage.value = null
+  try {
+    findings.value = await FindingService.getFindings(filters.value)
+  } catch {
+    errorMessage.value = 'No pudimos cargar los findings.'
+  }
 }
 
 onMounted(loadFindings)
 </script>
 
 <template>
-  <div class="p-6">
-    <div class="flex gap-4">
-      <select v-model="filters.severity" class="bg-gray-800 rounded px-2 py-1" @change="loadFindings">
-        <option :value="undefined">Any severity</option>
-        <option value="critical">Critical</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-      </select>
-      <select v-model="filters.sourceTool" class="bg-gray-800 rounded px-2 py-1" @change="loadFindings">
-        <option :value="undefined">Any tool</option>
-        <option value="SAST">SAST</option>
-        <option value="Secret Scanner">Secret Scanner</option>
-        <option value="Port Scanner">Port Scanner</option>
-      </select>
+  <div class="p-8">
+    <p class="font-mono text-xs text-gray-500">~/ findings</p>
+    <h1 class="mt-1 text-2xl font-semibold text-white">Findings</h1>
+    <p class="mt-1 text-sm text-gray-400">Security findings normalized across all scans and tools.</p>
+
+    <div class="mt-6 rounded-lg border border-gray-800 bg-gray-900/30 p-5">
+      <FindingFilterBar v-model="filters" @apply="loadFindings" />
     </div>
 
-    <table class="mt-4 w-full text-left">
-      <thead class="text-xs text-gray-400">
-        <tr>
-          <th>TYPE</th>
-          <th>SEVERITY</th>
-          <th>LOCATION</th>
-          <th>TOOL</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="finding in findings" :key="finding.id" class="border-t border-gray-800">
-          <td>
-            <RouterLink :to="{ name: 'finding.show', params: { id: finding.id } }" class="text-green-400">
-              {{ finding.type }}
-            </RouterLink>
-          </td>
-          <td><SeverityBadge :severity="finding.severity" /></td>
-          <td>{{ finding.filePath ? `${finding.filePath}:${finding.line}` : '—' }}</td>
-          <td>{{ finding.sourceTool }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <p v-if="errorMessage" class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+      {{ errorMessage }}
+    </p>
+
+    <div class="mt-4 overflow-hidden rounded-lg border border-gray-800">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-gray-900/50 text-[11px] text-gray-500">
+          <tr>
+            <th class="px-4 py-3 font-medium">TYPE</th>
+            <th class="px-4 py-3 font-medium">SEVERITY</th>
+            <th class="px-4 py-3 font-medium">LOCATION</th>
+            <th class="px-4 py-3 font-medium">TOOL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <RouterLink
+            v-for="finding in findings"
+            :key="finding.id"
+            :to="{ name: 'finding.show', params: { id: finding.id } }"
+            custom
+            v-slot="{ navigate }"
+          >
+            <tr class="cursor-pointer border-t border-gray-800 hover:bg-gray-900/40" @click="navigate">
+              <td class="px-4 py-3 text-gray-200">{{ finding.type }}</td>
+              <td class="px-4 py-3"><SeverityBadge :severity="finding.severity" /></td>
+              <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                {{ finding.filePath ? `${finding.filePath}:${finding.line}` : '—' }}
+              </td>
+              <td class="px-4 py-3">
+                <span class="rounded border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-300">
+                  {{ finding.sourceTool }}
+                </span>
+              </td>
+            </tr>
+          </RouterLink>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
