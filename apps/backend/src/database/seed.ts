@@ -1,4 +1,5 @@
 // apps/backend/src/database/seed.ts
+import 'dotenv/config'; // ← agregar esta línea, se perdió en algún merge
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Project } from '../projects/project.entity';
