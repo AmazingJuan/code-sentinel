@@ -5,7 +5,7 @@ about: "Registrar un requisito funcional o no funcional de CodeSentinel"
 title: "[REQ] "
 labels: ""
 assignees: ""
--------------
+---
 
 # Requirement
 
