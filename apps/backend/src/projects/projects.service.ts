@@ -1,8 +1,13 @@
 // apps/backend/src/projects/projects.service.ts
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { Project } from './project.entity';
 
 @Injectable()
@@ -41,5 +46,29 @@ export class ProjectsService {
 
   findAll(): Promise<Project[]> {
     return this.projectsRepository.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async findById(id: string): Promise<Project> {
+    const project = await this.projectsRepository.findOne({ where: { id } });
+    if (!project) {
+      throw new NotFoundException(`Project ${id} not found`);
+    }
+    return project;
+  }
+
+  async update(
+    id: string,
+    updateProjectDto: UpdateProjectDto,
+  ): Promise<Project> {
+    const project = await this.findById(id);
+
+    if (updateProjectDto.repo !== undefined) {
+      project.repo = updateProjectDto.repo.trim();
+    }
+    if (updateProjectDto.tools !== undefined) {
+      project.tools = updateProjectDto.tools;
+    }
+
+    return this.projectsRepository.save(project);
   }
 }

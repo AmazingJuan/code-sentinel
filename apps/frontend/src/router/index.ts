@@ -6,6 +6,7 @@ import FindingDetailView from '@/views/FindingDetailView.vue'
 import FindingsView from '@/views/FindingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import OverviewView from '@/views/OverviewView.vue'
+import ProjectDetailView from '@/views/ProjectDetailView.vue'
 import ProjectsView from '@/views/ProjectsView.vue'
 import ScanDetailView from '@/views/ScanDetailView.vue'
 import ScansView from '@/views/ScansView.vue'
@@ -31,6 +32,12 @@ const router = createRouter({
           name: 'project.index',
           component: ProjectsView,
           meta: { title: 'Projects', breadcrumb: 'projects' },
+        },
+        {
+          path: 'projects/:id',
+          name: 'project.show',
+          component: ProjectDetailView,
+          meta: { title: 'Project Configuration', breadcrumb: 'projects/detail' },
         },
         {
           path: 'scan',

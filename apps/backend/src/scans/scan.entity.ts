@@ -13,6 +13,11 @@ import { Finding } from '../findings/finding.entity';
 
 export type ScanStatus = 'completed' | 'failed';
 export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner';
+export const SCAN_TOOLS: ScanTool[] = [
+  'SAST',
+  'Secret Scanner',
+  'Port Scanner',
+];
 
 @Entity('scans')
 export class Scan {

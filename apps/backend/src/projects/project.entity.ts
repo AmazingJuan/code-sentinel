@@ -8,7 +8,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Scan } from '../scans/scan.entity';
+import { Scan, ScanTool } from '../scans/scan.entity';
 import { User } from '../users/entities/user.entity';
 
 export type ProjectStatus = 'pending' | 'completed' | 'failed';
@@ -23,6 +23,9 @@ export class Project {
 
   @Column()
   repo: string;
+
+  @Column({ type: 'simple-array', default: 'SAST,Secret Scanner,Port Scanner' })
+  tools: ScanTool[];
 
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'userId' })
