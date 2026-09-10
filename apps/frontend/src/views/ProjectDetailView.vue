@@ -2,13 +2,18 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { ChevronLeft, Settings2 } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
+import ProjectAssignmentsPanel from '@/components/ProjectAssignmentsPanel.vue'
+import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import { SCAN_TOOLS } from '@/interfaces/ScanInterface'
 import type { ScanTool } from '@/interfaces/ScanInterface'
 import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
+import type { ManagedUser } from '@/interfaces/UserInterface'
+import { AuthService } from '@/services/AuthService'
 import { ProjectService } from '@/services/ProjectService'
+import { UserService } from '@/services/UserService'
 
 const route = useRoute()
 const project = ref<ProjectInterface | null>(null)
@@ -19,8 +24,22 @@ const formErrorMessage = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const form = ref<{ repo: string; tools: ScanTool[] }>({ repo: '', tools: [] })
 
+const isAdmin = computed<boolean>(() => AuthService.getUser()?.role === 'admin')
+
+const assignments = ref<ProjectAssignment[]>([])
+const allUsers = ref<ManagedUser[]>([])
+const isLoadingAssignments = ref<boolean>(false)
+const isSavingAssignment = ref<boolean>(false)
+const assignmentErrorMessage = ref<string | null>(null)
+
+const availableUsers = computed<ManagedUser[]>(() => {
+  const assignedUserIds = new Set(assignments.value.map((assignment) => assignment.userId))
+  return allUsers.value.filter((user) => !assignedUserIds.has(user.id))
+})
+
 function extractErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError<{ message?: string | string[] }>(error)) {
+    if (error.response?.status === 403) return 'You do not have access to this project.'
     const message = error.response?.data?.message
     if (Array.isArray(message)) return message.join(' ')
     if (message) return message
@@ -35,10 +54,59 @@ async function loadProject(): Promise<void> {
     const id = route.params.id as string
     project.value = await ProjectService.getProjectById(id)
     form.value = { repo: project.value.repo, tools: [...project.value.tools] }
+    if (isAdmin.value) {
+      await loadAssignments()
+    }
   } catch (error) {
     errorMessage.value = extractErrorMessage(error, 'We could not load this project.')
   } finally {
     isLoading.value = false
+  }
+}
+
+async function loadAssignments(): Promise<void> {
+  if (!project.value) return
+  isLoadingAssignments.value = true
+  assignmentErrorMessage.value = null
+  try {
+    const [projectAssignments, users] = await Promise.all([
+      ProjectService.getAssignments(project.value.id),
+      allUsers.value.length > 0 ? Promise.resolve(allUsers.value) : UserService.findAll(),
+    ])
+    assignments.value = projectAssignments
+    allUsers.value = users
+  } catch (error) {
+    assignmentErrorMessage.value = extractErrorMessage(error, 'We could not load the project assignments.')
+  } finally {
+    isLoadingAssignments.value = false
+  }
+}
+
+async function assignUser(userId: string): Promise<void> {
+  if (!project.value) return
+  isSavingAssignment.value = true
+  assignmentErrorMessage.value = null
+  try {
+    const assignment = await ProjectService.assignUser(project.value.id, userId)
+    assignments.value = [...assignments.value, assignment]
+  } catch (error) {
+    assignmentErrorMessage.value = extractErrorMessage(error, 'We could not assign this user.')
+  } finally {
+    isSavingAssignment.value = false
+  }
+}
+
+async function unassignUser(userId: string): Promise<void> {
+  if (!project.value) return
+  isSavingAssignment.value = true
+  assignmentErrorMessage.value = null
+  try {
+    await ProjectService.unassignUser(project.value.id, userId)
+    assignments.value = assignments.value.filter((assignment) => assignment.userId !== userId)
+  } catch (error) {
+    assignmentErrorMessage.value = extractErrorMessage(error, 'We could not remove this assignment.')
+  } finally {
+    isSavingAssignment.value = false
   }
 }
 
@@ -153,6 +221,17 @@ onMounted(loadProject)
           </div>
         </form>
       </div>
+
+      <ProjectAssignmentsPanel
+        v-if="isAdmin"
+        :assignments="assignments"
+        :available-users="availableUsers"
+        :is-loading="isLoadingAssignments"
+        :is-saving="isSavingAssignment"
+        :error-message="assignmentErrorMessage"
+        @assign="assignUser"
+        @unassign="unassignUser"
+      />
     </template>
   </div>
 </template>
