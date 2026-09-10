@@ -31,7 +31,7 @@ async function seed() {
   await dataSource.createQueryBuilder().delete().from(Project).execute();
   await dataSource.createQueryBuilder().delete().from(User).execute();
 
-  await userRepo.save(
+  const demoUser = await userRepo.save(
     userRepo.create({
       email: 'demo@code-sentinel.local',
       name: 'Demo User',
@@ -40,10 +40,15 @@ async function seed() {
     }),
   );
 
-  const projectNames = ['code-sentinel', 'backend-api', 'frontend-app', 'payments-service'];
+  const projectsData: Record<string, string> = {
+    'code-sentinel': 'git@github.com:code-sentinel/code-sentinel.git',
+    'backend-api': 'git@github.com:code-sentinel/backend-api.git',
+    'frontend-app': 'git@github.com:code-sentinel/frontend-app.git',
+    'payments-service': 'git@github.com:code-sentinel/payments-service.git',
+  };
   const projects: Record<string, Project> = {};
-  for (const name of projectNames) {
-    projects[name] = await projectRepo.save(projectRepo.create({ name }));
+  for (const [name, repo] of Object.entries(projectsData)) {
+    projects[name] = await projectRepo.save(projectRepo.create({ name, repo, userId: demoUser.id }));
   }
 
   const scansData = [
