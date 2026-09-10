@@ -60,7 +60,3 @@ The system shall...
 - [ ] Other
 
 ---
-
-## Labels
-
-propuesta
