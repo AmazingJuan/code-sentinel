@@ -21,7 +21,7 @@ onMounted(async () => {
     scan.value = await ScanService.getScanById(id)
     findings.value = await FindingService.getFindings({ scanId: id })
   } catch {
-    errorMessage.value = 'No pudimos cargar el detalle de este scan.'
+    errorMessage.value = 'We could not load the details for this scan.'
   }
 })
 </script>

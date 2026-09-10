@@ -21,7 +21,7 @@ async function loadScans(): Promise<void> {
   try {
     scans.value = await ScanService.getScans(filters.value)
   } catch {
-    errorMessage.value = 'No pudimos cargar los escaneos. Intenta de nuevo en unos segundos.'
+    errorMessage.value = 'We could not load the scans. Please try again in a few seconds.'
   } finally {
     isLoading.value = false
   }

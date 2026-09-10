@@ -8,7 +8,7 @@ const route = useRoute()
 interface NavItem {
   label: string
   icon: typeof LayoutGrid
-  routeName: string | null // null = ruta aún no existe (otro módulo)
+  routeName: string | null // null = route does not exist yet (another module)
 }
 
 const navItems: NavItem[] = [

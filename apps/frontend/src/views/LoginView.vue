@@ -1,5 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Terminal,
   Eye,
@@ -7,12 +8,29 @@ import {
   ArrowRight,
 } from '@lucide/vue'
 import TerminalWindow from '../components/TerminalWindow.vue'
+import { AuthService } from '@/services/AuthService'
 
 const showPassword = ref(false)
 
-const email = ref('alex.stone@acme.dev')
-const password = ref('password123')
-const rememberMe = ref(true)
+const email = ref('')
+const password = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
+const router = useRouter()
+
+async function onSubmit(): Promise<void> {
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    await AuthService.login(email.value, password.value)
+    await router.push({ name: 'scan.index' })
+  } catch (error) {
+    errorMessage.value = AuthService.getErrorMessage(error)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 </script>
 
@@ -78,6 +96,7 @@ const rememberMe = ref(true)
               type="email"
               autocomplete="email"
               placeholder="you@company.com"
+              required
               class="h-10 rounded-md border border-input
                      bg-card px-3 font-mono text-sm outline-none
                      transition-colors placeholder:text-muted-foreground
@@ -97,12 +116,6 @@ const rememberMe = ref(true)
                 Password
               </label>
 
-              <a
-                href="#"
-                class="text-xs text-primary hover:underline"
-              >
-                Forgot password?
-              </a>
             </div>
 
             <div class="relative">
@@ -111,6 +124,7 @@ const rememberMe = ref(true)
                 v-model="password"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="current-password"
+                required
                 class="h-10 w-full rounded-md border border-input
                        bg-card px-3 pr-10 font-mono text-sm
                        outline-none transition-colors
@@ -144,20 +158,13 @@ const rememberMe = ref(true)
             </div>
           </div>
 
-          <!-- Remember me -->
-          <label
-            class="flex items-center gap-2 text-sm
-                   text-muted-foreground"
+          <p
+            v-if="errorMessage"
+            role="alert"
+            class="rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300"
           >
-            <input
-              v-model="rememberMe"
-              type="checkbox"
-              class="size-4 rounded border-input
-                     bg-card accent-primary"
-            />
-
-            Remember me on this device
-          </label>
+            {{ errorMessage }}
+          </p>
 
           <!-- Submit -->
           <button
@@ -166,9 +173,11 @@ const rememberMe = ref(true)
                    justify-center gap-2 rounded-md
                    bg-primary px-4 font-medium
                    text-primary-foreground
-                   transition-opacity hover:opacity-90"
+                   transition-opacity hover:opacity-90 disabled:cursor-not-allowed
+                   disabled:opacity-60"
+                 :disabled="isLoading"
           >
-            Sign In
+                 {{ isLoading ? 'Signing in…' : 'Sign In' }}
 
             <ArrowRight class="size-4" />
           </button>
