@@ -25,7 +25,7 @@ async function seed() {
   const findingRepo = dataSource.getRepository(Finding);
   const userRepo = dataSource.getRepository(User);
 
-  // Limpiar (orden importa por FKs)
+  // Clear data (order matters because of foreign keys)
   await dataSource.createQueryBuilder().delete().from(Finding).execute();
   await dataSource.createQueryBuilder().delete().from(Scan).execute();
   await dataSource.createQueryBuilder().delete().from(Project).execute();
@@ -34,7 +34,7 @@ async function seed() {
   await userRepo.save(
     userRepo.create({
       email: 'demo@code-sentinel.local',
-      name: 'Usuario Demo',
+      name: 'Demo User',
       passwordHash: await bcrypt.hash('Demo1234!', 12),
       role: UserRole.ADMIN,
     }),
@@ -72,7 +72,7 @@ async function seed() {
       }),
     );
 
-    // Findings de ejemplo solo para el primer scan completado, para tener datos que ver en Findings
+    // Add sample findings to the first completed scan so the Findings view has data
     if (scan.scanNumber === 1042) {
       await findingRepo.save([
         findingRepo.create({
@@ -82,8 +82,8 @@ async function seed() {
           filePath: 'src/config.js',
           line: 12,
           sourceTool: 'Secret Scanner',
-          description: 'API key expuesta en texto plano.',
-          recommendation: 'Mover a variables de entorno.',
+          description: 'API key exposed in plain text.',
+          recommendation: 'Move it to environment variables.',
         }),
         findingRepo.create({
           scanId: scan.id,
@@ -92,8 +92,8 @@ async function seed() {
           filePath: 'src/users.js',
           line: 45,
           sourceTool: 'SAST',
-          description: 'Concatenación directa de input en query SQL.',
-          recommendation: 'Usar consultas parametrizadas.',
+          description: 'Direct concatenation of input into an SQL query.',
+          recommendation: 'Use parameterized queries.',
         }),
         findingRepo.create({
           scanId: scan.id,
@@ -102,14 +102,14 @@ async function seed() {
           filePath: null,
           line: null,
           sourceTool: 'Port Scanner',
-          description: 'Puerto 8080 abierto sin autenticación.',
-          recommendation: 'Restringir acceso por firewall.',
+          description: 'Port 8080 is open without authentication.',
+          recommendation: 'Restrict access with a firewall.',
         }),
       ]);
     }
   }
 
-  console.log('Seed completado. Usuario de prueba: demo@code-sentinel.local / Demo1234!');
+  console.log('Seed completed. Test user: demo@code-sentinel.local / Demo1234!');
   await dataSource.destroy();
 }
 
