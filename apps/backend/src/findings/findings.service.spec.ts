@@ -6,7 +6,7 @@ import { Repository } from 'typeorm';
 import { Finding } from './finding.entity';
 import { FindingsService } from './findings.service';
 
-const FINDING_REPOSITORY_TOKEN = 'FindingRepository'; // equivalente a getRepositoryToken(Finding)
+const FINDING_REPOSITORY_TOKEN = 'FindingRepository';
 
 type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -22,7 +22,15 @@ describe('FindingsService', () => {
   let repository: MockRepository<Finding>;
 
   const mockFindings: Partial<Finding>[] = [
-    { id: 'f1', scanId: 's1', type: 'Hardcoded Secret', severity: 'critical', sourceTool: 'Secret Scanner' },
+    {
+      id: 'f1',
+      scanId: 's1',
+      type: 'Hardcoded Secret',
+      severity: 'critical',
+      sourceTool: 'Secret Scanner',
+      filePath: 'src/config.js', // ← agregado, faltaba
+      line: 12,                  // ← agregado, faltaba
+    },
     { id: 'f2', scanId: 's1', type: 'SQL Injection', severity: 'high', sourceTool: 'SAST' },
   ];
 
@@ -57,6 +65,12 @@ describe('FindingsService', () => {
         expect.objectContaining({ where: expect.objectContaining({ severity: 'critical' }) }),
       );
     });
+
+    it('sin filtros debe retornar el set completo de findings (RF-026)', async (): Promise<void> => {
+      repository.find!.mockResolvedValue(mockFindings);
+      const result = await service.findAll({});
+      expect(result).toHaveLength(mockFindings.length);
+    });
   });
 
   describe('findOne', (): void => {
@@ -64,24 +78,17 @@ describe('FindingsService', () => {
       repository.findOne!.mockResolvedValue(null);
       await expect(service.findOne('no-existe')).rejects.toThrow(NotFoundException);
     });
-  });
 
-  // apps/backend/src/findings/findings.service.spec.ts
-// ... (mantén todo lo que ya tienes, agrega estos describe/it)
+    it('debe retornar el finding aunque no tenga severity provista (RF-022)', async (): Promise<void> => {
+      const findingWithoutSeverity = { id: 'f3', scanId: 's1', type: 'Unknown Issue', severity: null };
+      repository.findOne!.mockResolvedValue(findingWithoutSeverity);
 
-describe('findOne — RF-022 (severity opcional tras el fix)', (): void => {
-  it('debe retornar el finding aunque no tenga severity provista por la herramienta', async (): Promise<void> => {
-    const findingWithoutSeverity = { id: 'f3', scanId: 's1', type: 'Unknown Issue', severity: null };
-    repository.findOne!.mockResolvedValue(findingWithoutSeverity);
+      const result = await service.findOne('f3');
 
-    const result = await service.findOne('f3');
+      expect(result.severity).toBeNull();
+    });
 
-    expect(result.severity).toBeNull();
-  });
-});
-
-  describe('findOne — RF-021 (ubicación opcional)', (): void => {
-    it('debe retornar el finding sin filePath/line cuando no aplican (ej. Port Scanner)', async (): Promise<void> => {
+    it('debe retornar el finding sin filePath/line cuando no aplican (RF-021)', async (): Promise<void> => {
       const portFinding = {
         id: 'f4',
         scanId: 's1',
@@ -93,13 +100,13 @@ describe('findOne — RF-022 (severity opcional tras el fix)', (): void => {
       };
       repository.findOne!.mockResolvedValue(portFinding);
 
-    const result = await service.findOne('f4');
+      const result = await service.findOne('f4');
 
       expect(result.filePath).toBeNull();
       expect(result.line).toBeNull();
     });
 
-    it('debe retornar filePath y line cuando el finding sí tiene ubicación en código', async (): Promise<void> => {
+    it('debe retornar filePath y line cuando el finding sí tiene ubicación en código (RF-021)', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(mockFindings[0]);
 
       const result = await service.findOne('f1');
@@ -107,15 +114,5 @@ describe('findOne — RF-022 (severity opcional tras el fix)', (): void => {
       expect(result.filePath).toBeDefined();
       expect(result.line).toBeDefined();
     });
-  });
-
-  describe('findAll — RF-026 (remover filtros)', (): void => {
-    it('sin filtros debe retornar el set completo de findings', async (): Promise<void> => {
-      repository.find!.mockResolvedValue(mockFindings);
-
-      const result = await service.findAll({});
-
-    expect(result).toHaveLength(mockFindings.length);
-  });
   });
 });

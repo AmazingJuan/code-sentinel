@@ -1,5 +1,4 @@
 // apps/backend/src/scans/scans.service.spec.ts
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
@@ -7,7 +6,7 @@ import { Repository } from 'typeorm';
 import { Scan } from './scan.entity';
 import { ScansService } from './scans.service';
 
-const SCAN_REPOSITORY_TOKEN = 'ScanRepository'; // equivalente a getRepositoryToken(Scan), sin importar @nestjs/typeorm (ESM roto en Jest)
+const SCAN_REPOSITORY_TOKEN = 'ScanRepository';
 
 type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -65,6 +64,14 @@ describe('ScansService', () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('1');
     });
+
+    it('cada scan retornado debe tener su projectId poblado (RF-007)', async (): Promise<void> => {
+      repository.find!.mockResolvedValue(mockScans);
+      const result = await service.findAll({});
+      result.forEach((scan) => {
+        expect(scan.projectId).toBeDefined();
+      });
+    });
   });
 
   describe('findOne', (): void => {
@@ -80,38 +87,26 @@ describe('ScansService', () => {
       await expect(service.findOne('no-existe')).rejects.toThrow(NotFoundException);
     });
 
-    describe('findOne — RF-027 (Scan Results)', (): void => {
-      it('debe incluir los findings asociados al scan seleccionado', async (): Promise<void> => {
+    it('debe incluir los findings asociados al scan seleccionado (RF-027)', async (): Promise<void> => {
       const scanWithFindings = {
         ...mockScans[0],
-      findings: [{ id: 'f1', scanId: '1', type: 'SQL Injection', severity: 'high' }],
-    };
-    repository.findOne!.mockResolvedValue(scanWithFindings);
+        findings: [{ id: 'f1', scanId: '1', type: 'SQL Injection', severity: 'high' }],
+      };
+      repository.findOne!.mockResolvedValue(scanWithFindings);
 
-    const result = await service.findOne('1');
+      const result = await service.findOne('1');
 
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0].scanId).toBe('1');
-  });
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].scanId).toBe('1');
+    });
 
-    it('debe indicar que el scan no tiene findings cuando el array viene vacío', async (): Promise<void> => {
+    it('debe indicar que el scan no tiene findings cuando el array viene vacío (RF-027)', async (): Promise<void> => {
       const scanWithoutFindings = { ...mockScans[0], findings: [] };
-    repository.findOne!.mockResolvedValue(scanWithoutFindings);
+      repository.findOne!.mockResolvedValue(scanWithoutFindings);
 
-    const result = await service.findOne('1');
+      const result = await service.findOne('1');
 
-    expect(result.findings).toEqual([]);
-  });
-});
-
-describe('findAll — RF-007 (asociación con proyecto)', (): void => {
-  it('cada scan retornado debe tener su projectId poblado', async (): Promise<void> => {
-    repository.find!.mockResolvedValue(mockScans);
-
-    const result = await service.findAll({});
-
-    result.forEach((scan) => {
-      expect(scan.projectId).toBeDefined();
+      expect(result.findings).toEqual([]);
     });
   });
 });
