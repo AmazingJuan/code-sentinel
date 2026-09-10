@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { Project } from '../projects/project.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
-import { User } from '../users/entities/user.entity';
+import { User, UserRole } from '../users/entities/user.entity';
 
 async function seed() {
   const dataSource = new DataSource({
@@ -36,6 +36,7 @@ async function seed() {
       email: 'demo@code-sentinel.local',
       name: 'Usuario Demo',
       passwordHash: await bcrypt.hash('Demo1234!', 12),
+      role: UserRole.ADMIN,
     }),
   );
 
