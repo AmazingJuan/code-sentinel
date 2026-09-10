@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
+    "test:integration": "jest --config ./test/jest-integration.json",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -80,6 +81,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@nestjs/typeorm$": "<rootDir>/__mocks__/nestjs-typeorm.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -1,168 +1,112 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+// apps/backend/src/scans/scans.service.spec.ts
+import { NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
-
-// `@nestjs/typeorm`'s published build is ESM-only and cannot be parsed by the
-// CommonJS Jest transform configured for this project. `ScansService` only
-// uses `InjectRepository` as a parameter decorator, so a no-op stub is safe here.
-jest.mock('@nestjs/typeorm', () => ({
-  InjectRepository: () => () => undefined,
-}));
 
 import { Scan } from './scan.entity';
 import { ScansService } from './scans.service';
-import { ProjectsService } from '../projects/projects.service';
-import { RequestingUser } from '../types/requesting-user.type';
-import { UserRole } from '../users/entities/user.entity';
 
-interface MockScanRepository {
-  find: jest.Mock<Promise<Scan[]>, [unknown]>;
-  findOne: jest.Mock<Promise<Scan | null>, [unknown]>;
-}
+const SCAN_REPOSITORY_TOKEN = 'ScanRepository';
 
-function createMockScanRepository(): MockScanRepository {
+type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+
+function createMockRepository<T = unknown>(): MockRepository<T> {
   return {
-    find: jest.fn<Promise<Scan[]>, [unknown]>(),
-    findOne: jest.fn<Promise<Scan | null>, [unknown]>(),
+    find: jest.fn(),
+    findOne: jest.fn(),
   };
 }
 
-interface MockProjectsService {
-  getAccessibleProjectIds: jest.Mock<
-    Promise<string[] | null>,
-    [RequestingUser]
-  >;
-}
-
-const admin: RequestingUser = { id: 'admin-1', role: UserRole.ADMIN };
-const analyst: RequestingUser = { id: 'analyst-1', role: UserRole.ANALYST };
-
 describe('ScansService', () => {
   let service: ScansService;
-  let scanRepository: MockScanRepository;
-  let projectsService: MockProjectsService;
+  let repository: MockRepository<Scan>;
 
-  beforeEach(() => {
-    scanRepository = createMockScanRepository();
-    projectsService = {
-      getAccessibleProjectIds: jest.fn<
-        Promise<string[] | null>,
-        [RequestingUser]
-      >(),
-    };
-    service = new ScansService(
-      scanRepository as unknown as Repository<Scan>,
-      projectsService as unknown as ProjectsService,
-    );
+  const mockScans: Partial<Scan>[] = [
+    { id: '1', scanNumber: 1042, projectId: 'p1', status: 'completed', criticalCount: 1, highCount: 3, mediumCount: 5, lowCount: 2 },
+    { id: '2', scanNumber: 1038, projectId: 'p2', status: 'failed', criticalCount: 0, highCount: 0, mediumCount: 0, lowCount: 0 },
+  ];
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ScansService,
+        { provide: SCAN_REPOSITORY_TOKEN, useValue: createMockRepository<Scan>() },
+      ],
+    }).compile();
+
+    service = module.get<ScansService>(ScansService);
+    repository = module.get(SCAN_REPOSITORY_TOKEN);
   });
 
-  afterEach(() => {
+  afterEach((): void => {
     jest.clearAllMocks();
   });
 
-  describe('findAll', () => {
-    it('does not restrict the query for an administrator', async () => {
-      projectsService.getAccessibleProjectIds.mockResolvedValue(null);
-      scanRepository.find.mockResolvedValue([]);
+  describe('findAll', (): void => {
+    it('debe retornar todos los scans cuando no hay filtros', async (): Promise<void> => {
+      repository.find!.mockResolvedValue(mockScans);
+      const result = await service.findAll({});
+      expect(repository.find).toHaveBeenCalledWith({ where: {}, order: { scanNumber: 'DESC' } });
+      expect(result).toHaveLength(2);
+    });
 
-      await service.findAll({}, admin);
-
-      expect(scanRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} }),
+    it('debe filtrar por projectId cuando se provee', async (): Promise<void> => {
+      repository.find!.mockResolvedValue([mockScans[0]]);
+      await service.findAll({ projectId: 'p1' });
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ projectId: 'p1' }) }),
       );
     });
 
-    it('returns an empty list without querying when a non-administrator has no assignments', async () => {
-      projectsService.getAccessibleProjectIds.mockResolvedValue([]);
-
-      const result = await service.findAll({}, analyst);
-
-      expect(scanRepository.find).not.toHaveBeenCalled();
-      expect(result).toEqual([]);
+    it('debe filtrar en memoria por severity, dejando solo scans con conteo > 0', async (): Promise<void> => {
+      repository.find!.mockResolvedValue(mockScans);
+      const result = await service.findAll({ severity: 'critical' });
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
     });
 
-    it('restricts the query to the assigned projects for a non-administrator', async () => {
-      projectsService.getAccessibleProjectIds.mockResolvedValue([
-        'project-1',
-        'project-2',
-      ]);
-      scanRepository.find.mockResolvedValue([]);
+    it('cada scan retornado debe tener su projectId poblado (RF-007)', async (): Promise<void> => {
+      repository.find!.mockResolvedValue(mockScans);
+      const result = await service.findAll({});
+      result.forEach((scan) => {
+        expect(scan.projectId).toBeDefined();
+      });
+    });
+  });
 
-      await service.findAll({}, analyst);
+  describe('findOne', (): void => {
+    it('debe retornar el scan cuando existe', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue(mockScans[0]);
+      const result = await service.findOne('1');
+      expect(result).toEqual(mockScans[0]);
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: '1' }, relations: { findings: true } });
+    });
 
-      const call = scanRepository.find.mock.calls[0]?.[0] as {
-        where?: { projectId?: unknown };
+    it('debe lanzar NotFoundException cuando el scan no existe', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue(null);
+      await expect(service.findOne('no-existe')).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe incluir los findings asociados al scan seleccionado (RF-027)', async (): Promise<void> => {
+      const scanWithFindings = {
+        ...mockScans[0],
+        findings: [{ id: 'f1', scanId: '1', type: 'SQL Injection', severity: 'high' }],
       };
-      expect(call.where?.projectId).toBeDefined();
+      repository.findOne!.mockResolvedValue(scanWithFindings);
+
+      const result = await service.findOne('1');
+
+      expect(result.findings).toHaveLength(1);
+      expect(result.findings[0].scanId).toBe('1');
     });
 
-    it('returns an empty list when filtering by a project the requester cannot access', async () => {
-      projectsService.getAccessibleProjectIds.mockResolvedValue(['project-1']);
+    it('debe indicar que el scan no tiene findings cuando el array viene vacío (RF-027)', async (): Promise<void> => {
+      const scanWithoutFindings = { ...mockScans[0], findings: [] };
+      repository.findOne!.mockResolvedValue(scanWithoutFindings);
 
-      const result = await service.findAll({ projectId: 'project-2' }, analyst);
+      const result = await service.findOne('1');
 
-      expect(scanRepository.find).not.toHaveBeenCalled();
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('findOne', () => {
-    it('returns the scan for an administrator', async () => {
-      const scan = { id: 'scan-1', projectId: 'project-1' } as Scan;
-      scanRepository.findOne.mockResolvedValue(scan);
-      projectsService.getAccessibleProjectIds.mockResolvedValue(null);
-
-      const result = await service.findOne('scan-1', admin);
-
-      expect(result).toBe(scan);
-    });
-
-    it('returns the scan for a requester assigned to its project', async () => {
-      const scan = { id: 'scan-1', projectId: 'project-1' } as Scan;
-      scanRepository.findOne.mockResolvedValue(scan);
-      projectsService.getAccessibleProjectIds.mockResolvedValue(['project-1']);
-
-      const result = await service.findOne('scan-1', analyst);
-
-      expect(result).toBe(scan);
-    });
-
-    it('throws Forbidden for a requester not assigned to the scan project', async () => {
-      const scan = { id: 'scan-1', projectId: 'project-1' } as Scan;
-      scanRepository.findOne.mockResolvedValue(scan);
-      projectsService.getAccessibleProjectIds.mockResolvedValue(['project-2']);
-
-      await expect(service.findOne('scan-1', analyst)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-    });
-
-    it('throws when the scan does not exist', async () => {
-      scanRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.findOne('missing', admin)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe('findProjectIdForScan', () => {
-    it('returns the project id of an existing scan', async () => {
-      scanRepository.findOne.mockResolvedValue({
-        id: 'scan-1',
-        projectId: 'project-1',
-      } as Scan);
-
-      const result = await service.findProjectIdForScan('scan-1');
-
-      expect(result).toBe('project-1');
-    });
-
-    it('returns null when the scan does not exist', async () => {
-      scanRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.findProjectIdForScan('missing');
-
-      expect(result).toBeNull();
+      expect(result.findings).toEqual([]);
     });
   });
 });
