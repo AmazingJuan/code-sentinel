@@ -1,8 +1,9 @@
 <!-- apps/frontend/src/views/ProjectsView.vue -->
 <script setup lang="ts">
 import axios from 'axios'
-import { FolderPlus } from 'lucide-vue-next'
+import { ChevronRight, FolderPlus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
 import { ProjectService } from '@/services/ProjectService'
@@ -148,22 +149,32 @@ onMounted(loadProjects)
             <th class="px-4 py-3 font-medium">Status</th>
             <th class="px-4 py-3 font-medium">Last scan</th>
             <th class="px-3 py-3 text-right font-medium">Findings</th>
+            <th class="px-2 py-3"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="project in projects" :key="project.id" class="border-t border-gray-800/60">
-            <td class="px-4 py-3 font-mono text-gray-200">{{ project.name }}</td>
-            <td class="max-w-xs truncate px-4 py-3 text-gray-400" :title="project.repo">{{ project.repo }}</td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(project.status)">
-                {{ statusLabel(project.status) }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-gray-400">{{ formatDate(project.lastScan) }}</td>
-            <td class="px-3 py-3 text-right font-mono tabular-nums text-white">
-              {{ project.criticalCount + project.highCount + project.mediumCount + project.lowCount }}
-            </td>
-          </tr>
+          <RouterLink
+            v-for="project in projects"
+            :key="project.id"
+            :to="{ name: 'project.show', params: { id: project.id } }"
+            custom
+            v-slot="{ navigate }"
+          >
+            <tr class="group cursor-pointer border-t border-gray-800/60 transition-colors hover:bg-gray-800/40" @click="navigate">
+              <td class="px-4 py-3 font-mono text-gray-200">{{ project.name }}</td>
+              <td class="max-w-xs truncate px-4 py-3 text-gray-400" :title="project.repo">{{ project.repo }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(project.status)">
+                  {{ statusLabel(project.status) }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-gray-400">{{ formatDate(project.lastScan) }}</td>
+              <td class="px-3 py-3 text-right font-mono tabular-nums text-white">
+                {{ project.criticalCount + project.highCount + project.mediumCount + project.lowCount }}
+              </td>
+              <td class="px-2 py-3 text-gray-500"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
+            </tr>
+          </RouterLink>
         </tbody>
       </table>
       <p v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-gray-500">

@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import type { CreateProjectDto } from '@/services/ProjectService'
@@ -10,6 +11,7 @@ const project: ProjectInterface = {
   id: 'project-1',
   name: 'payments-service',
   repo: 'git@github.com:org/payments-service.git',
+  tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
   status: 'pending',
   lastScan: null,
   criticalCount: 0,
@@ -30,11 +32,29 @@ vi.mock('@/services/ProjectService', () => ({
   },
 }))
 
+async function mountProjectsView(): Promise<ReturnType<typeof mount>> {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'project.index', component: { template: '<div />' } },
+      { path: '/projects/:id', name: 'project.show', component: { template: '<div />' } },
+    ],
+  })
+  await router.push('/')
+  await router.isReady()
+
+  return mount(ProjectsView, { global: { plugins: [router] } })
+}
+
 describe('ProjectsView', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('lists the registered projects on mount', async () => {
     getProjects.mockResolvedValueOnce([project])
 
-    const wrapper = mount(ProjectsView)
+    const wrapper = await mountProjectsView()
     await flushPromises()
 
     expect(getProjects).toHaveBeenCalledOnce()
@@ -45,7 +65,7 @@ describe('ProjectsView', () => {
   it('shows an empty state when no projects are registered', async () => {
     getProjects.mockResolvedValueOnce([])
 
-    const wrapper = mount(ProjectsView)
+    const wrapper = await mountProjectsView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('No projects have been registered yet')
@@ -55,7 +75,7 @@ describe('ProjectsView', () => {
     getProjects.mockResolvedValueOnce([])
     createProject.mockResolvedValueOnce(project)
 
-    const wrapper = mount(ProjectsView)
+    const wrapper = await mountProjectsView()
     await flushPromises()
 
     await wrapper.find('#project-name').setValue('payments-service')
@@ -74,7 +94,7 @@ describe('ProjectsView', () => {
   it('shows an error message when loading projects fails', async () => {
     getProjects.mockRejectedValueOnce(new Error('network error'))
 
-    const wrapper = mount(ProjectsView)
+    const wrapper = await mountProjectsView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('We could not load the registered projects')

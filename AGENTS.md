@@ -155,6 +155,7 @@ Currently implemented routes include:
 
 - `POST /auth/login` with the local strategy.
 - `GET /auth/me` with JWT.
+- `GET /projects`, `GET /projects/:id`, `POST /projects`, and `PATCH /projects/:id` for registering and configuring projects (`PATCH` updates `repo` and the selected `tools`).
 - `GET /scans` and `GET /scans/:id` with project, date, status, and severity filters.
 - `GET /findings` and `GET /findings/:id` with type, severity, scan, and tool filters.
 - `GET /users`, `POST /users`, `PATCH /users/:id`, and `DELETE /users/:id`, protected for administrators.
