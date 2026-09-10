@@ -1,5 +1,6 @@
 <!-- apps/frontend/src/views/FindingsView.vue -->
 <script setup lang="ts">
+import { ChevronRight } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -26,12 +27,14 @@ onMounted(loadFindings)
 </script>
 
 <template>
-  <div class="p-8">
-    <p class="font-mono text-xs text-gray-500">~/ findings</p>
-    <h1 class="mt-1 text-2xl font-semibold text-white">Findings</h1>
-    <p class="mt-1 text-sm text-gray-400">Security findings normalized across all scans and tools.</p>
+  <div class="p-5 sm:p-8">
+    <div class="mb-6">
+      <p class="mb-2 font-mono text-xs text-gray-500">~/ findings</p>
+      <h1 class="text-xl font-semibold tracking-tight text-white md:text-2xl">Findings</h1>
+      <p class="mt-1 max-w-2xl text-sm text-gray-400">Every vulnerability normalized from SAST, secret and port scans.</p>
+    </div>
 
-    <div class="mt-6 rounded-lg border border-gray-800 bg-gray-900/30 p-5">
+    <div class="mb-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
       <FindingFilterBar v-model="filters" @apply="loadFindings" />
     </div>
 
@@ -39,14 +42,17 @@ onMounted(loadFindings)
       {{ errorMessage }}
     </p>
 
-    <div class="mt-4 overflow-hidden rounded-lg border border-gray-800">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-gray-900/50 text-[11px] text-gray-500">
+    <div class="overflow-x-auto rounded-lg border border-gray-800 bg-gray-900/40">
+      <table class="w-full min-w-[760px] text-left text-sm">
+        <thead class="text-xs uppercase tracking-wider text-gray-500">
           <tr>
-            <th class="px-4 py-3 font-medium">TYPE</th>
-            <th class="px-4 py-3 font-medium">SEVERITY</th>
-            <th class="px-4 py-3 font-medium">LOCATION</th>
-            <th class="px-4 py-3 font-medium">TOOL</th>
+            <th class="px-4 py-3 font-medium">Severity</th>
+            <th class="px-4 py-3 font-medium">Finding Type</th>
+            <th class="px-4 py-3 font-medium">File / Path</th>
+            <th class="px-4 py-3 font-medium">Line</th>
+            <th class="px-4 py-3 font-medium">Tool</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-2 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -57,21 +63,19 @@ onMounted(loadFindings)
             custom
             v-slot="{ navigate }"
           >
-            <tr class="cursor-pointer border-t border-gray-800 hover:bg-gray-900/40" @click="navigate">
-              <td class="px-4 py-3 text-gray-200">{{ finding.type }}</td>
+            <tr class="group cursor-pointer border-t border-gray-800/60 transition-colors hover:bg-gray-800/40" @click="navigate">
               <td class="px-4 py-3"><SeverityBadge :severity="finding.severity" /></td>
-              <td class="px-4 py-3 font-mono text-xs text-gray-500">
-                {{ finding.filePath ? `${finding.filePath}:${finding.line}` : '—' }}
-              </td>
-              <td class="px-4 py-3">
-                <span class="rounded border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-300">
-                  {{ finding.sourceTool }}
-                </span>
-              </td>
+              <td class="px-4 py-3"><span class="font-medium text-gray-200 hover:text-green-400">{{ finding.type }}</span></td>
+              <td class="px-4 py-3 font-mono text-xs text-cyan-400">{{ finding.filePath ?? '—' }}</td>
+              <td class="px-4 py-3 font-mono text-gray-500">{{ finding.line ?? '—' }}</td>
+              <td class="px-4 py-3 text-gray-400">{{ finding.sourceTool }}</td>
+              <td class="px-4 py-3"><span class="rounded border border-orange-500/25 bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-400">Open</span></td>
+              <td class="px-2 py-3 text-gray-500"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
             </tr>
           </RouterLink>
         </tbody>
       </table>
+      <p v-if="findings.length === 0" class="px-4 py-12 text-center text-sm text-gray-500">No findings match the selected filters.</p>
     </div>
   </div>
 </template>
