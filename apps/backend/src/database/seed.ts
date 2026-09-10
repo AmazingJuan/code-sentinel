@@ -3,7 +3,6 @@ import { DataSource } from 'typeorm';
 import { Project } from '../projects/project.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
-import 'dotenv/config';
 
 async function seed() {
   const dataSource = new DataSource({
