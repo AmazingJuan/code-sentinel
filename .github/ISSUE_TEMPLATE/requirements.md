@@ -1,10 +1,11 @@
 ---
+
 name: "Requirement"
 about: "Registrar un requisito funcional o no funcional de CodeSentinel"
 title: "[REQ] "
-labels: "propuesta"
+labels: ""
 assignees: ""
----
+-------------
 
 # Requirement
 
@@ -16,47 +17,26 @@ assignees: ""
 
 ---
 
-## Requirement Type
-
-- [ ] Functional Requirement
-- [ ] Non-Functional Requirement
-
----
-
 ## User Story
 
-**As a** [actor],  
-**I want** [functionality or characteristic],  
+**As a** [actor],
+**I want** [functionality or characteristic],
 **so that** [benefit or purpose].
 
 ---
 
 ## Requirement
 
-The system shall...
+The system shall [requirement].
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-- [ ] 
-
----
-
-## Type of Work
-
-- [ ] Feature
-- [ ] Backend
-- [ ] Frontend
-- [ ] Security
-- [ ] Integration
-- [ ] Architecture
-- [ ] Data
-- [ ] Infrastructure
-- [ ] Other
+* [ ]
+* [ ]
+* [ ]
+* [ ]
+* [ ]
 
 ---
