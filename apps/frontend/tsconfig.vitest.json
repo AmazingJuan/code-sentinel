@@ -9,8 +9,11 @@
   "compilerOptions": {
     // Vitest runs in a different environment than the application code.
     // Adjust lib and types accordingly.
+    // `pinia-plugin-persistedstate` is included so the `persist` store option
+    // (a global augmentation of Pinia's types) type-checks for any test that
+    // transitively imports a store, the same as it does under tsconfig.app.json.
     "lib": [],
-    "types": ["node", "jsdom"],
+    "types": ["node", "jsdom", "pinia-plugin-persistedstate"],
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
     // Specified here to keep it out of the root directory.

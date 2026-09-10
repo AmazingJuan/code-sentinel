@@ -16,7 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Overview', icon: LayoutGrid, routeName: 'overview' },
-  { label: 'Projects', icon: FolderKanban, routeName: null },
+  { label: 'Projects', icon: FolderKanban, routeName: 'project.index' },
   { label: 'Scan Reports', icon: FileText, routeName: 'scan.index' },
   { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index' },
   { label: 'Users', icon: UserRound, routeName: 'users' },
