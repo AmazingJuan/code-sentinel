@@ -25,8 +25,8 @@ export class Finding {
   @Column()
   type: string; // ej. 'SQL Injection', 'Hardcoded Secret', 'Open Port'
 
-  @Column({ type: 'varchar' })
-  severity: FindingSeverity;
+  @Column({ type: 'varchar', nullable: true })
+  severity: FindingSeverity | null;
 
   @Column({ type: 'varchar', nullable: true })
   filePath: string | null;
