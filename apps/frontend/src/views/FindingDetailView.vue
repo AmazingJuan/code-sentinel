@@ -1,5 +1,6 @@
 <!-- apps/frontend/src/views/FindingDetailView.vue -->
 <script setup lang="ts">
+import axios from 'axios'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -11,11 +12,18 @@ const route = useRoute()
 const finding = ref<FindingInterface | null>(null)
 const errorMessage = ref<string | null>(null)
 
+function extractErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error) && error.response?.status === 403) {
+    return 'You do not have access to this finding.'
+  }
+  return 'We could not load this finding.'
+}
+
 onMounted(async () => {
   try {
     finding.value = await FindingService.getFindingById(route.params.id as string)
-  } catch {
-    errorMessage.value = 'We could not load this finding.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error)
   }
 })
 </script>

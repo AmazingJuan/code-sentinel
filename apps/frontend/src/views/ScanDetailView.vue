@@ -1,5 +1,6 @@
 <!-- apps/frontend/src/views/ScanDetailView.vue -->
 <script setup lang="ts">
+import axios from 'axios'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -15,13 +16,20 @@ const scan = ref<ScanInterface | null>(null)
 const findings = ref<FindingInterface[]>([])
 const errorMessage = ref<string | null>(null)
 
+function extractErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error) && error.response?.status === 403) {
+    return 'You do not have access to this scan.'
+  }
+  return 'We could not load the details for this scan.'
+}
+
 onMounted(async () => {
   const id = route.params.id as string
   try {
     scan.value = await ScanService.getScanById(id)
     findings.value = await FindingService.getFindings({ scanId: id })
-  } catch {
-    errorMessage.value = 'We could not load the details for this scan.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error)
   }
 })
 </script>
