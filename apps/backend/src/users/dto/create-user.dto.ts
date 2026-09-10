@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 import { UserRole } from '../entities/user.entity';
 
 export class CreateUserDto {
@@ -7,6 +7,7 @@ export class CreateUserDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/, { message: 'name must contain a non-whitespace character' })
   name: string;
 
   @IsString()

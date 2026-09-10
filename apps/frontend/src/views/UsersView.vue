@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import axios from 'axios'
 import { onMounted, ref } from 'vue'
 import type { ManagedUser } from '@/interfaces/UserInterface'
 import { UserService } from '@/services/UserService'
 
 const users = ref<ManagedUser[]>([])
 const errorMessage = ref('')
+const successMessage = ref('')
 const isLoading = ref(false)
 const form = ref({ name: '', email: '', password: '', role: 'analyst' as ManagedUser['role'] })
 const editingUserId = ref<string | null>(null)
@@ -22,12 +24,19 @@ async function loadUsers(): Promise<void> {
 
 async function createUser(): Promise<void> {
   errorMessage.value = ''
+  successMessage.value = ''
   try {
     await UserService.create(form.value)
     form.value = { name: '', email: '', password: '', role: 'analyst' }
+    successMessage.value = 'User created successfully.'
     await loadUsers()
-  } catch {
-    errorMessage.value = 'We could not create this user.'
+  } catch (error) {
+    if (axios.isAxiosError<{ message?: string | string[] }>(error)) {
+      const message = error.response?.data?.message
+      errorMessage.value = Array.isArray(message) ? message.join(' ') : message ?? 'We could not create this user.'
+    } else {
+      errorMessage.value = 'We could not create this user.'
+    }
   }
 }
 
@@ -73,6 +82,7 @@ onMounted(loadUsers)
     <p class="mt-1 text-sm text-gray-500">Create and remove access to the Code Sentinel console.</p>
 
     <p v-if="errorMessage" class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">{{ errorMessage }}</p>
+    <p v-if="successMessage" class="mt-5 rounded-md border border-green-900 bg-green-950/40 px-4 py-2 text-sm text-green-300">{{ successMessage }}</p>
 
     <form class="mt-6 grid gap-3 rounded-lg border border-gray-800 bg-gray-900/30 p-5 sm:grid-cols-2" @submit.prevent="editingUserId ? saveUser() : createUser()">
       <input v-model="form.name" required placeholder="Name" class="rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white" />
