@@ -20,6 +20,12 @@ services:
       context: ./apps/backend
     ports:
       - "8000:3000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-code_sentinel}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-code_sentinel}
+      DB_NAME: ${POSTGRES_DB:-code_sentinel}
     depends_on:
       db:
         condition: service_healthy
