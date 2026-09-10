@@ -1,8 +1,10 @@
 // apps/backend/src/database/seed.ts
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { Project } from '../projects/project.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
+import { User } from '../users/entities/user.entity';
 
 async function seed() {
   const dataSource = new DataSource({
@@ -12,7 +14,7 @@ async function seed() {
     username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    entities: [Project, Scan, Finding],
+    entities: [User, Project, Scan, Finding],
     synchronize: true,
   });
 
@@ -21,11 +23,21 @@ async function seed() {
   const projectRepo = dataSource.getRepository(Project);
   const scanRepo = dataSource.getRepository(Scan);
   const findingRepo = dataSource.getRepository(Finding);
+  const userRepo = dataSource.getRepository(User);
 
   // Limpiar (orden importa por FKs)
   await dataSource.createQueryBuilder().delete().from(Finding).execute();
   await dataSource.createQueryBuilder().delete().from(Scan).execute();
   await dataSource.createQueryBuilder().delete().from(Project).execute();
+  await dataSource.createQueryBuilder().delete().from(User).execute();
+
+  await userRepo.save(
+    userRepo.create({
+      email: 'demo@code-sentinel.local',
+      name: 'Usuario Demo',
+      passwordHash: await bcrypt.hash('Demo1234!', 12),
+    }),
+  );
 
   const projectNames = ['code-sentinel', 'backend-api', 'frontend-app', 'payments-service'];
   const projects: Record<string, Project> = {};
@@ -96,7 +108,7 @@ async function seed() {
     }
   }
 
-  console.log('Seed completado.');
+  console.log('Seed completado. Usuario de prueba: demo@code-sentinel.local / Demo1234!');
   await dataSource.destroy();
 }
 

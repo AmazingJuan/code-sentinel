@@ -7,6 +7,8 @@ import { AppService } from './app.service';
 import { ScansModule } from './scans/scans.module';
 import { FindingsModule } from './findings/findings.module';
 import { ProjectsModule } from './projects/projects.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { ProjectsModule } from './projects/projects.module';
     ProjectsModule,
     ScansModule,
     FindingsModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

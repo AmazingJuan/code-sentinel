@@ -15,7 +15,7 @@ onMounted(async () => {
   try {
     finding.value = await FindingService.getFindingById(route.params.id as string)
   } catch {
-    errorMessage.value = 'No pudimos cargar este finding.'
+    errorMessage.value = 'We could not load this finding.'
   }
 })
 </script>

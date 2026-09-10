@@ -18,7 +18,7 @@ async function loadFindings(): Promise<void> {
   try {
     findings.value = await FindingService.getFindings(filters.value)
   } catch {
-    errorMessage.value = 'No pudimos cargar los findings.'
+    errorMessage.value = 'We could not load the findings.'
   }
 }
 
