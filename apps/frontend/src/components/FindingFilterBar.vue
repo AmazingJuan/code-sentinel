@@ -11,7 +11,7 @@ const labelClass = 'mb-1.5 block text-[11px] tracking-wide text-gray-500'
 </script>
 
 <template>
-  <div class="grid grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <div>
       <label :class="labelClass">SEVERITY</label>
       <select v-model="filters.severity" :class="selectClass" @change="$emit('apply')">

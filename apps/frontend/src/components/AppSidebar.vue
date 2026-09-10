@@ -5,6 +5,8 @@ import { RouterLink, useRoute } from 'vue-router'
 
 const route = useRoute()
 
+const emit = defineEmits<{ navigate: [] }>()
+
 interface NavItem {
   label: string
   icon: typeof LayoutGrid
@@ -12,7 +14,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Overview', icon: LayoutGrid, routeName: null },
+  { label: 'Overview', icon: LayoutGrid, routeName: 'overview' },
   { label: 'Projects', icon: FolderKanban, routeName: null },
   { label: 'Scan Reports', icon: FileText, routeName: 'scan.index' },
   { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index' },
@@ -48,6 +50,7 @@ function isActive(routeName: string): boolean {
             :to="{ name: item.routeName }"
             class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors"
             :class="isActive(item.routeName) ? 'bg-gray-800/70 text-white' : 'text-gray-400 hover:bg-gray-800/40 hover:text-gray-200'"
+            @click="emit('navigate')"
           >
             <component :is="item.icon" class="size-4" />
             {{ item.label }}

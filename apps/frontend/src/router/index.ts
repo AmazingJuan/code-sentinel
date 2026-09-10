@@ -5,6 +5,7 @@ import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import FindingDetailView from '@/views/FindingDetailView.vue'
 import FindingsView from '@/views/FindingsView.vue'
 import LoginView from '@/views/LoginView.vue'
+import OverviewView from '@/views/OverviewView.vue'
 import ScanDetailView from '@/views/ScanDetailView.vue'
 import ScansView from '@/views/ScansView.vue'
 import { AuthService } from '@/services/AuthService'
@@ -17,6 +18,12 @@ const router = createRouter({
       path: '/',
       component: DefaultLayout,
       children: [
+        {
+          path: 'overview',
+          name: 'overview',
+          component: OverviewView,
+          meta: { title: 'Security Overview', breadcrumb: 'overview' },
+        },
         {
           path: 'scan',
           name: 'scan.index',
@@ -54,7 +61,7 @@ router.beforeEach((to) => {
   }
 
   if (to.name === 'login' && isAuthenticated) {
-    return { name: 'scan.index' }
+    return { name: 'overview' }
   }
 })
 

@@ -24,7 +24,7 @@ async function onSubmit(): Promise<void> {
 
   try {
     await AuthService.login(email.value, password.value)
-    await router.push({ name: 'scan.index' })
+    await router.push({ name: 'overview' })
   } catch (error) {
     errorMessage.value = AuthService.getErrorMessage(error)
   } finally {

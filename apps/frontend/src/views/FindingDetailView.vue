@@ -27,7 +27,7 @@ onMounted(async () => {
     </p>
 
     <template v-else-if="finding">
-      <p class="font-mono text-xs text-gray-500">~/ findings/{{ finding.id }}</p>
+      <p class="font-mono text-xs text-gray-500">~/ findings</p>
       <div class="mt-1 flex items-center gap-3">
         <h1 class="text-2xl font-semibold text-white">{{ finding.type }}</h1>
         <SeverityBadge :severity="finding.severity" />
