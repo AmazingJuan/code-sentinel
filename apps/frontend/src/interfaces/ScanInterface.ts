@@ -3,6 +3,7 @@ import type { ProjectInterface } from './ProjectInterface'
 
 export type ScanStatus = 'completed' | 'failed'
 export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner'
+export const SCAN_TOOLS: ScanTool[] = ['SAST', 'Secret Scanner', 'Port Scanner']
 
 export interface ScanInterface {
   id: string

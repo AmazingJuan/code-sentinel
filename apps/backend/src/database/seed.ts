@@ -1,8 +1,11 @@
 // apps/backend/src/database/seed.ts
-import 'dotenv/config'; // ← agregar esta línea, se perdió en algún merge
+// This script runs standalone (outside Nest's bootstrap), so it must load
+// `.env` itself; `ConfigModule` only does this once the Nest app starts.
+import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Project } from '../projects/project.entity';
+import { ProjectAssignment } from '../projects/project-assignment.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
 import { User, UserRole } from '../users/entities/user.entity';
@@ -15,13 +18,14 @@ async function seed() {
     username: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    entities: [User, Project, Scan, Finding],
+    entities: [User, Project, ProjectAssignment, Scan, Finding],
     synchronize: true,
   });
 
   await dataSource.initialize();
 
   const projectRepo = dataSource.getRepository(Project);
+  const assignmentRepo = dataSource.getRepository(ProjectAssignment);
   const scanRepo = dataSource.getRepository(Scan);
   const findingRepo = dataSource.getRepository(Finding);
   const userRepo = dataSource.getRepository(User);
@@ -29,10 +33,11 @@ async function seed() {
   // Clear data (order matters because of foreign keys)
   await dataSource.createQueryBuilder().delete().from(Finding).execute();
   await dataSource.createQueryBuilder().delete().from(Scan).execute();
+  await dataSource.createQueryBuilder().delete().from(ProjectAssignment).execute();
   await dataSource.createQueryBuilder().delete().from(Project).execute();
   await dataSource.createQueryBuilder().delete().from(User).execute();
 
-  await userRepo.save(
+  const demoUser = await userRepo.save(
     userRepo.create({
       email: 'demo@code-sentinel.local',
       name: 'Demo User',
@@ -41,10 +46,40 @@ async function seed() {
     }),
   );
 
-  const projectNames = ['code-sentinel', 'backend-api', 'frontend-app', 'payments-service'];
+  // Non-admin user used to demonstrate RF-035 project assignment: it can
+  // only access the projects explicitly assigned to it below.
+  const analystUser = await userRepo.save(
+    userRepo.create({
+      email: 'analyst@code-sentinel.local',
+      name: 'Analyst User',
+      passwordHash: await bcrypt.hash('Analyst1234!', 12),
+      role: UserRole.ANALYST,
+    }),
+  );
+
+  const projectsData: Record<string, string> = {
+    'code-sentinel': 'git@github.com:code-sentinel/code-sentinel.git',
+    'backend-api': 'git@github.com:code-sentinel/backend-api.git',
+    'frontend-app': 'git@github.com:code-sentinel/frontend-app.git',
+    'payments-service': 'git@github.com:code-sentinel/payments-service.git',
+  };
   const projects: Record<string, Project> = {};
-  for (const name of projectNames) {
-    projects[name] = await projectRepo.save(projectRepo.create({ name }));
+  for (const [name, repo] of Object.entries(projectsData)) {
+    projects[name] = await projectRepo.save(projectRepo.create({ name, repo, userId: demoUser.id }));
+  }
+
+  // The registrant (the admin, here) is assigned to every project it
+  // registers, mirroring what ProjectsService.create does at runtime.
+  for (const project of Object.values(projects)) {
+    await assignmentRepo.save(assignmentRepo.create({ projectId: project.id, userId: demoUser.id }));
+  }
+
+  // Assign the analyst to only two of the four projects, so logging in as
+  // that user demonstrates RF-035's access restriction: it will see
+  // "code-sentinel" and "backend-api", but not "frontend-app" or
+  // "payments-service".
+  for (const name of ['code-sentinel', 'backend-api']) {
+    await assignmentRepo.save(assignmentRepo.create({ projectId: projects[name].id, userId: analystUser.id }));
   }
 
   const scansData = [
@@ -110,7 +145,9 @@ async function seed() {
     }
   }
 
-  console.log('Seed completed. Test user: demo@code-sentinel.local / Demo1234!');
+  console.log('Seed completed.');
+  console.log('Admin user (sees every project): demo@code-sentinel.local / Demo1234!');
+  console.log('Analyst user (sees only code-sentinel and backend-api): analyst@code-sentinel.local / Analyst1234!');
   await dataSource.destroy();
 }
 
