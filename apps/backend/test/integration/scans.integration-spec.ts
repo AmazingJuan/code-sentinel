@@ -75,4 +75,26 @@ describe('Scans — integración (Controller + Service)', (): void => {
 
     expect(response.status).toBe(404);
   });
+
+  describe('RF-027 — findings correspondientes solo al scan seleccionado', (): void => {
+  it('GET /scans/:id debe retornar únicamente los findings de ese scan, no de otros', async (): Promise<void> => {
+    const scanWithScopedFindings = {
+      ...mockScans[0],
+      findings: [{ id: 'f1', scanId: '1', type: 'Hardcoded Secret', severity: 'critical' }],
+    };
+    mockRepository.findOne.mockResolvedValueOnce(scanWithScopedFindings);
+
+    const response = await request(app.getHttpServer()).get('/scans/1');
+
+    expect(response.body.findings).toHaveLength(1);
+    expect(response.body.findings.every((f: { scanId: string }) => f.scanId === '1')).toBe(true);
+  });
+
+  it('GET /scans/:id debe retornar findings: [] cuando el scan no tiene hallazgos', async (): Promise<void> => {
+    mockRepository.findOne.mockResolvedValueOnce({ ...mockScans[0], findings: [] });
+
+    const response = await request(app.getHttpServer()).get('/scans/1');
+
+    expect(response.body.findings).toEqual([]);
+  });
 });
