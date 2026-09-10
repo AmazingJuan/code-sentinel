@@ -1,7 +1,8 @@
 <!-- apps/frontend/src/components/AppSidebar.vue -->
 <script setup lang="ts">
-import { FileText, FolderKanban, LayoutGrid, Settings, ShieldAlert, Terminal, Wrench } from 'lucide-vue-next'
+import { FileText, FolderKanban, LayoutGrid, Settings, ShieldAlert, Terminal, UserRound, Wrench } from 'lucide-vue-next'
 import { RouterLink, useRoute } from 'vue-router'
+import { AuthService } from '@/services/AuthService'
 
 const route = useRoute()
 
@@ -18,6 +19,7 @@ const navItems: NavItem[] = [
   { label: 'Projects', icon: FolderKanban, routeName: null },
   { label: 'Scan Reports', icon: FileText, routeName: 'scan.index' },
   { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index' },
+  { label: 'Users', icon: UserRound, routeName: 'users' },
   { label: 'Security Tools', icon: Wrench, routeName: null },
   { label: 'Settings', icon: Settings, routeName: null },
 ]
@@ -44,7 +46,7 @@ function isActive(routeName: string): boolean {
 
       <p class="mb-2 px-2 text-[10px] font-medium tracking-wider text-gray-500">NAVIGATION</p>
       <nav class="flex flex-col gap-0.5">
-        <template v-for="item in navItems" :key="item.label">
+        <template v-for="item in navItems.filter((item) => item.routeName !== 'users' || AuthService.getUser()?.role === 'admin')" :key="item.label">
           <RouterLink
             v-if="item.routeName"
             :to="{ name: item.routeName }"

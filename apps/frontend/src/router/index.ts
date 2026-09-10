@@ -9,6 +9,7 @@ import OverviewView from '@/views/OverviewView.vue'
 import ScanDetailView from '@/views/ScanDetailView.vue'
 import ScansView from '@/views/ScansView.vue'
 import { AuthService } from '@/services/AuthService'
+import UsersView from '@/views/UsersView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -48,6 +49,12 @@ const router = createRouter({
           component: FindingDetailView,
           meta: { title: 'Finding Detail', breadcrumb: 'findings/detail' },
         },
+        {
+          path: 'users',
+          name: 'users',
+          component: UsersView,
+          meta: { title: 'User Management', breadcrumb: 'users', adminOnly: true },
+        },
       ],
     },
   ],
@@ -61,6 +68,10 @@ router.beforeEach((to) => {
   }
 
   if (to.name === 'login' && isAuthenticated) {
+    return { name: 'overview' }
+  }
+
+  if (to.meta.adminOnly && AuthService.getUser()?.role !== 'admin') {
     return { name: 'overview' }
   }
 })

@@ -1,9 +1,11 @@
 // apps/backend/src/findings/findings.controller.ts
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FindingsService } from './findings.service';
 import { Finding } from './finding.entity';
 
 @Controller('findings')
+@UseGuards(JwtAuthGuard)
 export class FindingsController {
   constructor(private readonly findingsService: FindingsService) {}
 

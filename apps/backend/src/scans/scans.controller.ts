@@ -1,9 +1,11 @@
 // apps/backend/src/scans/scans.controller.ts
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ScansService } from './scans.service';
 import { Scan } from './scan.entity';
 
 @Controller('scans')
+@UseGuards(JwtAuthGuard)
 export class ScansController {
   constructor(private readonly scansService: ScansService) {}
 
