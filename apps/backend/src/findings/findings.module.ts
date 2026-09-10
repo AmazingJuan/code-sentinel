@@ -4,9 +4,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Finding } from './finding.entity';
 import { FindingsService } from './findings.service';
 import { FindingsController } from './findings.controller';
+import { ProjectsModule } from '../projects/projects.module';
+import { ScansModule } from '../scans/scans.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Finding])],
+  imports: [TypeOrmModule.forFeature([Finding]), ProjectsModule, ScansModule],
   controllers: [FindingsController],
   providers: [FindingsService],
 })

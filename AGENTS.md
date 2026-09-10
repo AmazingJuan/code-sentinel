@@ -155,9 +155,10 @@ Currently implemented routes include:
 
 - `POST /auth/login` with the local strategy.
 - `GET /auth/me` with JWT.
-- `GET /projects`, `GET /projects/:id`, `POST /projects`, and `PATCH /projects/:id` for registering and configuring projects (`PATCH` updates `repo` and the selected `tools`).
-- `GET /scans` and `GET /scans/:id` with project, date, status, and severity filters.
-- `GET /findings` and `GET /findings/:id` with type, severity, scan, and tool filters.
+- `GET /projects`, `GET /projects/:id`, `POST /projects`, and `PATCH /projects/:id` for registering and configuring projects (`PATCH` updates `repo` and the selected `tools`). `GET /projects` and `GET /projects/:id` are scoped to the requester's assigned projects unless they are an administrator.
+- `GET /projects/:id/assignments`, `POST /projects/:id/assignments`, and `DELETE /projects/:id/assignments/:userId`, protected for administrators, to assign and unassign users on a project. Registering a project automatically assigns its registrant.
+- `GET /scans` and `GET /scans/:id` with project, date, status, and severity filters, scoped to the requester's assigned projects unless they are an administrator.
+- `GET /findings` and `GET /findings/:id` with type, severity, scan, and tool filters, scoped to the requester's assigned projects unless they are an administrator.
 - `GET /users`, `POST /users`, `PATCH /users/:id`, and `DELETE /users/:id`, protected for administrators.
 
 `main.ts` enables CORS and a global `ValidationPipe` with `whitelist` and `forbidNonWhitelisted`. Preserve these protections when extending the API. Use `JwtAuthGuard` for authenticated resources and `RolesGuard`/`@Roles` for role authorization.
