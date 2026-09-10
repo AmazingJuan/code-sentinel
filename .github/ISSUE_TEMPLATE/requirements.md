@@ -38,5 +38,3 @@ The system shall [requirement].
 * [ ]
 * [ ]
 * [ ]
-
----
