@@ -1,0 +1,22 @@
+[
+ {
+  "RuleID": "github-pat",
+  "Description": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access and sensitive content exposure.",
+  "StartLine": 1,
+  "EndLine": 1,
+  "StartColumn": 29,
+  "EndColumn": 68,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "/repo/spike/fixtures/fake-secret.ts",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 5.221928,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "/repo/spike/fixtures/fake-secret.ts:github-pat:1"
+ }
+]

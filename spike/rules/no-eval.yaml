@@ -1,0 +1,6 @@
+rules:
+  - id: no-eval
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: eval() con datos externos permite ejecutar código arbitrario
+    pattern: eval($X)

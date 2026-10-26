@@ -65,3 +65,5 @@ CodeSentinel_Requisitos_completos_y_plan.md
 
 # Vite
 *.timestamp-*-*.mjs
+spike/fixtures/fake-secret.ts
+spike/results/gitleaks-repo.json
