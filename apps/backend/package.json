@@ -83,7 +83,8 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@nestjs/typeorm$": "<rootDir>/__mocks__/nestjs-typeorm.ts"
+      "^@nestjs/typeorm$": "<rootDir>/__mocks__/nestjs-typeorm.ts",
+      "^@nestjs/passport$": "<rootDir>/__mocks__/nestjs-passport.ts"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
