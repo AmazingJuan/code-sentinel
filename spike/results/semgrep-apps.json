@@ -1,0 +1,167 @@
+{
+    "version": "1.181.1",
+    "results": [],
+    "errors": [],
+    "paths": {
+        "scanned": [
+            "target/backend/__mocks__/nestjs-typeorm.ts",
+            "target/backend/app.controller.spec.ts",
+            "target/backend/app.controller.ts",
+            "target/backend/app.module.ts",
+            "target/backend/app.service.ts",
+            "target/backend/auth/auth.controller.ts",
+            "target/backend/auth/auth.module.ts",
+            "target/backend/auth/auth.service.ts",
+            "target/backend/auth/decorators/roles.decorator.ts",
+            "target/backend/auth/dto/login.dto.ts",
+            "target/backend/auth/guards/jwt-auth.guard.ts",
+            "target/backend/auth/guards/local-auth.guard.ts",
+            "target/backend/auth/guards/roles.guard.ts",
+            "target/backend/auth/strategies/jwt.strategy.ts",
+            "target/backend/auth/strategies/local.strategy.ts",
+            "target/backend/database/seed.ts",
+            "target/backend/findings/finding.entity.ts",
+            "target/backend/findings/findings.controller.ts",
+            "target/backend/findings/findings.module.ts",
+            "target/backend/findings/findings.service.spec.ts",
+            "target/backend/findings/findings.service.ts",
+            "target/backend/main.ts",
+            "target/backend/projects/dto/assign-project.dto.ts",
+            "target/backend/projects/dto/create-project.dto.ts",
+            "target/backend/projects/dto/update-project.dto.ts",
+            "target/backend/projects/project-assignment.entity.ts",
+            "target/backend/projects/project.entity.ts",
+            "target/backend/projects/projects.controller.ts",
+            "target/backend/projects/projects.module.ts",
+            "target/backend/projects/projects.service.spec.ts",
+            "target/backend/projects/projects.service.ts",
+            "target/backend/scans/scan.entity.ts",
+            "target/backend/scans/scans.controller.ts",
+            "target/backend/scans/scans.module.ts",
+            "target/backend/scans/scans.service.spec.ts",
+            "target/backend/scans/scans.service.ts",
+            "target/backend/types/requesting-user.type.ts",
+            "target/backend/users/dto/create-user.dto.ts",
+            "target/backend/users/dto/update-user.dto.ts",
+            "target/backend/users/entities/user.entity.ts",
+            "target/backend/users/users.controller.ts",
+            "target/backend/users/users.module.ts",
+            "target/backend/users/users.service.ts",
+            "target/frontend/App.vue",
+            "target/frontend/__tests__/App.spec.ts",
+            "target/frontend/__tests__/FindingDetailView.spec.ts",
+            "target/frontend/__tests__/ProjectDetailView.spec.ts",
+            "target/frontend/__tests__/ProjectsView.spec.ts",
+            "target/frontend/__tests__/ScanDetailView.spec.ts",
+            "target/frontend/components/AppHeader.vue",
+            "target/frontend/components/AppSidebar.vue",
+            "target/frontend/components/FindingFilterBar.vue",
+            "target/frontend/components/ProjectAssignmentsPanel.vue",
+            "target/frontend/components/ScanFilterBar.vue",
+            "target/frontend/components/SeverityBadge.vue",
+            "target/frontend/components/StatusBadge.vue",
+            "target/frontend/components/TerminalWindow.vue",
+            "target/frontend/interfaces/AuthInterface.ts",
+            "target/frontend/interfaces/FindingFiltersInterface.ts",
+            "target/frontend/interfaces/FindingInterface.ts",
+            "target/frontend/interfaces/ProjectAssignmentInterface.ts",
+            "target/frontend/interfaces/ProjectInterface.ts",
+            "target/frontend/interfaces/ScanFiltersInterface.ts",
+            "target/frontend/interfaces/ScanInterface.ts",
+            "target/frontend/interfaces/UserInterface.ts",
+            "target/frontend/layouts/DefaultLayout.vue",
+            "target/frontend/main.ts",
+            "target/frontend/router/index.ts",
+            "target/frontend/services/AuthService.ts",
+            "target/frontend/services/FindingService.ts",
+            "target/frontend/services/ProjectService.ts",
+            "target/frontend/services/ScanService.ts",
+            "target/frontend/services/UserService.ts",
+            "target/frontend/services/httpClient.ts",
+            "target/frontend/stores/authStore.ts",
+            "target/frontend/stores/counter.ts",
+            "target/frontend/views/FindingDetailView.vue",
+            "target/frontend/views/FindingsView.vue",
+            "target/frontend/views/LoginView.vue",
+            "target/frontend/views/OverviewView.vue",
+            "target/frontend/views/ProjectDetailView.vue",
+            "target/frontend/views/ProjectsView.vue",
+            "target/frontend/views/ScanDetailView.vue",
+            "target/frontend/views/ScansView.vue",
+            "target/frontend/views/UsersView.vue"
+        ]
+    },
+    "time": {
+        "rules": [],
+        "rules_parse_time": 0.25971078872680664,
+        "profiling_times": {
+            "config_time": 0.6806695461273193,
+            "core_time": 4.152804613113403,
+            "ignores_time": 0.00010752677917480469,
+            "total_time": 4.851909637451172
+        },
+        "parsing_time": {
+            "total_time": 0.0,
+            "per_file_time": {
+                "mean": 0.0,
+                "std_dev": 0.0
+            },
+            "very_slow_stats": {
+                "time_ratio": 0.0,
+                "count_ratio": 0.0
+            },
+            "very_slow_files": []
+        },
+        "scanning_time": {
+            "total_time": 0.9926590919494629,
+            "per_file_time": {
+                "mean": 0.011678342258228974,
+                "std_dev": 3.6617653217300045e-06
+            },
+            "very_slow_stats": {
+                "time_ratio": 0.0,
+                "count_ratio": 0.0
+            },
+            "very_slow_files": []
+        },
+        "matching_time": {
+            "total_time": 0.0,
+            "per_file_and_rule_time": {
+                "mean": 0.0,
+                "std_dev": 0.0
+            },
+            "very_slow_stats": {
+                "time_ratio": 0.0,
+                "count_ratio": 0.0
+            },
+            "very_slow_rules_on_files": []
+        },
+        "tainting_time": {
+            "total_time": 0.0,
+            "per_def_and_rule_time": {
+                "mean": 0.0,
+                "std_dev": 0.0
+            },
+            "very_slow_stats": {
+                "time_ratio": 0.0,
+                "count_ratio": 0.0
+            },
+            "very_slow_rules_on_defs": []
+        },
+        "fixpoint_timeouts": [],
+        "prefiltering": {
+            "project_level_time": 0.0,
+            "file_level_time": 0.0,
+            "rules_with_project_prefilters_ratio": 0.0,
+            "rules_with_file_prefilters_ratio": 1.0,
+            "rules_selected_ratio": 0.0,
+            "rules_matched_ratio": 0.0
+        },
+        "targets": [],
+        "total_bytes": 0,
+        "max_memory_bytes": 101352448
+    },
+    "engine_requested": "OSS",
+    "skipped_rules": [],
+    "profiling_results": []
+}
