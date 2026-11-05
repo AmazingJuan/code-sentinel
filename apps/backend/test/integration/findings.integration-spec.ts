@@ -2,11 +2,15 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 
+import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { Finding } from '../../src/findings/finding.entity';
 import { FindingsController } from '../../src/findings/findings.controller';
 import { FindingsService } from '../../src/findings/findings.service';
+import { ProjectsService } from '../../src/projects/projects.service';
+import { ScansService } from '../../src/scans/scans.service';
+import { fakeJwtAuthGuard } from './fake-jwt-auth.guard';
 
 describe('Findings — integración (Controller + Service)', (): void => {
   let app: INestApplication;
@@ -28,14 +32,28 @@ describe('Findings — integración (Controller + Service)', (): void => {
     findOne: jest.fn().mockResolvedValue(mockFindings[0]),
   };
 
-  beforeAll(async () => {
+  const mockProjectsService = {
+    getAccessibleProjectIds: jest.fn().mockResolvedValue(['p1']),
+  };
+
+  const mockScansService = {
+    findScanIdsForProjects: jest.fn().mockResolvedValue(['s1']),
+    findProjectIdForScan: jest.fn().mockResolvedValue('p1'),
+  };
+
+  beforeAll(async (): Promise<void> => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [FindingsController],
       providers: [
         FindingsService,
         { provide: getRepositoryToken(Finding), useValue: mockRepository },
+        { provide: ProjectsService, useValue: mockProjectsService },
+        { provide: ScansService, useValue: mockScansService },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(fakeJwtAuthGuard)
+      .compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -53,17 +71,23 @@ describe('Findings — integración (Controller + Service)', (): void => {
   });
 
   it('GET /findings?severity=critical debe pasar el filtro al service', async (): Promise<void> => {
-    await request(app.getHttpServer()).get('/findings').query({ severity: 'critical' });
+    await request(app.getHttpServer())
+      .get('/findings')
+      .query({ severity: 'critical' });
 
     expect(mockRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ severity: 'critical' }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ severity: 'critical' }),
+      }),
     );
   });
 
   it('GET /findings/:id debe retornar 404 cuando el finding no existe', async (): Promise<void> => {
     mockRepository.findOne.mockResolvedValueOnce(null);
 
-    const response = await request(app.getHttpServer()).get('/findings/no-existe');
+    const response = await request(app.getHttpServer()).get(
+      '/findings/no-existe',
+    );
 
     expect(response.status).toBe(404);
   });

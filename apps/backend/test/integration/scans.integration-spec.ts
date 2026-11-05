@@ -2,11 +2,14 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import * as request from 'supertest';
+import request from 'supertest';
 
+import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
+import { ProjectsService } from '../../src/projects/projects.service';
 import { Scan } from '../../src/scans/scan.entity';
 import { ScansController } from '../../src/scans/scans.controller';
 import { ScansService } from '../../src/scans/scans.service';
+import { fakeJwtAuthGuard } from './fake-jwt-auth.guard';
 
 describe('Scans — integración (Controller + Service)', (): void => {
   let app: INestApplication;
@@ -31,11 +34,22 @@ describe('Scans — integración (Controller + Service)', (): void => {
     findOne: jest.fn().mockResolvedValue(mockScans[0]),
   };
 
-  beforeAll(async () => {
+  const mockProjectsService = {
+    getAccessibleProjectIds: jest.fn().mockResolvedValue(['p1']),
+  };
+
+  beforeAll(async (): Promise<void> => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [ScansController],
-      providers: [ScansService, { provide: getRepositoryToken(Scan), useValue: mockRepository }],
-    }).compile();
+      providers: [
+        ScansService,
+        { provide: getRepositoryToken(Scan), useValue: mockRepository },
+        { provide: ProjectsService, useValue: mockProjectsService },
+      ],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(fakeJwtAuthGuard)
+      .compile();
 
     app = moduleRef.createNestApplication();
     await app.init();
@@ -54,10 +68,14 @@ describe('Scans — integración (Controller + Service)', (): void => {
   });
 
   it('GET /scans?status=completed debe pasar el filtro al service', async (): Promise<void> => {
-    await request(app.getHttpServer()).get('/scans').query({ status: 'completed' });
+    await request(app.getHttpServer())
+      .get('/scans')
+      .query({ status: 'completed' });
 
     expect(mockRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'completed' }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'completed' }),
+      }),
     );
   });
 
@@ -77,24 +95,39 @@ describe('Scans — integración (Controller + Service)', (): void => {
   });
 
   describe('RF-027 — findings correspondientes solo al scan seleccionado', (): void => {
-  it('GET /scans/:id debe retornar únicamente los findings de ese scan, no de otros', async (): Promise<void> => {
-    const scanWithScopedFindings = {
-      ...mockScans[0],
-      findings: [{ id: 'f1', scanId: '1', type: 'Hardcoded Secret', severity: 'critical' }],
-    };
-    mockRepository.findOne.mockResolvedValueOnce(scanWithScopedFindings);
+    it('GET /scans/:id debe retornar únicamente los findings de ese scan, no de otros', async (): Promise<void> => {
+      const scanWithScopedFindings = {
+        ...mockScans[0],
+        findings: [
+          {
+            id: 'f1',
+            scanId: '1',
+            type: 'Hardcoded Secret',
+            severity: 'critical',
+          },
+        ],
+      };
+      mockRepository.findOne.mockResolvedValueOnce(scanWithScopedFindings);
 
-    const response = await request(app.getHttpServer()).get('/scans/1');
+      const response = await request(app.getHttpServer()).get('/scans/1');
 
-    expect(response.body.findings).toHaveLength(1);
-    expect(response.body.findings.every((f: { scanId: string }) => f.scanId === '1')).toBe(true);
-  });
+      expect(response.body.findings).toHaveLength(1);
+      expect(
+        response.body.findings.every(
+          (f: { scanId: string }) => f.scanId === '1',
+        ),
+      ).toBe(true);
+    });
 
-  it('GET /scans/:id debe retornar findings: [] cuando el scan no tiene hallazgos', async (): Promise<void> => {
-    mockRepository.findOne.mockResolvedValueOnce({ ...mockScans[0], findings: [] });
+    it('GET /scans/:id debe retornar findings: [] cuando el scan no tiene hallazgos', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        ...mockScans[0],
+        findings: [],
+      });
 
-    const response = await request(app.getHttpServer()).get('/scans/1');
+      const response = await request(app.getHttpServer()).get('/scans/1');
 
-    expect(response.body.findings).toEqual([]);
+      expect(response.body.findings).toEqual([]);
+    });
   });
 });
