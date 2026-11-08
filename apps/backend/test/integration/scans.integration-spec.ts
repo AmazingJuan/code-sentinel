@@ -9,7 +9,7 @@ import { ProjectsService } from '../../src/projects/projects.service';
 import { Scan } from '../../src/scans/scan.entity';
 import { ScansController } from '../../src/scans/scans.controller';
 import { ScansService } from '../../src/scans/scans.service';
-import { fakeJwtAuthGuard } from './fake-jwt-auth.guard';
+import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
 describe('Scans — integración (Controller + Service)', (): void => {
   let app: INestApplication;
@@ -128,6 +128,27 @@ describe('Scans — integración (Controller + Service)', (): void => {
       const response = await request(app.getHttpServer()).get('/scans/1');
 
       expect(response.body.findings).toEqual([]);
+    });
+  });
+
+  describe('RF-032 — el administrador no accede a los scans', (): void => {
+    it('GET /scans como admin debe retornar 403 sin consultar la base de datos', async (): Promise<void> => {
+      mockRepository.find.mockClear();
+
+      const response = await request(app.getHttpServer())
+        .get('/scans')
+        .set(TEST_ROLE_HEADER, 'admin');
+
+      expect(response.status).toBe(403);
+      expect(mockRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('GET /scans/:id como admin debe retornar 403', async (): Promise<void> => {
+      const response = await request(app.getHttpServer())
+        .get('/scans/1')
+        .set(TEST_ROLE_HEADER, 'admin');
+
+      expect(response.status).toBe(403);
     });
   });
 });
