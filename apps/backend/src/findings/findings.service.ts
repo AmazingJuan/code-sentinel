@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
-import { Finding } from './finding.entity';
+import { Finding, FindingSeverity } from './finding.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { ScansService } from '../scans/scans.service';
 import { RequestingUser } from '../types/requesting-user.type';
@@ -33,29 +33,24 @@ export class FindingsService {
   ): Promise<Finding[]> {
     const where: FindOptionsWhere<Finding> = {};
     if (filters.type) where.type = filters.type;
-    if (filters.severity)
-      where.severity = filters.severity as Finding['severity'];
+    if (filters.severity) where.severity = filters.severity as FindingSeverity;
     if (filters.sourceTool) where.sourceTool = filters.sourceTool;
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);
-    if (accessibleProjectIds !== null) {
-      if (filters.scanId) {
-        const scanProjectId = await this.scansService.findProjectIdForScan(
-          filters.scanId,
-        );
-        if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId))
-          return [];
-        where.scanId = filters.scanId;
-      } else {
-        if (accessibleProjectIds.length === 0) return [];
-        const accessibleScanIds =
-          await this.scansService.findScanIdsForProjects(accessibleProjectIds);
-        if (accessibleScanIds.length === 0) return [];
-        where.scanId = In(accessibleScanIds);
-      }
-    } else if (filters.scanId) {
+    if (filters.scanId) {
+      const scanProjectId = await this.scansService.findProjectIdForScan(
+        filters.scanId,
+      );
+      if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId))
+        return [];
       where.scanId = filters.scanId;
+    } else {
+      if (accessibleProjectIds.length === 0) return [];
+      const accessibleScanIds =
+        await this.scansService.findScanIdsForProjects(accessibleProjectIds);
+      if (accessibleScanIds.length === 0) return [];
+      where.scanId = In(accessibleScanIds);
     }
 
     return this.findingRepository.find({ where, order: { severity: 'ASC' } });
@@ -67,13 +62,11 @@ export class FindingsService {
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);
-    if (accessibleProjectIds !== null) {
-      const scanProjectId = await this.scansService.findProjectIdForScan(
-        finding.scanId,
-      );
-      if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId)) {
-        throw new ForbiddenException('You are not assigned to this project');
-      }
+    const scanProjectId = await this.scansService.findProjectIdForScan(
+      finding.scanId,
+    );
+    if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId)) {
+      throw new ForbiddenException('You are not assigned to this project');
     }
 
     return finding;
