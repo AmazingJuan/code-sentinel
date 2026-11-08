@@ -170,16 +170,11 @@ describe('ProjectsService', () => {
   });
 
   describe('findAll', () => {
-    it('returns every project for an administrator', async () => {
-      const projects = [{ id: 'project-1' }] as Project[];
-      projectsRepository.find.mockResolvedValue(projects);
-
+    it('returns no projects for an administrator (RF-032)', async () => {
       const result = await service.findAll(admin);
 
-      expect(projectsRepository.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' },
-      });
-      expect(result).toBe(projects);
+      expect(projectsRepository.find).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
 
     it('returns only the assigned projects for a non-administrator', async () => {
@@ -211,14 +206,32 @@ describe('ProjectsService', () => {
     });
   });
 
+  describe('findDirectory', () => {
+    it('returns only id and name of every project, sorted by name', async () => {
+      const directory = [
+        { id: 'project-1', name: 'code-sentinel' },
+      ] as Project[];
+      projectsRepository.find.mockResolvedValue(directory);
+
+      const result = await service.findDirectory();
+
+      expect(projectsRepository.find).toHaveBeenCalledWith({
+        select: { id: true, name: true },
+        order: { name: 'ASC' },
+      });
+      expect(result).toBe(directory);
+    });
+  });
+
   describe('findById', () => {
-    it('returns the matching project for an administrator', async () => {
-      const project = { id: 'project-1', name: 'code-sentinel' } as Project;
-      projectsRepository.findOne.mockResolvedValue(project);
+    it('throws Forbidden for an administrator (RF-032)', async () => {
+      projectsRepository.findOne.mockResolvedValue({
+        id: 'project-1',
+      } as Project);
 
-      const result = await service.findById('project-1', admin);
-
-      expect(result).toBe(project);
+      await expect(service.findById('project-1', admin)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('returns the project for a user assigned to it', async () => {
@@ -247,14 +260,14 @@ describe('ProjectsService', () => {
     it('throws when the project does not exist', async () => {
       projectsRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findById('missing', admin)).rejects.toBeInstanceOf(
+      await expect(service.findById('missing', analyst)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
   });
 
   describe('update', () => {
-    it('updates the repo and tools of an existing project for an administrator', async () => {
+    it('updates the repo and tools of an existing project for an assigned analyst', async () => {
       const project = {
         id: 'project-1',
         name: 'code-sentinel',
@@ -262,6 +275,9 @@ describe('ProjectsService', () => {
         tools: ['SAST'],
       } as Project;
       projectsRepository.findOne.mockResolvedValue(project);
+      assignmentsRepository.find.mockResolvedValue([
+        { projectId: 'project-1' } as ProjectAssignment,
+      ]);
 
       const result = await service.update(
         'project-1',
@@ -269,7 +285,7 @@ describe('ProjectsService', () => {
           repo: '  git@github.com:org/new.git  ',
           tools: ['SAST', 'Secret Scanner'],
         },
-        admin,
+        analyst,
       );
 
       expect(projectsRepository.save).toHaveBeenCalledWith(
@@ -293,8 +309,11 @@ describe('ProjectsService', () => {
         tools: ['SAST', 'Port Scanner'],
       } as Project;
       projectsRepository.findOne.mockResolvedValue(project);
+      assignmentsRepository.find.mockResolvedValue([
+        { projectId: 'project-1' } as ProjectAssignment,
+      ]);
 
-      await service.update('project-1', {}, admin);
+      await service.update('project-1', {}, analyst);
 
       expect(projectsRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -327,7 +346,7 @@ describe('ProjectsService', () => {
         service.update(
           'missing',
           { repo: 'git@github.com:org/repo.git' },
-          admin,
+          analyst,
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(projectsRepository.save).not.toHaveBeenCalled();
@@ -453,10 +472,10 @@ describe('ProjectsService', () => {
   });
 
   describe('getAccessibleProjectIds', () => {
-    it('returns null for an administrator, meaning unrestricted access', async () => {
+    it('returns an empty list for an administrator (RF-032)', async () => {
       const result = await service.getAccessibleProjectIds(admin);
 
-      expect(result).toBeNull();
+      expect(result).toEqual([]);
       expect(assignmentsRepository.find).not.toHaveBeenCalled();
     });
 

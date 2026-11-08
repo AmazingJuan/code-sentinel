@@ -10,7 +10,7 @@ import { FindingsController } from '../../src/findings/findings.controller';
 import { FindingsService } from '../../src/findings/findings.service';
 import { ProjectsService } from '../../src/projects/projects.service';
 import { ScansService } from '../../src/scans/scans.service';
-import { fakeJwtAuthGuard } from './fake-jwt-auth.guard';
+import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
 describe('Findings — integración (Controller + Service)', (): void => {
   let app: INestApplication;
@@ -90,5 +90,26 @@ describe('Findings — integración (Controller + Service)', (): void => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  describe('RF-032 — el administrador no accede a los findings', (): void => {
+    it('GET /findings como admin debe retornar 403 sin consultar la base de datos', async (): Promise<void> => {
+      mockRepository.find.mockClear();
+
+      const response = await request(app.getHttpServer())
+        .get('/findings')
+        .set(TEST_ROLE_HEADER, 'admin');
+
+      expect(response.status).toBe(403);
+      expect(mockRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('GET /findings/:id como admin debe retornar 403', async (): Promise<void> => {
+      const response = await request(app.getHttpServer())
+        .get('/findings/f1')
+        .set(TEST_ROLE_HEADER, 'admin');
+
+      expect(response.status).toBe(403);
+    });
   });
 });
