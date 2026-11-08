@@ -20,6 +20,12 @@ export type PublicProjectAssignment = Omit<ProjectAssignment, 'user'> & {
   user: Omit<User, 'passwordHash'>;
 };
 
+/**
+ * Minimal view of a project for the administrator (RF-032 + RF-035): just
+ * enough to assign it to users, without any security content.
+ */
+export type ProjectDirectoryEntry = Pick<Project, 'id' | 'name'>;
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -68,15 +74,20 @@ export class ProjectsService {
 
   async findAll(requester: RequestingUser): Promise<Project[]> {
     const accessibleProjectIds = await this.getAccessibleProjectIds(requester);
-    if (accessibleProjectIds === null) {
-      return this.projectsRepository.find({ order: { createdAt: 'DESC' } });
-    }
     if (accessibleProjectIds.length === 0) {
       return [];
     }
     return this.projectsRepository.find({
       where: { id: In(accessibleProjectIds) },
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  /** Id and name of every project, for the administrator's assignment view. */
+  findDirectory(): Promise<ProjectDirectoryEntry[]> {
+    return this.projectsRepository.find({
+      select: { id: true, name: true },
+      order: { name: 'ASC' },
     });
   }
 
@@ -157,16 +168,13 @@ export class ProjectsService {
   }
 
   /**
-   * Returns the ids of the projects the requester is authorized to access:
-   * `null` means no restriction applies (administrators can access every
-   * project), while an array (possibly empty) lists the assigned project ids
-   * for any other role.
+   * Returns the ids of the projects whose security content the requester may
+   * access. Administrators always get an empty list (RF-032): they manage
+   * identities, never projects, scans, findings or reports.
    */
-  async getAccessibleProjectIds(
-    requester: RequestingUser,
-  ): Promise<string[] | null> {
+  async getAccessibleProjectIds(requester: RequestingUser): Promise<string[]> {
     if (requester.role === UserRole.ADMIN) {
-      return null;
+      return [];
     }
     const assignments = await this.assignmentsRepository.find({
       where: { userId: requester.id },
@@ -179,9 +187,6 @@ export class ProjectsService {
     requester: RequestingUser,
   ): Promise<void> {
     const accessibleProjectIds = await this.getAccessibleProjectIds(requester);
-    if (accessibleProjectIds === null) {
-      return;
-    }
     if (!accessibleProjectIds.includes(projectId)) {
       throw new ForbiddenException('You are not assigned to this project');
     }

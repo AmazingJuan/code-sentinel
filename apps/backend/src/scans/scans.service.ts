@@ -41,16 +41,12 @@ export class ScansService {
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);
-    if (accessibleProjectIds !== null) {
-      if (filters.projectId) {
-        if (!accessibleProjectIds.includes(filters.projectId)) return [];
-        where.projectId = filters.projectId;
-      } else {
-        if (accessibleProjectIds.length === 0) return [];
-        where.projectId = In(accessibleProjectIds);
-      }
-    } else if (filters.projectId) {
+    if (filters.projectId) {
+      if (!accessibleProjectIds.includes(filters.projectId)) return [];
       where.projectId = filters.projectId;
+    } else {
+      if (accessibleProjectIds.length === 0) return [];
+      where.projectId = In(accessibleProjectIds);
     }
 
     const severityColumnMap: Record<string, keyof Scan> = {
@@ -82,10 +78,7 @@ export class ScansService {
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);
-    if (
-      accessibleProjectIds !== null &&
-      !accessibleProjectIds.includes(scan.projectId)
-    ) {
+    if (!accessibleProjectIds.includes(scan.projectId)) {
       throw new ForbiddenException('You are not assigned to this project');
     }
 

@@ -18,7 +18,10 @@ export class AuthService {
     return this.issueToken(this.usersService.toPublicUser(user));
   }
 
-  async validateUser(email: string, password: string): Promise<Omit<User, 'passwordHash'> | null> {
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<Omit<User, 'passwordHash'> | null> {
     const user = await this.usersService.findByEmail(email);
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return null;

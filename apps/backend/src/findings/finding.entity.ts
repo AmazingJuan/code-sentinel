@@ -15,7 +15,10 @@ export class Finding {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Scan, (scan) => scan.findings, { eager: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Scan, (scan) => scan.findings, {
+    eager: true,
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'scanId' })
   scan: Scan;
 

@@ -20,21 +20,35 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectAssignment } from './project-assignment.entity';
 import { Project } from './project.entity';
-import { ProjectsService, PublicProjectAssignment } from './projects.service';
+import {
+  ProjectDirectoryEntry,
+  ProjectsService,
+  PublicProjectAssignment,
+} from './projects.service';
 
 type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
 
 @Controller('projects')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
+  // RF-035 + RF-032: the admin only sees id and name, to assign projects.
+  // Declared before ':id' so Express does not read "directory" as an id.
+  @Get('directory')
+  @Roles(UserRole.ADMIN)
+  findDirectory(): Promise<ProjectDirectoryEntry[]> {
+    return this.projectsService.findDirectory();
+  }
+
   @Get()
+  @Roles(UserRole.ANALYST)
   findAll(@Req() request: AuthenticatedRequest): Promise<Project[]> {
     return this.projectsService.findAll(request.user);
   }
 
   @Get(':id')
+  @Roles(UserRole.ANALYST)
   findOne(
     @Param('id') id: string,
     @Req() request: AuthenticatedRequest,
@@ -43,6 +57,7 @@ export class ProjectsController {
   }
 
   @Post()
+  @Roles(UserRole.ANALYST)
   create(
     @Body() createProjectDto: CreateProjectDto,
     @Req() request: AuthenticatedRequest,
@@ -51,6 +66,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.ANALYST)
   update(
     @Param('id') id: string,
     @Body() updateProjectDto: UpdateProjectDto,
@@ -60,14 +76,12 @@ export class ProjectsController {
   }
 
   @Get(':id/assignments')
-  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   findAssignments(@Param('id') id: string): Promise<PublicProjectAssignment[]> {
     return this.projectsService.findAssignments(id);
   }
 
   @Post(':id/assignments')
-  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   assignUser(
     @Param('id') id: string,
@@ -77,7 +91,6 @@ export class ProjectsController {
   }
 
   @Delete(':id/assignments/:userId')
-  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   unassignUser(
     @Param('id') id: string,
