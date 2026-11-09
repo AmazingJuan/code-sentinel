@@ -137,41 +137,14 @@ describe('ProjectDetailView', () => {
     expect(wrapper.text()).toContain('We could not load this project')
   })
 
-  it('does not show the assignments panel to a non-administrator', async () => {
+  it('never shows the assignments panel, which now lives in Project access (RF-032)', async () => {
     getUser.mockReturnValue(analystUser)
     getProjectById.mockResolvedValueOnce(project)
 
     const wrapper = await mountProjectDetailView()
     await flushPromises()
 
-    expect(getAssignments).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Project access')
-  })
-
-  it('loads and displays assignments for an administrator', async () => {
-    getUser.mockReturnValue(adminUser)
-    getProjectById.mockResolvedValueOnce(project)
-    getAssignments.mockResolvedValueOnce([
-      {
-        id: 'assignment-1',
-        projectId: 'project-1',
-        userId: 'user-1',
-        assignedAt: '2026-09-01T00:00:00.000Z',
-        user: { id: 'user-1', email: 'analyst@example.com', name: 'Analyst', role: 'analyst', createdAt: '2026-01-01T00:00:00.000Z' },
-      },
-    ])
-    findAllUsers.mockResolvedValueOnce([
-      { id: 'user-1', email: 'analyst@example.com', name: 'Analyst', role: 'analyst', createdAt: '2026-01-01T00:00:00.000Z' },
-      { id: 'user-2', email: 'other@example.com', name: 'Other Analyst', role: 'analyst', createdAt: '2026-01-01T00:00:00.000Z' },
-    ])
-
-    const wrapper = await mountProjectDetailView()
-    await flushPromises()
-
-    expect(getAssignments).toHaveBeenCalledWith('project-1')
-    expect(wrapper.text()).toContain('Project access')
-    expect(wrapper.text()).toContain('Analyst')
-    expect(wrapper.find('select').findAll('option')).toHaveLength(2) // placeholder + the unassigned user
   })
 
   it('assigns a selected user to the project', async () => {
@@ -198,32 +171,5 @@ describe('ProjectDetailView', () => {
 
     expect(assignUserToProject).toHaveBeenCalledWith('project-1', 'user-2')
     expect(wrapper.text()).toContain('Other Analyst')
-  })
-
-  it('removes an existing assignment', async () => {
-    getUser.mockReturnValue(adminUser)
-    getProjectById.mockResolvedValueOnce(project)
-    getAssignments.mockResolvedValueOnce([
-      {
-        id: 'assignment-1',
-        projectId: 'project-1',
-        userId: 'user-1',
-        assignedAt: '2026-09-01T00:00:00.000Z',
-        user: { id: 'user-1', email: 'analyst@example.com', name: 'Analyst', role: 'analyst', createdAt: '2026-01-01T00:00:00.000Z' },
-      },
-    ])
-    findAllUsers.mockResolvedValueOnce([
-      { id: 'user-1', email: 'analyst@example.com', name: 'Analyst', role: 'analyst', createdAt: '2026-01-01T00:00:00.000Z' },
-    ])
-    unassignUserFromProject.mockResolvedValueOnce(undefined)
-
-    const wrapper = await mountProjectDetailView()
-    await flushPromises()
-
-    await wrapper.find('button[type="button"]').trigger('click')
-    await flushPromises()
-
-    expect(unassignUserFromProject).toHaveBeenCalledWith('project-1', 'user-1')
-    expect(wrapper.text()).toContain('No users are assigned to this project yet.')
   })
 })

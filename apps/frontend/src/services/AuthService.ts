@@ -20,6 +20,14 @@ export const AuthService = {
     return useAuthStore().user
   },
 
+  /**
+ * RF-032: each role has its own landing page. The admin never lands on
+ * security content; the analyst starts on the security overview.
+ */
+  getHomeRouteName(): 'users' | 'overview' {
+    return useAuthStore().user?.role === 'admin' ? 'users' : 'overview'
+  },
+
   logout(): void {
     useAuthStore().logout()
   },
