@@ -37,11 +37,22 @@ async function seed() {
   await dataSource.createQueryBuilder().delete().from(Project).execute();
   await dataSource.createQueryBuilder().delete().from(User).execute();
 
+  // RF-032: the main demo user is an analyst, so the demo shows security
+  // content. The administrator only manages users and project assignments.
   const demoUser = await userRepo.save(
     userRepo.create({
       email: 'demo@code-sentinel.local',
       name: 'Demo User',
       passwordHash: await bcrypt.hash('Demo1234!', 12),
+      role: UserRole.ANALYST,
+    }),
+  );
+
+  await userRepo.save(
+    userRepo.create({
+      email: 'admin@code-sentinel.local',
+      name: 'Admin User',
+      passwordHash: await bcrypt.hash('Admin1234!', 12),
       role: UserRole.ADMIN,
     }),
   );
@@ -68,7 +79,7 @@ async function seed() {
     projects[name] = await projectRepo.save(projectRepo.create({ name, repo, userId: demoUser.id }));
   }
 
-  // The registrant (the admin, here) is assigned to every project it
+  // The registrant (the demo analyst, here) is assigned to every project it
   // registers, mirroring what ProjectsService.create does at runtime.
   for (const project of Object.values(projects)) {
     await assignmentRepo.save(assignmentRepo.create({ projectId: project.id, userId: demoUser.id }));
@@ -146,8 +157,10 @@ async function seed() {
   }
 
   console.log('Seed completed.');
-  console.log('Admin user (sees every project): demo@code-sentinel.local / Demo1234!');
+  console.log('Demo analyst (sees every project): demo@code-sentinel.local / Demo1234!');
+  console.log('Admin user (manages users and assignments only): admin@code-sentinel.local / Admin1234!');
   console.log('Analyst user (sees only code-sentinel and backend-api): analyst@code-sentinel.local / Analyst1234!');
+
   await dataSource.destroy();
 }
 
