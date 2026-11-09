@@ -21,6 +21,7 @@ const router = useRouter()
 async function onSubmit(): Promise<void> {
   isLoading.value = true
   errorMessage.value = ''
+  await router.push({ name: AuthService.getHomeRouteName() })
 
   try {
     await AuthService.login(email.value, password.value)

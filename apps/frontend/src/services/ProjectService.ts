@@ -2,6 +2,7 @@
 import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { httpClient } from '@/services/httpClient'
+import type { ProjectDirectoryEntryInterface } from '@/interfaces/ProjectDirectoryEntryInterface'
 
 export type CreateProjectDto = Omit<
   ProjectInterface,
@@ -43,5 +44,11 @@ export class ProjectService {
 
   static async unassignUser(projectId: string, userId: string): Promise<void> {
     await httpClient.delete(`/projects/${projectId}/assignments/${userId}`)
+  }
+
+  /** Admin only (RF-035): id and name of every project, to manage assignments. */
+  static async getDirectory(): Promise<ProjectDirectoryEntryInterface[]> {
+    const response = await httpClient.get<ProjectDirectoryEntryInterface[]>('/projects/directory')
+    return response.data
   }
 }

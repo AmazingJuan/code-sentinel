@@ -1,7 +1,20 @@
 <!-- apps/frontend/src/components/AppSidebar.vue -->
 <script setup lang="ts">
-import { FileText, FolderKanban, LayoutGrid, Settings, ShieldAlert, Terminal, UserRound, Wrench } from 'lucide-vue-next'
+import {
+  FileText,
+  FolderKanban,
+  KeyRound,
+  LayoutGrid,
+  Settings,
+  ShieldAlert,
+  Terminal,
+  UserRound,
+  Wrench,
+} from 'lucide-vue-next'
+import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+
+import type { AuthUser } from '@/interfaces/AuthInterface'
 import { AuthService } from '@/services/AuthService'
 
 const route = useRoute()
@@ -12,17 +25,24 @@ interface NavItem {
   label: string
   icon: typeof LayoutGrid
   routeName: string | null // null = route does not exist yet (another module)
+  roles: AuthUser['role'][] // RF-032: who sees the item
 }
 
 const navItems: NavItem[] = [
-  { label: 'Overview', icon: LayoutGrid, routeName: 'overview' },
-  { label: 'Projects', icon: FolderKanban, routeName: 'project.index' },
-  { label: 'Scan Reports', icon: FileText, routeName: 'scan.index' },
-  { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index' },
-  { label: 'Users', icon: UserRound, routeName: 'users' },
-  { label: 'Security Tools', icon: Wrench, routeName: null },
-  { label: 'Settings', icon: Settings, routeName: null },
+  { label: 'Overview', icon: LayoutGrid, routeName: 'overview', roles: ['analyst'] },
+  { label: 'Projects', icon: FolderKanban, routeName: 'project.index', roles: ['analyst'] },
+  { label: 'Scan Reports', icon: FileText, routeName: 'scan.index', roles: ['analyst'] },
+  { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index', roles: ['analyst'] },
+  { label: 'Users', icon: UserRound, routeName: 'users', roles: ['admin'] },
+  { label: 'Project Access', icon: KeyRound, routeName: 'project-access.index', roles: ['admin'] },
+  { label: 'Security Tools', icon: Wrench, routeName: null, roles: ['analyst'] },
+  { label: 'Settings', icon: Settings, routeName: null, roles: ['analyst'] },
 ]
+
+const visibleNavItems = computed<NavItem[]>(() => {
+  const role = AuthService.getUser()?.role
+  return role ? navItems.filter((item) => item.roles.includes(role)) : []
+})
 
 function isActive(routeName: string): boolean {
   return route.name === routeName || route.matched.some((match) => match.name === routeName)
@@ -46,7 +66,7 @@ function isActive(routeName: string): boolean {
 
       <p class="mb-2 px-2 text-[10px] font-medium tracking-wider text-gray-500">NAVIGATION</p>
       <nav class="flex flex-col gap-0.5">
-        <template v-for="item in navItems.filter((item) => item.routeName !== 'users' || AuthService.getUser()?.role === 'admin')" :key="item.label">
+        <template v-for="item in visibleNavItems" :key="item.label">
           <RouterLink
             v-if="item.routeName"
             :to="{ name: item.routeName }"
