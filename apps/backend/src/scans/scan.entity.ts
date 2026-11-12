@@ -28,12 +28,45 @@ export function isScanStatus(value: string): value is ScanStatus {
   return (SCAN_STATUSES as readonly string[]).includes(value);
 }
 
+export const RESULT_SCAN_STATUSES = ['completed', 'failed'] as const;
+export type ResultScanStatus = (typeof RESULT_SCAN_STATUSES)[number];
+
+export function isResultScanStatus(value: string): value is ResultScanStatus {
+  return (RESULT_SCAN_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * RF-006: allowed lifecycle transitions. Any other transition (such as
+ * reopening a closed scan or jumping from pending to completed) is rejected
+ * with 409 Conflict.
+ */
+export const ALLOWED_SCAN_TRANSITIONS: Record<
+  ScanStatus,
+  readonly ScanStatus[]
+> = {
+  pending: ['running', 'failed'],
+  running: ['completed', 'failed'],
+  completed: [],
+  failed: [],
+};
+
+export function canTransitionScanStatus(
+  from: ScanStatus,
+  to: ScanStatus,
+): boolean {
+  return ALLOWED_SCAN_TRANSITIONS[from].includes(to);
+}
+
 export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner';
 export const SCAN_TOOLS: ScanTool[] = [
   'SAST',
   'Secret Scanner',
   'Port Scanner',
 ];
+
+export function isScanTool(value: string): value is ScanTool {
+  return (SCAN_TOOLS as readonly string[]).includes(value);
+}
 
 @Entity('scans')
 export class Scan {
@@ -55,6 +88,9 @@ export class Scan {
 
   @Column({ type: 'varchar', default: 'pending' })
   status: ScanStatus;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  errorMessage: string | null;
 
   @Column({ type: 'simple-array' })
   tools: ScanTool[];

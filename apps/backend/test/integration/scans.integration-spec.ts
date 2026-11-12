@@ -1,11 +1,12 @@
 // apps/backend/test/integration/scans.integration-spec.ts
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
+import { Finding } from '../../src/findings/finding.entity';
 import { ProjectsService } from '../../src/projects/projects.service';
 import { Scan } from '../../src/scans/scan.entity';
 import { ScansController } from '../../src/scans/scans.controller';
@@ -21,6 +22,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
       scanNumber: 1042,
       projectId: 'p1',
       status: 'completed',
+      errorMessage: null,
       tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
       criticalCount: 1,
       highCount: 3,
@@ -33,6 +35,19 @@ describe('Scans — integración (Controller + Service)', (): void => {
   const mockRepository = {
     find: jest.fn().mockResolvedValue(mockScans),
     findOne: jest.fn().mockResolvedValue(mockScans[0]),
+    create: jest.fn((data: Partial<Scan>): Partial<Scan> => ({ ...data })),
+    save: jest.fn((data: Partial<Scan>): Promise<Partial<Scan>> =>
+      Promise.resolve({ id: 'scan-created', ...data }),
+    ),
+  };
+
+  const mockFindingRepository = {
+    create: jest.fn((data: Partial<Finding>): Partial<Finding> => ({
+      ...data,
+    })),
+    save: jest.fn((data: Partial<Finding>[]): Promise<Partial<Finding>[]> =>
+      Promise.resolve(data),
+    ),
   };
 
   const mockProjectsService = {
@@ -45,6 +60,10 @@ describe('Scans — integración (Controller + Service)', (): void => {
       providers: [
         ScansService,
         { provide: getRepositoryToken(Scan), useValue: mockRepository },
+        {
+          provide: getRepositoryToken(Finding),
+          useValue: mockFindingRepository,
+        },
         { provide: ProjectsService, useValue: mockProjectsService },
       ],
     })
@@ -53,11 +72,19 @@ describe('Scans — integración (Controller + Service)', (): void => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    );
     await app.init();
   });
 
   afterAll(async (): Promise<void> => {
     await app.close();
+  });
+
+  afterEach((): void => {
+    mockRepository.find.mockResolvedValue(mockScans);
+    mockRepository.findOne.mockResolvedValue(mockScans[0]);
   });
 
   it('GET /scans debe retornar 200 con la lista de scans', async (): Promise<void> => {
@@ -113,6 +140,109 @@ describe('Scans — integración (Controller + Service)', (): void => {
     expect(response.status).toBe(404);
   });
 
+  describe('Endpoints del contrato de ingesta (POST /scans, PATCH /scans/:id/status, POST /scans/:id/results)', (): void => {
+    it('POST /scans debe crear un scan en pending y retornar 201 (RF-005)', async (): Promise<void> => {
+      const response = await request(app.getHttpServer())
+        .post('/scans')
+        .send({ projectId: 'p1', tools: ['SAST', 'Secret Scanner'] });
+      const body = response.body as Scan;
+
+      expect(response.status).toBe(201);
+      expect(body.status).toBe('pending');
+      expect(body.scanNumber).toBe(1043);
+    });
+
+    it('POST /scans debe retornar 403 si el proyecto no está asignado al analista (RF-035)', async (): Promise<void> => {
+      const response = await request(app.getHttpServer())
+        .post('/scans')
+        .send({ projectId: 'p-unassigned', tools: ['SAST'] });
+
+      expect(response.status).toBe(403);
+    });
+
+    it('PATCH /scans/:id/status debe mover un scan de pending a running y retornar 200 (RF-006)', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        id: 'scan-pending',
+        projectId: 'p1',
+        status: 'pending',
+      });
+
+      const response = await request(app.getHttpServer())
+        .patch('/scans/scan-pending/status')
+        .send({ status: 'running' });
+      const body = response.body as Scan;
+
+      expect(response.status).toBe(200);
+      expect(body.status).toBe('running');
+    });
+
+    it('PATCH /scans/:id/status debe retornar 409 en una transición inválida (RF-006)', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        id: 'scan-closed',
+        projectId: 'p1',
+        status: 'completed',
+      });
+
+      const response = await request(app.getHttpServer())
+        .patch('/scans/scan-closed/status')
+        .send({ status: 'running' });
+
+      expect(response.status).toBe(409);
+    });
+
+    it('POST /scans/:id/results debe cerrar el scan en 200 con conteos calculados y findings registrados (RF-010, RF-019)', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        id: 'scan-running',
+        projectId: 'p1',
+        status: 'running',
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/scans/scan-running/results')
+        .send({
+          status: 'completed',
+          errorMessage: null,
+          findings: [
+            {
+              type: 'github-pat',
+              severity: 'high',
+              toolCategory: 'Secret Scanner',
+              sourceTool: 'Gitleaks',
+              filePath: 'src/config.ts',
+              line: 12,
+              description: 'GitHub Personal Access Token detected.',
+              recommendation:
+                'Revoke the token and load it from an environment variable.',
+            },
+          ],
+        });
+      const body = response.body as Scan;
+
+      expect(response.status).toBe(200);
+      expect(body.status).toBe('completed');
+      expect(body.highCount).toBe(1);
+      expect(body.totalCount).toBe(1);
+    });
+
+    it('POST /scans/:id/results debe retornar 409 si el scan ya estaba cerrado', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        id: 'scan-closed',
+        projectId: 'p1',
+        status: 'failed',
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/scans/scan-closed/results')
+        .send({
+          status: 'completed',
+          errorMessage: null,
+          findings: [],
+        });
+
+      expect(response.status).toBe(409);
+    });
+  });
+
   describe('RF-027 — findings correspondientes solo al scan seleccionado', (): void => {
     it('GET /scans/:id debe retornar únicamente los findings de ese scan, no de otros', async (): Promise<void> => {
       const scanWithScopedFindings = {
@@ -166,6 +296,15 @@ describe('Scans — integración (Controller + Service)', (): void => {
       const response = await request(app.getHttpServer())
         .get('/scans/1')
         .set(TEST_ROLE_HEADER, 'admin');
+
+      expect(response.status).toBe(403);
+    });
+
+    it('POST /scans como admin debe retornar 403 (RF-032)', async (): Promise<void> => {
+      const response = await request(app.getHttpServer())
+        .post('/scans')
+        .set(TEST_ROLE_HEADER, 'admin')
+        .send({ projectId: 'p1', tools: ['SAST'] });
 
       expect(response.status).toBe(403);
     });

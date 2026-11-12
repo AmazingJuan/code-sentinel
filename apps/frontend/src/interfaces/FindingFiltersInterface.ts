@@ -4,4 +4,5 @@ export interface FindingFiltersInterface {
   severity?: string
   scanId?: string
   sourceTool?: string
+  toolCategory?: string
 }

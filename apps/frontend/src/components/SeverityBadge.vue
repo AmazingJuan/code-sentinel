@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import type { FindingSeverity } from '@/interfaces/FindingInterface'
 
-defineProps<{ severity: FindingSeverity }>()
+defineProps<{ severity: FindingSeverity | null }>()
 
 const colorMap: Record<FindingSeverity, string> = {
   critical: 'text-red-400',
@@ -13,5 +13,10 @@ const colorMap: Record<FindingSeverity, string> = {
 </script>
 
 <template>
-  <span class="font-mono text-xs font-semibold uppercase" :class="colorMap[severity]">{{ severity }}</span>
+  <span
+    class="font-mono text-xs font-semibold uppercase"
+    :class="severity ? colorMap[severity] : 'text-gray-400'"
+  >
+    {{ severity ?? 'unclassified' }}
+  </span>
 </template>

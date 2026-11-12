@@ -58,6 +58,13 @@ onMounted(async () => {
         </span>
       </div>
 
+      <p
+        v-if="scan.status === 'failed' && scan.errorMessage"
+        class="mt-4 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300"
+      >
+        {{ scan.errorMessage }}
+      </p>
+
       <h2 class="mt-8 text-sm font-medium tracking-wide text-gray-400">FINDINGS</h2>
       <p v-if="findings.length === 0" class="mt-2 text-sm text-gray-500">No findings for this scan.</p>
 
