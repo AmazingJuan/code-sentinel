@@ -110,7 +110,6 @@ export class ScansService {
       );
     }
 
-    scan.status = updateScanStatusDto.status;
     if (updateScanStatusDto.status === 'failed') {
       if (
         !updateScanStatusDto.errorMessage ||
@@ -122,6 +121,7 @@ export class ScansService {
       }
       scan.errorMessage = updateScanStatusDto.errorMessage.trim();
     }
+    scan.status = updateScanStatusDto.status;
 
     return this.scanRepository.save(scan);
   }

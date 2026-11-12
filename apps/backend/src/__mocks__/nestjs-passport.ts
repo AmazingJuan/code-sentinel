@@ -19,7 +19,11 @@ export function AuthGuard(): new () => CanActivate {
 }
 
 export function PassportStrategy(Base: Constructor): Constructor {
-  return class MockPassportStrategy extends Base {};
+  return class MockPassportStrategy extends Base {
+    constructor(...args: unknown[]) {
+      super(...args, () => undefined);
+    }
+  };
 }
 
 export class PassportModule {

@@ -6,7 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Scan, ScanTool } from '../scans/scan.entity';
+import { Scan, type ScanTool } from '../scans/scan.entity';
 
 export const FINDING_SEVERITIES = [
   'critical',

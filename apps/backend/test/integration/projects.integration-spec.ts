@@ -2,6 +2,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { App } from 'supertest/types';
 
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { ProjectsController } from '../../src/projects/projects.controller';
@@ -9,7 +10,7 @@ import { ProjectsService } from '../../src/projects/projects.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
 describe('Projects — integración RF-032 / RF-035 (Controller + guards)', (): void => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   const mockProjectsService = {
     findDirectory: jest
