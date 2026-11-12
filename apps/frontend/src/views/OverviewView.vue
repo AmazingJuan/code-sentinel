@@ -1,4 +1,5 @@
-feat(all): add authentication and seeded demo access  - add JWT and local authentication flows - add user entity, service, DTOs, and guards - seed a bcrypt-hashed demo user - add frontend login and session persistence - protect frontend routes with auth state - update API client and English error messages - configure JWT and database environment variables<script setup lang="ts">
+<!-- apps/frontend/src/views/OverviewView.vue -->
+<script setup lang="ts">
 import { Activity, ArrowRight, Bug, ScrollText, ShieldAlert } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
