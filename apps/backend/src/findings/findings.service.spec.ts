@@ -110,7 +110,7 @@ describe('FindingsService', () => {
       await service.findAll({ severity: 'critical' }, analyst);
       expect(repository.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ severity: 'critical' }),
+          where: expect.objectContaining({ severity: 'critical' }) as unknown,
         }),
       );
     });

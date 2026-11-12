@@ -1,12 +1,13 @@
 // apps/backend/src/scans/scans.service.ts
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindOptionsWhere, In, Repository } from 'typeorm';
-import { Scan } from './scan.entity';
+import { isScanStatus, Scan, SCAN_STATUSES } from './scan.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { RequestingUser } from '../types/requesting-user.type';
 
@@ -31,7 +32,15 @@ export class ScansService {
   ): Promise<Scan[]> {
     const where: FindOptionsWhere<Scan> = {};
 
-    if (filters.status) where.status = filters.status as Scan['status'];
+    if (filters.status) {
+      // RF-006: reject unknown states instead of silently returning nothing.
+      if (!isScanStatus(filters.status)) {
+        throw new BadRequestException(
+          `Invalid status "${filters.status}". Use one of: ${SCAN_STATUSES.join(', ')}`,
+        );
+      }
+      where.status = filters.status;
+    }
     if (filters.dateFrom && filters.dateTo) {
       where.date = Between(
         new Date(filters.dateFrom),

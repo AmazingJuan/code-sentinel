@@ -94,6 +94,9 @@ async function seed() {
   }
 
   const scansData = [
+    // RF-006: one scan per lifecycle state, so the demo shows all four.
+    { scanNumber: 1044, project: 'frontend-app', date: '2026-08-13', status: 'pending', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 0, medium: 0, low: 0 },
+    { scanNumber: 1043, project: 'code-sentinel', date: '2026-08-13', status: 'running', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 0, medium: 0, low: 0 },
     { scanNumber: 1042, project: 'code-sentinel', date: '2026-08-12', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 1, high: 3, medium: 5, low: 2 },
     { scanNumber: 1041, project: 'backend-api', date: '2026-08-11', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 2, high: 6, medium: 9, low: 4 },
     { scanNumber: 1040, project: 'frontend-app', date: '2026-08-10', status: 'completed', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 2, medium: 7, low: 6 },
