@@ -14,6 +14,7 @@ import { SubmitScanResultsDto } from './dto/submit-scan-results.dto';
 import { UpdateScanStatusDto } from './dto/update-scan-status.dto';
 import {
   canTransitionScanStatus,
+  computeProjectCountersFromScans,
   isResultScanStatus,
   isScanStatus,
   isScanTool,
@@ -22,6 +23,7 @@ import {
   SCAN_TOOLS,
 } from './scan.entity';
 import { Finding, isFindingSeverity } from '../findings/finding.entity';
+import { Project } from '../projects/project.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { RequestingUser } from '../types/requesting-user.type';
 
@@ -43,6 +45,9 @@ export class ScansService {
     @Optional()
     @InjectRepository(Finding)
     private readonly findingRepository?: Repository<Finding>,
+    @Optional()
+    @InjectRepository(Project)
+    private readonly projectRepository?: Repository<Project>,
   ) {}
 
   async create(
@@ -202,7 +207,9 @@ export class ScansService {
     scan.lowCount = lowCount;
     scan.totalCount = findingsInput.length;
 
-    return this.scanRepository.save(scan);
+    const savedScan = await this.scanRepository.save(scan);
+    await this.syncProjectCounters(scan.projectId, savedScan);
+    return savedScan;
   }
 
   async findAll(
@@ -313,6 +320,37 @@ export class ScansService {
     if (!accessibleProjectIds.includes(projectId)) {
       throw new ForbiddenException('You are not assigned to this project');
     }
+  }
+
+  private async syncProjectCounters(
+    projectId: string,
+    latestScan: Scan,
+  ): Promise<void> {
+    if (!this.projectRepository) return;
+
+    const project = await this.projectRepository.findOne({
+      where: { id: projectId },
+    });
+    if (!project) return;
+
+    const projectScans =
+      (await this.scanRepository.find({
+        where: { projectId },
+        order: { scanNumber: 'DESC' },
+      })) ?? [];
+    const allScans = projectScans.some((s) => s.id === latestScan.id)
+      ? projectScans
+      : [latestScan, ...projectScans];
+
+    const counters = computeProjectCountersFromScans(allScans);
+    project.status = counters.status;
+    project.lastScan = counters.lastScan;
+    project.criticalCount = counters.criticalCount;
+    project.highCount = counters.highCount;
+    project.mediumCount = counters.mediumCount;
+    project.lowCount = counters.lowCount;
+
+    await this.projectRepository.save(project);
   }
 
   private validateFindingItem(item: Record<string, unknown>): void {

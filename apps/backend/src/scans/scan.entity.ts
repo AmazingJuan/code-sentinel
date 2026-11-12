@@ -68,6 +68,58 @@ export function isScanTool(value: string): value is ScanTool {
   return (SCAN_TOOLS as readonly string[]).includes(value);
 }
 
+export interface ProjectScanCounters {
+  status: 'pending' | 'completed' | 'failed';
+  lastScan: Date | null;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+}
+
+/**
+ * RF-028 / RF-029: calculates a project's status, lastScan timestamp, and
+ * severity counters from its historical scans. In-progress (`pending` or
+ * `running`) scans do not overwrite the last finished scan's counters.
+ */
+export function computeProjectCountersFromScans(
+  scans: Pick<
+    Scan,
+    | 'scanNumber'
+    | 'date'
+    | 'status'
+    | 'criticalCount'
+    | 'highCount'
+    | 'mediumCount'
+    | 'lowCount'
+  >[],
+): ProjectScanCounters {
+  const sorted = [...scans].sort((a, b) => b.scanNumber - a.scanNumber);
+  const latestFinished = sorted.find(
+    (s) => s.status === 'completed' || s.status === 'failed',
+  );
+  if (!latestFinished) {
+    return {
+      status: 'pending',
+      lastScan: null,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+    };
+  }
+
+  const latestCompleted = sorted.find((s) => s.status === 'completed');
+  return {
+    status: latestFinished.status as 'completed' | 'failed',
+    lastScan: latestFinished.date,
+    criticalCount: latestCompleted?.criticalCount ?? 0,
+    highCount: latestCompleted?.highCount ?? 0,
+    mediumCount: latestCompleted?.mediumCount ?? 0,
+    lowCount: latestCompleted?.lowCount ?? 0,
+  };
+}
+
 @Entity('scans')
 export class Scan {
   @PrimaryGeneratedColumn('uuid')

@@ -13,11 +13,16 @@ import { ProjectsService } from '../projects/projects.service';
 import { RequestingUser } from '../types/requesting-user.type';
 import { UserRole } from '../users/entities/user.entity';
 import { SubmitScanResultsDto } from './dto/submit-scan-results.dto';
-import { Scan, ScanStatus } from './scan.entity';
+import {
+  computeProjectCountersFromScans,
+  Scan,
+  ScanStatus,
+} from './scan.entity';
 import { ScansService } from './scans.service';
 
 const SCAN_REPOSITORY_TOKEN = 'ScanRepository';
 const FINDING_REPOSITORY_TOKEN = 'FindingRepository';
+const PROJECT_REPOSITORY_TOKEN = 'ProjectRepository';
 
 type MockRepository<T extends ObjectLiteral> = Partial<
   Record<keyof Repository<T>, jest.Mock>
@@ -90,6 +95,10 @@ describe('ScansService', () => {
         {
           provide: FINDING_REPOSITORY_TOKEN,
           useValue: createMockRepository<Finding>(),
+        },
+        {
+          provide: PROJECT_REPOSITORY_TOKEN,
+          useValue: createMockRepository(),
         },
         { provide: ProjectsService, useValue: projectsService },
       ],
@@ -475,6 +484,72 @@ describe('ScansService', () => {
       const result = await service.findOne('1', analyst);
 
       expect(result.findings).toEqual([]);
+    });
+  });
+
+  describe('computeProjectCountersFromScans (RF-028, RF-029)', (): void => {
+    it('debe calcular los contadores del proyecto desde su último scan completado ignorando scans en curso', (): void => {
+      const counters = computeProjectCountersFromScans([
+        {
+          scanNumber: 1043,
+          date: new Date('2026-08-13T00:00:00.000Z'),
+          status: 'running',
+          criticalCount: 0,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+        },
+        {
+          scanNumber: 1042,
+          date: new Date('2026-08-12T00:00:00.000Z'),
+          status: 'completed',
+          criticalCount: 1,
+          highCount: 3,
+          mediumCount: 5,
+          lowCount: 2,
+        },
+        {
+          scanNumber: 1039,
+          date: new Date('2026-08-08T00:00:00.000Z'),
+          status: 'completed',
+          criticalCount: 2,
+          highCount: 4,
+          mediumCount: 4,
+          lowCount: 3,
+        },
+      ]);
+
+      expect(counters).toEqual({
+        status: 'completed',
+        lastScan: new Date('2026-08-12T00:00:00.000Z'),
+        criticalCount: 1,
+        highCount: 3,
+        mediumCount: 5,
+        lowCount: 2,
+      });
+    });
+
+    it('debe retornar estado pending y contadores en 0 si no hay scans cerrados', (): void => {
+      const counters = computeProjectCountersFromScans([
+        {
+          scanNumber: 1044,
+          date: new Date('2026-08-13T00:00:00.000Z'),
+          status: 'pending',
+          criticalCount: 0,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+        },
+      ]);
+
+      expect(counters).toEqual({
+        status: 'pending',
+        lastScan: null,
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+      });
     });
   });
 });

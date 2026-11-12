@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Finding, FindingSeverity } from './finding.entity';
 import { ProjectsService } from '../projects/projects.service';
-import { ScanTool } from '../scans/scan.entity';
+import { isScanTool, ScanTool } from '../scans/scan.entity';
 import { ScansService } from '../scans/scans.service';
 import { RequestingUser } from '../types/requesting-user.type';
 
@@ -36,9 +36,16 @@ export class FindingsService {
     const where: FindOptionsWhere<Finding> = {};
     if (filters.type) where.type = filters.type;
     if (filters.severity) where.severity = filters.severity as FindingSeverity;
-    if (filters.sourceTool) where.sourceTool = filters.sourceTool;
-    if (filters.toolCategory)
+    if (filters.toolCategory) {
       where.toolCategory = filters.toolCategory as ScanTool;
+    }
+    if (filters.sourceTool) {
+      if (isScanTool(filters.sourceTool) && !filters.toolCategory) {
+        where.toolCategory = filters.sourceTool;
+      } else {
+        where.sourceTool = filters.sourceTool;
+      }
+    }
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);

@@ -5,10 +5,11 @@ import { Scan } from './scan.entity';
 import { ScansService } from './scans.service';
 import { ScansController } from './scans.controller';
 import { Finding } from '../findings/finding.entity';
+import { Project } from '../projects/project.entity';
 import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Scan, Finding]), ProjectsModule],
+  imports: [TypeOrmModule.forFeature([Scan, Finding, Project]), ProjectsModule],
   controllers: [ScansController],
   providers: [ScansService],
   exports: [TypeOrmModule, ScansService],

@@ -68,4 +68,3 @@ export class SubmitScanResultsDto {
   @Type(() => ScanFindingItemDto)
   findings: ScanFindingItemDto[];
 }
-

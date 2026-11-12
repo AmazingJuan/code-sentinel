@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Project } from '../projects/project.entity';
 import { ProjectAssignment } from '../projects/project-assignment.entity';
-import { Scan } from '../scans/scan.entity';
+import { computeProjectCountersFromScans, Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 
@@ -164,6 +164,23 @@ async function seed() {
         }),
       ]);
     }
+  }
+
+  // RF-028 / RF-029: calculate each project's status, lastScan, and severity
+  // counters from its seeded scans.
+  for (const project of Object.values(projects)) {
+    const projectScans = await scanRepo.find({
+      where: { projectId: project.id },
+      order: { scanNumber: 'DESC' },
+    });
+    const counters = computeProjectCountersFromScans(projectScans);
+    project.status = counters.status;
+    project.lastScan = counters.lastScan;
+    project.criticalCount = counters.criticalCount;
+    project.highCount = counters.highCount;
+    project.mediumCount = counters.mediumCount;
+    project.lowCount = counters.lowCount;
+    await projectRepo.save(project);
   }
 
   console.log('Seed completed.');
