@@ -24,9 +24,10 @@ export class FindingsController {
     @Query('severity') severity?: string,
     @Query('scanId') scanId?: string,
     @Query('sourceTool') sourceTool?: string,
+    @Query('toolCategory') toolCategory?: string,
   ): Promise<Finding[]> {
     return this.findingsService.findAll(
-      { type, severity, scanId, sourceTool },
+      { type, severity, scanId, sourceTool, toolCategory },
       request.user,
     );
   }

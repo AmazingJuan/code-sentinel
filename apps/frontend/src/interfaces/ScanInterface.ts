@@ -22,6 +22,7 @@ export interface ScanInterface {
   projectId: string
   date: string
   status: ScanStatus
+  errorMessage?: string | null
   tools: ScanTool[]
   criticalCount: number
   highCount: number

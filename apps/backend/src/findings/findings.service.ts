@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { Finding, FindingSeverity } from './finding.entity';
 import { ProjectsService } from '../projects/projects.service';
+import { ScanTool } from '../scans/scan.entity';
 import { ScansService } from '../scans/scans.service';
 import { RequestingUser } from '../types/requesting-user.type';
 
@@ -16,6 +17,7 @@ export interface FindingFilters {
   severity?: string;
   scanId?: string;
   sourceTool?: string;
+  toolCategory?: string;
 }
 
 @Injectable()
@@ -35,6 +37,8 @@ export class FindingsService {
     if (filters.type) where.type = filters.type;
     if (filters.severity) where.severity = filters.severity as FindingSeverity;
     if (filters.sourceTool) where.sourceTool = filters.sourceTool;
+    if (filters.toolCategory)
+      where.toolCategory = filters.toolCategory as ScanTool;
 
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);

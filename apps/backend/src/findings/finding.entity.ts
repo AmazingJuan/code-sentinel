@@ -6,9 +6,19 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Scan } from '../scans/scan.entity';
+import { Scan, ScanTool } from '../scans/scan.entity';
 
-export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+export const FINDING_SEVERITIES = [
+  'critical',
+  'high',
+  'medium',
+  'low',
+] as const;
+export type FindingSeverity = (typeof FINDING_SEVERITIES)[number];
+
+export function isFindingSeverity(value: string): value is FindingSeverity {
+  return (FINDING_SEVERITIES as readonly string[]).includes(value);
+}
 
 @Entity('findings')
 export class Finding {
@@ -26,10 +36,13 @@ export class Finding {
   scanId: string;
 
   @Column()
-  type: string; // ej. 'SQL Injection', 'Hardcoded Secret', 'Open Port'
+  type: string; // e.g. 'github-pat', 'SQL Injection', 'Open Port'
 
   @Column({ type: 'varchar', nullable: true })
   severity: FindingSeverity | null;
+
+  @Column({ type: 'varchar', default: 'SAST' })
+  toolCategory: ScanTool;
 
   @Column({ type: 'varchar', nullable: true })
   filePath: string | null;
@@ -38,7 +51,7 @@ export class Finding {
   line: number | null;
 
   @Column()
-  sourceTool: string; // 'SAST' | 'Secret Scanner' | 'Port Scanner'
+  sourceTool: string; // Real tool name: 'Semgrep', 'Gitleaks', 'CodeSentinel' (RF-018)
 
   @Column({ type: 'text', nullable: true })
   description: string | null;
