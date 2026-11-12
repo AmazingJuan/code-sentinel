@@ -11,7 +11,23 @@ import {
 import { Project } from '../projects/project.entity';
 import { Finding } from '../findings/finding.entity';
 
-export type ScanStatus = 'completed' | 'failed';
+/**
+ * RF-006: lifecycle of a scan. The CLI creates it as `pending`, moves it to
+ * `running` once the project path is validated, and closes it as `completed`
+ * or `failed`.
+ */
+export const SCAN_STATUSES = [
+  'pending',
+  'running',
+  'completed',
+  'failed',
+] as const;
+export type ScanStatus = (typeof SCAN_STATUSES)[number];
+
+export function isScanStatus(value: string): value is ScanStatus {
+  return (SCAN_STATUSES as readonly string[]).includes(value);
+}
+
 export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner';
 export const SCAN_TOOLS: ScanTool[] = [
   'SAST',
@@ -37,7 +53,7 @@ export class Scan {
   @CreateDateColumn({ type: 'timestamptz' })
   date: Date;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', default: 'pending' })
   status: ScanStatus;
 
   @Column({ type: 'simple-array' })

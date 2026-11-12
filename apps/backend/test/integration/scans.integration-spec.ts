@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
+import { App } from 'supertest/types';
 
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { ProjectsService } from '../../src/projects/projects.service';
@@ -12,7 +13,7 @@ import { ScansService } from '../../src/scans/scans.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
 describe('Scans — integración (Controller + Service)', (): void => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   const mockScans: Partial<Scan>[] = [
     {
@@ -61,10 +62,11 @@ describe('Scans — integración (Controller + Service)', (): void => {
 
   it('GET /scans debe retornar 200 con la lista de scans', async (): Promise<void> => {
     const response = await request(app.getHttpServer()).get('/scans');
+    const body = response.body as Scan[];
 
     expect(response.status).toBe(200);
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].scanNumber).toBe(1042);
+    expect(body).toHaveLength(1);
+    expect(body[0].scanNumber).toBe(1042);
   });
 
   it('GET /scans?status=completed debe pasar el filtro al service', async (): Promise<void> => {
@@ -74,16 +76,33 @@ describe('Scans — integración (Controller + Service)', (): void => {
 
     expect(mockRepository.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: 'completed' }),
+        where: expect.objectContaining({ status: 'completed' }) as unknown,
       }),
     );
   });
 
-  it('GET /scans/:id debe retornar 200 con el scan solicitado', async (): Promise<void> => {
-    const response = await request(app.getHttpServer()).get('/scans/1');
+  it('GET /scans?status=running debe aceptar el nuevo estado (RF-006)', async (): Promise<void> => {
+    const response = await request(app.getHttpServer())
+      .get('/scans')
+      .query({ status: 'running' });
 
     expect(response.status).toBe(200);
-    expect(response.body.id).toBe('1');
+  });
+
+  it('GET /scans?status=done debe retornar 400 por estado desconocido (RF-006)', async (): Promise<void> => {
+    const response = await request(app.getHttpServer())
+      .get('/scans')
+      .query({ status: 'done' });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('GET /scans/:id debe retornar 200 con el scan solicitado', async (): Promise<void> => {
+    const response = await request(app.getHttpServer()).get('/scans/1');
+    const body = response.body as Scan;
+
+    expect(response.status).toBe(200);
+    expect(body.id).toBe('1');
   });
 
   it('GET /scans/:id debe retornar 404 cuando el scan no existe', async (): Promise<void> => {
@@ -110,12 +129,11 @@ describe('Scans — integración (Controller + Service)', (): void => {
       mockRepository.findOne.mockResolvedValueOnce(scanWithScopedFindings);
 
       const response = await request(app.getHttpServer()).get('/scans/1');
+      const body = response.body as { findings: { scanId: string }[] };
 
-      expect(response.body.findings).toHaveLength(1);
+      expect(body.findings).toHaveLength(1);
       expect(
-        response.body.findings.every(
-          (f: { scanId: string }) => f.scanId === '1',
-        ),
+        body.findings.every((f: { scanId: string }) => f.scanId === '1'),
       ).toBe(true);
     });
 
@@ -126,8 +144,9 @@ describe('Scans — integración (Controller + Service)', (): void => {
       });
 
       const response = await request(app.getHttpServer()).get('/scans/1');
+      const body = response.body as { findings: unknown[] };
 
-      expect(response.body.findings).toEqual([]);
+      expect(body.findings).toEqual([]);
     });
   });
 

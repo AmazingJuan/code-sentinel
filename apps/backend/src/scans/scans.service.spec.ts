@@ -1,5 +1,9 @@
 // apps/backend/src/scans/scans.service.spec.ts
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { In, ObjectLiteral, Repository } from 'typeorm';
 
@@ -98,9 +102,29 @@ describe('ScansService', () => {
       await service.findAll({ projectId: 'p1' }, analyst);
       expect(repository.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ projectId: 'p1' }),
+          where: expect.objectContaining({ projectId: 'p1' }) as unknown,
         }),
       );
+    });
+
+    it.each(['pending', 'running', 'completed', 'failed'])(
+      'debe aceptar el estado %s como filtro (RF-006)',
+      async (status: string): Promise<void> => {
+        repository.find!.mockResolvedValue([]);
+        await service.findAll({ status }, analyst);
+        expect(repository.find).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ status }) as unknown,
+          }),
+        );
+      },
+    );
+
+    it('debe rechazar un estado desconocido con BadRequestException (RF-006)', async (): Promise<void> => {
+      await expect(
+        service.findAll({ status: 'done' }, analyst),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.find).not.toHaveBeenCalled();
     });
 
     it('debe retornar [] si el projectId pedido no está asignado al usuario', async (): Promise<void> => {

@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
+import { App } from 'supertest/types';
 
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { Finding } from '../../src/findings/finding.entity';
@@ -13,7 +14,7 @@ import { ScansService } from '../../src/scans/scans.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
 describe('Findings — integración (Controller + Service)', (): void => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   const mockFindings: Partial<Finding>[] = [
     {
@@ -65,9 +66,10 @@ describe('Findings — integración (Controller + Service)', (): void => {
 
   it('GET /findings debe retornar 200 con la lista de findings', async (): Promise<void> => {
     const response = await request(app.getHttpServer()).get('/findings');
+    const body = response.body as Finding[];
 
     expect(response.status).toBe(200);
-    expect(response.body[0].type).toBe('Hardcoded Secret');
+    expect(body[0].type).toBe('Hardcoded Secret');
   });
 
   it('GET /findings?severity=critical debe pasar el filtro al service', async (): Promise<void> => {
@@ -77,7 +79,7 @@ describe('Findings — integración (Controller + Service)', (): void => {
 
     expect(mockRepository.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ severity: 'critical' }),
+        where: expect.objectContaining({ severity: 'critical' }) as unknown,
       }),
     );
   });
