@@ -7,6 +7,7 @@ import { App } from 'supertest/types';
 
 import { JwtAuthGuard } from '../../src/auth/guards/jwt-auth.guard';
 import { Finding } from '../../src/findings/finding.entity';
+import { Project } from '../../src/projects/project.entity';
 import { ProjectsService } from '../../src/projects/projects.service';
 import { Scan } from '../../src/scans/scan.entity';
 import { ScansController } from '../../src/scans/scans.controller';
@@ -54,6 +55,22 @@ describe('Scans — integración (Controller + Service)', (): void => {
     getAccessibleProjectIds: jest.fn().mockResolvedValue(['p1']),
   };
 
+  const mockProjectRepository = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 'p1',
+      name: 'code-sentinel',
+      status: 'pending',
+      lastScan: null,
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+    }),
+    save: jest.fn((project: Partial<Project>): Promise<Partial<Project>> =>
+      Promise.resolve(project),
+    ),
+  };
+
   beforeAll(async (): Promise<void> => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [ScansController],
@@ -63,6 +80,10 @@ describe('Scans — integración (Controller + Service)', (): void => {
         {
           provide: getRepositoryToken(Finding),
           useValue: mockFindingRepository,
+        },
+        {
+          provide: getRepositoryToken(Project),
+          useValue: mockProjectRepository,
         },
         { provide: ProjectsService, useValue: mockProjectsService },
       ],
@@ -240,6 +261,26 @@ describe('Scans — integración (Controller + Service)', (): void => {
         });
 
       expect(response.status).toBe(409);
+    });
+
+    it('POST /scans/:id/results debe sincronizar los contadores del proyecto y rechazar con 400 secretos en texto plano (RF-028, RF-029)', async (): Promise<void> => {
+      const forbiddenResponse = await request(app.getHttpServer())
+        .post('/scans/scan-running-2/results')
+        .send({
+          status: 'completed',
+          findings: [
+            {
+              type: 'github-pat',
+              severity: 'critical',
+              toolCategory: 'Secret Scanner',
+              sourceTool: 'Gitleaks',
+              Secret: 'ghp_raw_secret',
+            },
+          ],
+        });
+
+      expect(forbiddenResponse.status).toBe(400);
+      expect(mockProjectRepository.save).toHaveBeenCalled();
     });
   });
 

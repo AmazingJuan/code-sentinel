@@ -124,4 +124,20 @@ describe('ScanDetailView', () => {
 
     expect(wrapper.text()).toContain('We could not load the details for this scan.')
   })
+
+  it('displays the scan failure errorMessage when status is failed (RF-006)', async () => {
+    getScanById.mockResolvedValueOnce({
+      ...scan,
+      status: 'failed',
+      errorMessage: 'Scanner could not access repository path.',
+      totalCount: 0,
+    })
+    getFindings.mockResolvedValueOnce([])
+
+    const wrapper = await mountScanDetailView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed')
+    expect(wrapper.text()).toContain('Scanner could not access repository path.')
+  })
 })

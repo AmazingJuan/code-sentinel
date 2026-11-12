@@ -7,7 +7,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { ScansService } from '../scans/scans.service';
 import { RequestingUser } from '../types/requesting-user.type';
 import { UserRole } from '../users/entities/user.entity';
-import { Finding } from './finding.entity';
+import { Finding, isFindingSeverity } from './finding.entity';
 import { FindingsService } from './findings.service';
 
 const FINDING_REPOSITORY_TOKEN = 'FindingRepository';
@@ -126,6 +126,54 @@ describe('FindingsService', () => {
       const result = await service.findAll({ scanId: 's9' }, analyst);
       expect(result).toEqual([]);
       expect(repository.find).not.toHaveBeenCalled();
+    });
+
+    it('debe filtrar por scanId asignado, type, toolCategory y sourceTool (incluyendo categoría legada)', async (): Promise<void> => {
+      repository.find!.mockResolvedValue([mockFindings[0]]);
+
+      await service.findAll(
+        {
+          scanId: 's1',
+          type: 'Hardcoded Secret',
+          toolCategory: 'Secret Scanner',
+          sourceTool: 'Gitleaks',
+        },
+        analyst,
+      );
+
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            scanId: 's1',
+            type: 'Hardcoded Secret',
+            toolCategory: 'Secret Scanner',
+            sourceTool: 'Gitleaks',
+          },
+        }),
+      );
+
+      await service.findAll({ sourceTool: 'SAST' }, analyst);
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ toolCategory: 'SAST' }) as unknown,
+        }),
+      );
+    });
+
+    it('debe retornar [] cuando el usuario no tiene proyectos asignados o esos proyectos no tienen scans', async (): Promise<void> => {
+      projectsService.getAccessibleProjectIds.mockResolvedValueOnce([]);
+      expect(await service.findAll({}, analyst)).toEqual([]);
+
+      scansService.findScanIdsForProjects.mockResolvedValueOnce([]);
+      expect(await service.findAll({}, analyst)).toEqual([]);
+    });
+
+    it('isFindingSeverity debe validar severidades válidas e inválidas', (): void => {
+      expect(isFindingSeverity('critical')).toBe(true);
+      expect(isFindingSeverity('high')).toBe(true);
+      expect(isFindingSeverity('medium')).toBe(true);
+      expect(isFindingSeverity('low')).toBe(true);
+      expect(isFindingSeverity('none')).toBe(false);
     });
   });
 

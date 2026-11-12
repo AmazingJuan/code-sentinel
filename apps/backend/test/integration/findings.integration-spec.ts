@@ -94,6 +94,33 @@ describe('Findings — integración (Controller + Service)', (): void => {
     expect(response.status).toBe(404);
   });
 
+  it('GET /findings/:id debe retornar 200 cuando existe y el proyecto está asignado, o 403 si no está asignado', async (): Promise<void> => {
+    const okResponse = await request(app.getHttpServer()).get('/findings/f1');
+    expect(okResponse.status).toBe(200);
+
+    mockScansService.findProjectIdForScan.mockResolvedValueOnce('p-unassigned');
+    const forbiddenResponse = await request(app.getHttpServer()).get(
+      '/findings/f1',
+    );
+    expect(forbiddenResponse.status).toBe(403);
+  });
+
+  it('GET /findings debe soportar filtros por toolCategory y sourceTool (RF-019, RF-026)', async (): Promise<void> => {
+    const response = await request(app.getHttpServer())
+      .get('/findings')
+      .query({ toolCategory: 'Secret Scanner', sourceTool: 'Gitleaks' });
+
+    expect(response.status).toBe(200);
+    expect(mockRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          toolCategory: 'Secret Scanner',
+          sourceTool: 'Gitleaks',
+        }) as unknown,
+      }),
+    );
+  });
+
   describe('RF-032 — el administrador no accede a los findings', (): void => {
     it('GET /findings como admin debe retornar 403 sin consultar la base de datos', async (): Promise<void> => {
       mockRepository.find.mockClear();

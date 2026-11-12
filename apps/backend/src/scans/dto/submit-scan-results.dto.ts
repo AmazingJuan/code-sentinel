@@ -12,13 +12,13 @@ import {
 } from 'class-validator';
 import {
   FINDING_SEVERITIES,
-  FindingSeverity,
+  type FindingSeverity,
 } from '../../findings/finding.entity';
 import {
   RESULT_SCAN_STATUSES,
-  ResultScanStatus,
+  type ResultScanStatus,
   SCAN_TOOLS,
-  ScanTool,
+  type ScanTool,
 } from '../scan.entity';
 
 export class ScanFindingItemDto {

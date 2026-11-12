@@ -9,12 +9,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { In, ObjectLiteral, Repository } from 'typeorm';
 
 import { Finding } from '../findings/finding.entity';
+import { Project } from '../projects/project.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { RequestingUser } from '../types/requesting-user.type';
 import { UserRole } from '../users/entities/user.entity';
 import { SubmitScanResultsDto } from './dto/submit-scan-results.dto';
 import {
+  canTransitionScanStatus,
   computeProjectCountersFromScans,
+  isResultScanStatus,
+  isScanStatus,
+  isScanTool,
   Scan,
   ScanStatus,
 } from './scan.entity';
@@ -47,6 +52,7 @@ describe('ScansService', () => {
   let service: ScansService;
   let repository: MockRepository<Scan>;
   let findingRepository: MockRepository<Finding>;
+  let projectRepository: MockRepository<Project>;
   let projectsService: MockProjectsService;
 
   const analyst: RequestingUser = { id: 'u1', role: UserRole.ANALYST };
@@ -107,6 +113,7 @@ describe('ScansService', () => {
     service = module.get<ScansService>(ScansService);
     repository = module.get(SCAN_REPOSITORY_TOKEN);
     findingRepository = module.get(FINDING_REPOSITORY_TOKEN);
+    projectRepository = module.get(PROJECT_REPOSITORY_TOKEN);
   });
 
   afterEach((): void => {
@@ -143,6 +150,23 @@ describe('ScansService', () => {
       await expect(
         service.create({ projectId: 'p1', tools: [] }, analyst),
       ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.create({ projectId: '  ', tools: ['SAST'] }, analyst),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.create({ projectId: 'p1', tools: ['DAST' as never] }, analyst),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('debe iniciar scanNumber en 1001 cuando no existen scans previos', async (): Promise<void> => {
+      repository.find!.mockResolvedValue([]);
+      const result = await service.create(
+        { projectId: 'p1', tools: ['SAST'] },
+        analyst,
+      );
+      expect(result.scanNumber).toBe(1001);
     });
   });
 
@@ -162,6 +186,41 @@ describe('ScansService', () => {
 
       expect(result.status).toBe('running');
       expect(repository.save).toHaveBeenCalled();
+    });
+
+    it('debe permitir pasar a failed con errorMessage y rechazar si falta errorMessage o status inválido', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue({
+        id: 'scan-1',
+        projectId: 'p1',
+        status: 'running',
+      });
+
+      await expect(
+        service.updateStatus('scan-1', { status: 'invalid' as never }, analyst),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.updateStatus(
+          'scan-1',
+          { status: 'failed', errorMessage: '   ' },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      const result = await service.updateStatus(
+        'scan-1',
+        { status: 'failed', errorMessage: 'Scanner timeout' },
+        analyst,
+      );
+      expect(result.status).toBe('failed');
+      expect(result.errorMessage).toBe('Scanner timeout');
+    });
+
+    it('debe lanzar NotFoundException si el scan no existe al actualizar estado', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue(null);
+      await expect(
+        service.updateStatus('missing', { status: 'running' }, analyst),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it.each<[ScanStatus, ScanStatus]>([
@@ -369,6 +428,117 @@ describe('ScansService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(findingRepository.save).not.toHaveBeenCalled();
     });
+
+    it('debe validar campos de findings (status inválido, type, severity, toolCategory, sourceTool) y sincronizar contadores del proyecto', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue({
+        id: 'scan-1',
+        scanNumber: 1045,
+        projectId: 'p1',
+        date: new Date('2026-08-14T00:00:00.000Z'),
+        status: 'running',
+      });
+
+      await expect(
+        service.submitResults(
+          'scan-1',
+          { status: 'running' as never, findings: [] },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.submitResults(
+          'scan-1',
+          {
+            status: 'completed',
+            findings: [{ ...sampleResults.findings[0], type: '   ' }],
+          },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.submitResults(
+          'scan-1',
+          {
+            status: 'completed',
+            findings: [
+              { ...sampleResults.findings[0], severity: 'urgent' as never },
+            ],
+          },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.submitResults(
+          'scan-1',
+          {
+            status: 'completed',
+            findings: [
+              { ...sampleResults.findings[0], toolCategory: 'DAST' as never },
+            ],
+          },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.submitResults(
+          'scan-1',
+          {
+            status: 'completed',
+            findings: [{ ...sampleResults.findings[0], sourceTool: '' }],
+          },
+          analyst,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      projectRepository.findOne!.mockResolvedValue({
+        id: 'p1',
+        name: 'code-sentinel',
+        status: 'pending',
+        lastScan: null,
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+      });
+      repository.find!.mockResolvedValue([]);
+
+      const completed = await service.submitResults(
+        'scan-1',
+        {
+          status: 'completed',
+          findings: [
+            {
+              type: 'medium-issue',
+              severity: 'medium',
+              toolCategory: 'SAST',
+              sourceTool: 'Semgrep',
+            },
+            {
+              type: 'low-issue',
+              severity: 'low',
+              toolCategory: 'SAST',
+              sourceTool: 'Semgrep',
+            },
+          ],
+        },
+        analyst,
+      );
+
+      expect(completed.mediumCount).toBe(1);
+      expect(completed.lowCount).toBe(1);
+      expect(projectRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'p1',
+          status: 'completed',
+          mediumCount: 1,
+          lowCount: 1,
+        }),
+      );
+    });
   });
 
   describe('findAll', (): void => {
@@ -430,6 +600,66 @@ describe('ScansService', () => {
       const result = await service.findAll({}, analyst);
       result.forEach((scan) => {
         expect(scan.projectId).toBeDefined();
+      });
+    });
+
+    it('debe filtrar por rango de fechas dateFrom y dateTo y retornar [] cuando no hay proyectos accesibles', async (): Promise<void> => {
+      repository.find!.mockResolvedValue([mockScans[0]]);
+      await service.findAll(
+        { dateFrom: '2026-08-01', dateTo: '2026-08-31' },
+        analyst,
+      );
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            date: expect.anything() as unknown,
+          }) as unknown,
+        }),
+      );
+
+      projectsService.getAccessibleProjectIds.mockResolvedValueOnce([]);
+      const empty = await service.findAll({}, analyst);
+      expect(empty).toEqual([]);
+    });
+  });
+
+  describe('findScanIdsForProjects & findProjectIdForScan', (): void => {
+    it('debe retornar IDs de scans para proyectos dados o [] si la lista está vacía', async (): Promise<void> => {
+      expect(await service.findScanIdsForProjects([])).toEqual([]);
+      repository.find!.mockResolvedValue([{ id: 's1' }, { id: 's2' }]);
+      expect(await service.findScanIdsForProjects(['p1'])).toEqual([
+        's1',
+        's2',
+      ]);
+    });
+
+    it('debe retornar el projectId de un scan o null si no existe', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValueOnce({ id: 's1', projectId: 'p1' });
+      expect(await service.findProjectIdForScan('s1')).toBe('p1');
+
+      repository.findOne!.mockResolvedValueOnce(null);
+      expect(await service.findProjectIdForScan('missing')).toBeNull();
+    });
+  });
+
+  describe('scan.entity helpers', (): void => {
+    it('debe validar estados, estados de resultado, herramientas y transiciones', (): void => {
+      expect(isScanStatus('pending')).toBe(true);
+      expect(isScanStatus('unknown')).toBe(false);
+      expect(isResultScanStatus('completed')).toBe(true);
+      expect(isResultScanStatus('failed')).toBe(true);
+      expect(isResultScanStatus('running')).toBe(false);
+      expect(isScanTool('SAST')).toBe(true);
+      expect(isScanTool('Other')).toBe(false);
+      expect(canTransitionScanStatus('pending', 'running')).toBe(true);
+      expect(canTransitionScanStatus('completed', 'failed')).toBe(false);
+      expect(computeProjectCountersFromScans([])).toEqual({
+        status: 'pending',
+        lastScan: null,
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
       });
     });
   });

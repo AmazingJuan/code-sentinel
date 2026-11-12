@@ -10,7 +10,7 @@ import { computeProjectCountersFromScans, Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 
-async function seed() {
+async function seed(): Promise<void> {
   const dataSource = new DataSource({
     type: 'postgres',
     host: process.env.DB_HOST,
@@ -33,7 +33,11 @@ async function seed() {
   // Clear data (order matters because of foreign keys)
   await dataSource.createQueryBuilder().delete().from(Finding).execute();
   await dataSource.createQueryBuilder().delete().from(Scan).execute();
-  await dataSource.createQueryBuilder().delete().from(ProjectAssignment).execute();
+  await dataSource
+    .createQueryBuilder()
+    .delete()
+    .from(ProjectAssignment)
+    .execute();
   await dataSource.createQueryBuilder().delete().from(Project).execute();
   await dataSource.createQueryBuilder().delete().from(User).execute();
 
@@ -76,13 +80,17 @@ async function seed() {
   };
   const projects: Record<string, Project> = {};
   for (const [name, repo] of Object.entries(projectsData)) {
-    projects[name] = await projectRepo.save(projectRepo.create({ name, repo, userId: demoUser.id }));
+    projects[name] = await projectRepo.save(
+      projectRepo.create({ name, repo, userId: demoUser.id }),
+    );
   }
 
   // The registrant (the demo analyst, here) is assigned to every project it
   // registers, mirroring what ProjectsService.create does at runtime.
   for (const project of Object.values(projects)) {
-    await assignmentRepo.save(assignmentRepo.create({ projectId: project.id, userId: demoUser.id }));
+    await assignmentRepo.save(
+      assignmentRepo.create({ projectId: project.id, userId: demoUser.id }),
+    );
   }
 
   // Assign the analyst to only two of the four projects, so logging in as
@@ -90,19 +98,104 @@ async function seed() {
   // "code-sentinel" and "backend-api", but not "frontend-app" or
   // "payments-service".
   for (const name of ['code-sentinel', 'backend-api']) {
-    await assignmentRepo.save(assignmentRepo.create({ projectId: projects[name].id, userId: analystUser.id }));
+    await assignmentRepo.save(
+      assignmentRepo.create({
+        projectId: projects[name].id,
+        userId: analystUser.id,
+      }),
+    );
   }
 
   const scansData = [
     // RF-006: one scan per lifecycle state, so the demo shows all four.
-    { scanNumber: 1044, project: 'frontend-app', date: '2026-08-13', status: 'pending', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 0, medium: 0, low: 0 },
-    { scanNumber: 1043, project: 'code-sentinel', date: '2026-08-13', status: 'running', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 0, medium: 0, low: 0 },
-    { scanNumber: 1042, project: 'code-sentinel', date: '2026-08-12', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 1, high: 3, medium: 5, low: 2 },
-    { scanNumber: 1041, project: 'backend-api', date: '2026-08-11', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 2, high: 6, medium: 9, low: 4 },
-    { scanNumber: 1040, project: 'frontend-app', date: '2026-08-10', status: 'completed', tools: ['SAST', 'Secret Scanner'], critical: 0, high: 2, medium: 7, low: 6 },
-    { scanNumber: 1039, project: 'code-sentinel', date: '2026-08-08', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 2, high: 4, medium: 4, low: 3 },
-    { scanNumber: 1038, project: 'payments-service', date: '2026-08-09', status: 'failed', tools: ['SAST'], critical: 0, high: 0, medium: 0, low: 0 },
-    { scanNumber: 1037, project: 'backend-api', date: '2026-08-06', status: 'completed', tools: ['SAST', 'Secret Scanner', 'Port Scanner'], critical: 1, high: 5, medium: 8, low: 5 },
+    {
+      scanNumber: 1044,
+      project: 'frontend-app',
+      date: '2026-08-13',
+      status: 'pending',
+      tools: ['SAST', 'Secret Scanner'],
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    },
+    {
+      scanNumber: 1043,
+      project: 'code-sentinel',
+      date: '2026-08-13',
+      status: 'running',
+      tools: ['SAST', 'Secret Scanner'],
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    },
+    {
+      scanNumber: 1042,
+      project: 'code-sentinel',
+      date: '2026-08-12',
+      status: 'completed',
+      tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+      critical: 1,
+      high: 3,
+      medium: 5,
+      low: 2,
+    },
+    {
+      scanNumber: 1041,
+      project: 'backend-api',
+      date: '2026-08-11',
+      status: 'completed',
+      tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+      critical: 2,
+      high: 6,
+      medium: 9,
+      low: 4,
+    },
+    {
+      scanNumber: 1040,
+      project: 'frontend-app',
+      date: '2026-08-10',
+      status: 'completed',
+      tools: ['SAST', 'Secret Scanner'],
+      critical: 0,
+      high: 2,
+      medium: 7,
+      low: 6,
+    },
+    {
+      scanNumber: 1039,
+      project: 'code-sentinel',
+      date: '2026-08-08',
+      status: 'completed',
+      tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+      critical: 2,
+      high: 4,
+      medium: 4,
+      low: 3,
+    },
+    {
+      scanNumber: 1038,
+      project: 'payments-service',
+      date: '2026-08-09',
+      status: 'failed',
+      tools: ['SAST'],
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    },
+    {
+      scanNumber: 1037,
+      project: 'backend-api',
+      date: '2026-08-06',
+      status: 'completed',
+      tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+      critical: 1,
+      high: 5,
+      medium: 8,
+      low: 5,
+    },
   ] as const;
 
   for (const s of scansData) {
@@ -184,14 +277,20 @@ async function seed() {
   }
 
   console.log('Seed completed.');
-  console.log('Demo analyst (sees every project): demo@code-sentinel.local / Demo1234!');
-  console.log('Admin user (manages users and assignments only): admin@code-sentinel.local / Admin1234!');
-  console.log('Analyst user (sees only code-sentinel and backend-api): analyst@code-sentinel.local / Analyst1234!');
+  console.log(
+    'Demo analyst (sees every project): demo@code-sentinel.local / Demo1234!',
+  );
+  console.log(
+    'Admin user (manages users and assignments only): admin@code-sentinel.local / Admin1234!',
+  );
+  console.log(
+    'Analyst user (sees only code-sentinel and backend-api): analyst@code-sentinel.local / Analyst1234!',
+  );
 
   await dataSource.destroy();
 }
 
-seed().catch((err) => {
+seed().catch((err: unknown): void => {
   console.error(err);
   process.exit(1);
 });
