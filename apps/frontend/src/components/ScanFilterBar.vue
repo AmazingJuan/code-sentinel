@@ -4,6 +4,15 @@ import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
 import { SCAN_STATUS_LABELS, SCAN_STATUSES } from '@/interfaces/ScanInterface'
 import type { ScanStatus } from '@/interfaces/ScanInterface'
 
+withDefaults(
+  defineProps<{
+    projects?: { id: string; name: string }[]
+  }>(),
+  {
+    projects: () => [],
+  },
+)
+
 const filters = defineModel<ScanFiltersInterface>({ required: true })
 defineEmits<{ (e: 'apply'): void }>()
 
@@ -26,6 +35,9 @@ const labelClass = 'mb-1.5 block text-[11px] tracking-wide text-gray-500'
       <label :class="labelClass">PROJECT</label>
       <select v-model="filters.projectId" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">All projects</option>
+        <option v-for="project in projects" :key="project.id" :value="project.id">
+          {{ project.name }}
+        </option>
       </select>
     </div>
     <div>

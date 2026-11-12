@@ -10,4 +10,3 @@ export class UpdateScanStatusDto {
   @IsString()
   errorMessage?: string | null;
 }
-

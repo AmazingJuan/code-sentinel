@@ -29,6 +29,9 @@ const labelClass = 'mb-1.5 block text-[11px] tracking-wide text-gray-500'
         <option value="SAST">SAST</option>
         <option value="Secret Scanner">Secret Scanner</option>
         <option value="Port Scanner">Port Scanner</option>
+        <option value="Semgrep">Semgrep</option>
+        <option value="Gitleaks">Gitleaks</option>
+        <option value="CodeSentinel">CodeSentinel</option>
       </select>
     </div>
     <div>

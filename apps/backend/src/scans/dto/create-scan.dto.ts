@@ -18,4 +18,3 @@ export class CreateScanDto {
   @IsIn(SCAN_TOOLS, { each: true })
   tools: ScanTool[];
 }
-
