@@ -1,0 +1,26 @@
+{
+  "status": "completed",
+  "errorMessage": null,
+  "findings": [
+    {
+      "type": "no-eval",
+      "severity": "high",
+      "toolCategory": "SAST",
+      "sourceTool": "Semgrep",
+      "filePath": "src/utils/unsafe.ts",
+      "line": 2,
+      "description": "eval() con datos externos permite ejecutar código arbitrario",
+      "recommendation": null
+    },
+    {
+      "type": "github-pat",
+      "severity": "high",
+      "toolCategory": "Secret Scanner",
+      "sourceTool": "Gitleaks",
+      "filePath": "src/config.ts",
+      "line": 12,
+      "description": "GitHub Personal Access Token detected.",
+      "recommendation": "Revoca el token y cárgalo desde una variable de entorno."
+    }
+  ]
+}
