@@ -1,0 +1,8 @@
+rules:
+  - id: no-v-html
+    languages: [generic]
+    severity: WARNING
+    message: v-html renderiza HTML sin escapar y permite XSS
+    pattern: v-html="..."
+    paths:
+      include: ["*.vue"]

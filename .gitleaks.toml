@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Falsos positivos conocidos"
+regexTarget = "match" # Hace que compare contra la coincidencia completa, así que solo se ignora ese caso exacto y no cualquier aparición de abc123def456.
+regexes = ['''token=abc123def456''']
