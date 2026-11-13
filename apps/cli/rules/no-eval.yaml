@@ -3,4 +3,6 @@ rules:
     languages: [typescript, javascript]
     severity: ERROR
     message: eval() con datos externos permite ejecutar código arbitrario
+    metadata:
+      recommendation: Reemplaza eval() por JSON.parse() o por una función explícita que no ejecute texto como código.
     pattern: eval($X)
