@@ -11,13 +11,21 @@ import { Finding } from '../findings/finding.entity';
 import { User, UserRole } from '../users/entities/user.entity';
 
 async function seed(): Promise<void> {
+  const databaseUrl = process.env.DATABASE_URL;
+  const isSsl = process.env.DB_SSL === 'true' || Boolean(databaseUrl);
+
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT),
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
+    ...(databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: process.env.DB_HOST,
+          port: Number(process.env.DB_PORT),
+          username: process.env.DB_USERNAME,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME,
+        }),
+    ssl: isSsl ? { rejectUnauthorized: false } : false,
     entities: [User, Project, ProjectAssignment, Scan, Finding],
     synchronize: true,
   });

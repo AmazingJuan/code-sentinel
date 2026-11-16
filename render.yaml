@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: code-sentinel-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: apps/backend
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.0
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1h
+      - key: DATABASE_URL
+        sync: false

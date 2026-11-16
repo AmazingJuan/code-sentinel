@@ -15,16 +15,27 @@ import { AuthModule } from './auth/auth.module';
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USERNAME'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
-        autoLoadEntities: true,
-        synchronize: true, // solo para desarrollo, nunca en producción
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        const isSsl =
+          config.get<string>('DB_SSL') === 'true' || Boolean(databaseUrl);
+
+        return {
+          type: 'postgres',
+          ...(databaseUrl
+            ? { url: databaseUrl }
+            : {
+                host: config.get<string>('DB_HOST'),
+                port: config.get<number>('DB_PORT'),
+                username: config.get<string>('DB_USERNAME'),
+                password: config.get<string>('DB_PASSWORD'),
+                database: config.get<string>('DB_NAME'),
+              }),
+          ssl: isSsl ? { rejectUnauthorized: false } : false,
+          autoLoadEntities: true,
+          synchronize: true, // solo para desarrollo, nunca en producción
+        };
+      },
     }),
     ProjectsModule,
     ScansModule,
