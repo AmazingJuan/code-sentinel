@@ -16,3 +16,4 @@ services:
         value: 1h
       - key: DATABASE_URL
         sync: false
+
