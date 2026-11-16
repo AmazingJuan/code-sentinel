@@ -60,10 +60,12 @@ export function computeProjectSummariesFromScans(
 
   const summaries: ProjectScanSummaryInterface[] = []
   for (const [projectId, projectScans] of byProject.entries()) {
-    const sorted = [...projectScans].sort((a, b) => b.scanNumber - a.scanNumber)
+    const sorted = [...projectScans].sort(
+      (firstScan, secondScan) => secondScan.scanNumber - firstScan.scanNumber,
+    )
     const latest = sorted[0]
     if (!latest) continue
-    const latestCompleted = sorted.find((s) => s.status === 'completed')
+    const latestCompleted = sorted.find((scan) => scan.status === 'completed')
     const criticalCount = latestCompleted?.criticalCount ?? 0
     const highCount = latestCompleted?.highCount ?? 0
     const mediumCount = latestCompleted?.mediumCount ?? 0
@@ -85,5 +87,7 @@ export function computeProjectSummariesFromScans(
     })
   }
 
-  return summaries.sort((a, b) => a.projectName.localeCompare(b.projectName))
+  return summaries.sort((firstSummary, secondSummary) =>
+    firstSummary.projectName.localeCompare(secondSummary.projectName),
+  )
 }

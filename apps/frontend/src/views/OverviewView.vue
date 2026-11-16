@@ -49,7 +49,9 @@ const recentFindings = computed<FindingInterface[]>(() =>
 // RF-029: calculate aggregate counters from the project summaries (derived from scans).
 const aggregate = computed<{ critical: number; high: number; medium: number; low: number }>(() => {
   const summaries = selectedProjectId.value
-    ? projectSummaries.value.filter((p) => p.projectId === selectedProjectId.value)
+    ? projectSummaries.value.filter(
+        (project) => project.projectId === selectedProjectId.value,
+      )
     : projectSummaries.value
   return summaries.reduce(
     (counts, project) => ({

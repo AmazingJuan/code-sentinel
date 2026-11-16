@@ -21,3 +21,4 @@ describe('mapPortSeverity (RF-022)', (): void => {
     expect(mapPortSeverity(12345)).toBe('low');
   });
 });
+

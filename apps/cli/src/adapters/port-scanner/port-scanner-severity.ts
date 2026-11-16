@@ -16,3 +16,4 @@ export function mapPortSeverity(port: number): Severity {
   }
   return 'low';
 }
+

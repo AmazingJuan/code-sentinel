@@ -198,23 +198,24 @@ async function seed(): Promise<void> {
     },
   ] as const;
 
-  for (const s of scansData) {
-    const total = s.critical + s.high + s.medium + s.low;
+  for (const scanItem of scansData) {
+    const total =
+      scanItem.critical + scanItem.high + scanItem.medium + scanItem.low;
     const scan = await scanRepo.save(
       scanRepo.create({
-        scanNumber: s.scanNumber,
-        projectId: projects[s.project].id,
-        date: new Date(s.date),
-        status: s.status,
+        scanNumber: scanItem.scanNumber,
+        projectId: projects[scanItem.project].id,
+        date: new Date(scanItem.date),
+        status: scanItem.status,
         errorMessage:
-          s.status === 'failed'
+          scanItem.status === 'failed'
             ? 'Repository path could not be accessed by the scanner.'
             : null,
-        tools: s.tools as unknown as Scan['tools'],
-        criticalCount: s.critical,
-        highCount: s.high,
-        mediumCount: s.medium,
-        lowCount: s.low,
+        tools: scanItem.tools as unknown as Scan['tools'],
+        criticalCount: scanItem.critical,
+        highCount: scanItem.high,
+        mediumCount: scanItem.medium,
+        lowCount: scanItem.low,
         totalCount: total,
       }),
     );
