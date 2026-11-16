@@ -77,8 +77,8 @@ onMounted(loadFindings)
                   {{ finding.type }}
                 </span>
               </td>
-              <td class="px-4 py-3 font-mono text-xs text-term-cyan">{{ finding.filePath ?? '—' }}</td>
-              <td class="px-4 py-3 font-mono text-muted-foreground">{{ finding.line ?? '—' }}</td>
+              <td class="px-4 py-3 font-mono text-xs text-term-cyan">{{ finding.filePath ?? '-' }}</td>
+              <td class="px-4 py-3 font-mono text-muted-foreground">{{ finding.line ?? '-' }}</td>
               <td class="px-4 py-3 text-muted-foreground">{{ finding.sourceTool }}</td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-high/30 bg-high/15 px-2.5 py-0.5 text-xs font-medium text-high">

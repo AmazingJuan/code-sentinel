@@ -110,7 +110,7 @@ function severityClass(value: number, tone: 'critical' | 'high' | 'medium' | 'lo
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return '—'
+  if (!value) return '-'
   return new Date(value).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -160,28 +160,28 @@ onMounted(loadOverview)
     <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
         label="Total Scans"
-        :value="isLoading ? '—' : filteredScans.length"
+        :value="isLoading ? '-' : filteredScans.length"
         :hint="selectedProjectId ? 'selected project' : 'all time'"
         :icon="Activity"
         tone="primary"
       />
       <StatCard
         label="Total Findings"
-        :value="isLoading ? '—' : totalFindings"
+        :value="isLoading ? '-' : totalFindings"
         hint="latest scan posture"
         :icon="Bug"
         tone="default"
       />
       <StatCard
         label="Critical"
-        :value="isLoading ? '—' : aggregate.critical"
+        :value="isLoading ? '-' : aggregate.critical"
         hint="open"
         :icon="ShieldAlert"
         tone="critical"
       />
       <StatCard
         label="High"
-        :value="isLoading ? '—' : aggregate.high"
+        :value="isLoading ? '-' : aggregate.high"
         hint="open"
         :icon="ShieldAlert"
         tone="high"
@@ -192,14 +192,14 @@ onMounted(loadOverview)
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 class="text-sm font-medium text-muted-foreground">Latest CLI run</h2>
         <span class="font-mono text-xs text-muted-foreground">
-          scan #{{ latestDisplayScan?.scanNumber ?? '—' }} ·
+          scan #{{ latestDisplayScan?.scanNumber ?? '-' }} ·
           {{ latestDisplayScan?.project?.name ?? 'code-sentinel' }}
         </span>
       </div>
       <div class="grid gap-4 lg:grid-cols-5">
         <TerminalWindow
           class="lg:col-span-3"
-          title="zsh — ~/projects/code-sentinel"
+          title="zsh - ~/projects/code-sentinel"
           :lines="[
             [
               { text: '$ ', tone: 'prompt' },
@@ -265,7 +265,7 @@ onMounted(loadOverview)
             [],
             [{ text: `Total findings: ${latestDisplayScan?.totalCount ?? 0}`, tone: 'default' }],
             [{ text: 'Report generated successfully.', tone: 'green' }],
-            [{ text: `Scan ID: #${latestDisplayScan?.scanNumber ?? '—'}`, tone: 'cyan' }],
+            [{ text: `Scan ID: #${latestDisplayScan?.scanNumber ?? '-'}`, tone: 'cyan' }],
           ]"
         />
 

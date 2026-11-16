@@ -30,7 +30,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: 'zsh — codesentinel',
+  title: 'zsh - codesentinel',
   animate: true,
   showCursor: true,
 })

@@ -217,7 +217,7 @@ async function onSubmit(): Promise<void> {
       <div class="relative min-w-0 w-full max-w-lg">
 
         <TerminalWindow
-          title="zsh — ~/projects/code-sentinel"
+          title="zsh - ~/projects/code-sentinel"
           :lines="[
             [
               { text: '$ ', tone: 'prompt' },
