@@ -4,7 +4,10 @@ import axios from 'axios'
 import { useAuthStore } from '@/stores/authStore'
 
 export const httpClient = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000',
+  baseURL:
+    (import.meta.env.CODE_SENTINEL_API_URL as string | undefined) ??
+    (import.meta.env.VITE_API_URL as string | undefined) ??
+    'http://localhost:8000',
 })
 
 httpClient.interceptors.request.use((config) => {
