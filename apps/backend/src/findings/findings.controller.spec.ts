@@ -71,4 +71,3 @@ describe('FindingsController', (): void => {
     expect(findingsService.findOne).toHaveBeenCalledWith('f1', request.user);
   });
 });
-

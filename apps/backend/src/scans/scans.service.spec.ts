@@ -539,6 +539,58 @@ describe('ScansService', () => {
         }),
       );
     });
+
+    it('debe reutilizar la lista de scans del proyecto cuando el scan actual ya existe en la consulta', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue({
+        id: 'scan-1',
+        scanNumber: 1045,
+        projectId: 'p1',
+        date: new Date('2026-08-14T00:00:00.000Z'),
+        status: 'running',
+      });
+      projectRepository.findOne!.mockResolvedValue({
+        id: 'p1',
+        name: 'code-sentinel',
+        status: 'running',
+        lastScan: null,
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+      });
+      repository.find!.mockResolvedValue([
+        {
+          id: 'scan-1',
+          scanNumber: 1045,
+          projectId: 'p1',
+          status: 'completed',
+          date: new Date('2026-08-14T00:00:00.000Z'),
+          criticalCount: 2,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+        },
+      ]);
+
+      const completed = await service.submitResults(
+        'scan-1',
+        {
+          status: 'completed',
+          findings: [
+            {
+              type: 'crit-issue',
+              severity: 'critical',
+              toolCategory: 'SAST',
+              sourceTool: 'Semgrep',
+            },
+          ],
+        },
+        analyst,
+      );
+
+      expect(completed.criticalCount).toBe(1);
+      expect(projectRepository.save).toHaveBeenCalled();
+    });
   });
 
   describe('findAll', (): void => {
