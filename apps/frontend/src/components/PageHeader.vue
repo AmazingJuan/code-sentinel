@@ -14,10 +14,10 @@ defineProps<{
     </div>
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 class="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
+        <h1 class="text-xl font-semibold tracking-tight text-balance md:text-2xl">
           {{ title }}
         </h1>
-        <p v-if="description" class="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p v-if="description" class="mt-1 max-w-2xl text-sm text-muted-foreground text-pretty">
           {{ description }}
         </p>
       </div>

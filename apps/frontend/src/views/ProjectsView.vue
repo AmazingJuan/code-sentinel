@@ -162,8 +162,8 @@ onMounted(loadProjects)
             v-slot="{ navigate }"
           >
             <tr class="group cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40" @click="navigate">
-              <td class="px-4 py-3 font-mono text-foreground group-hover:text-primary transition-colors">{{ project.name }}</td>
-              <td class="max-w-xs truncate px-4 py-3 text-muted-foreground" :title="project.repo">{{ project.repo }}</td>
+              <td class="px-4 py-3 font-mono font-medium text-primary hover:underline">{{ project.name }}</td>
+              <td class="max-w-xs truncate px-4 py-3 font-mono text-xs text-term-cyan" :title="project.repo">{{ project.repo }}</td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="statusClass(project.status)">
                   <span class="size-1.5 rounded-full" :class="project.status === 'completed' ? 'bg-primary' : project.status === 'failed' ? 'bg-destructive' : 'bg-muted-foreground'" aria-hidden="true" />
