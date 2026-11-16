@@ -1,0 +1,222 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Security & Secret Detection (Gitleaks)
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Security & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks secret scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  # ---------------------------------------------------------------------------
+  # 2. CLI Toolsuite (apps/cli)
+  # ---------------------------------------------------------------------------
+  cli:
+    name: CLI Checks (Lint, Test, Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: apps/cli/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint CLI
+        run: pnpm run lint
+
+      - name: Run CLI unit tests
+        run: pnpm test
+
+      - name: Build CLI
+        run: pnpm run build
+
+  # ---------------------------------------------------------------------------
+  # 3. Backend API (apps/backend)
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend Checks (Lint, Unit, Integration, Coverage, Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: apps/backend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Backend
+        run: pnpm run lint
+
+      - name: Run unit tests with coverage
+        run: pnpm run test:cov
+
+      - name: Run integration tests
+        run: pnpm run test:integration
+
+      - name: Build Backend
+        run: pnpm run build
+
+      - name: Upload backend coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage-report
+          path: apps/backend/coverage
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # 4. Frontend Application (apps/frontend)
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend Checks (Lint, Types, Unit, Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    env:
+      CYPRESS_INSTALL_BINARY: 0
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: apps/frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Frontend (oxlint & eslint)
+        run: pnpm run lint
+
+      - name: Type check (vue-tsc)
+        run: pnpm run type-check
+
+      - name: Run frontend unit tests
+        run: pnpm run test:unit --run
+
+      - name: Build Frontend
+        run: pnpm run build
+
+  # ---------------------------------------------------------------------------
+  # 5. Docker Compose & Container Integrity
+  # ---------------------------------------------------------------------------
+  docker-validation:
+    name: Docker & Compose Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate docker compose configuration
+        run: docker compose config --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: docker compose build --parallel
+
+  # ---------------------------------------------------------------------------
+  # 6. CI Status Gate (Single Required Status Check for Branch Protection)
+  # ---------------------------------------------------------------------------
+  ci-status:
+    name: CI Status Gate
+    runs-on: ubuntu-latest
+    needs:
+      - secret-scan
+      - cli
+      - backend
+      - frontend
+      - docker-validation
+    if: always()
+    steps:
+      - name: Evaluate pipeline results
+        run: |
+          echo "Evaluating CI pipeline status:"
+          echo "  Secret scan:       ${{ needs.secret-scan.result }}"
+          echo "  CLI checks:        ${{ needs.cli.result }}"
+          echo "  Backend checks:    ${{ needs.backend.result }}"
+          echo "  Frontend checks:   ${{ needs.frontend.result }}"
+          echo "  Docker validation: ${{ needs.docker-validation.result }}"
+
+          if [ "${{ needs.secret-scan.result }}" != "success" ] || \
+             [ "${{ needs.cli.result }}" != "success" ] || \
+             [ "${{ needs.backend.result }}" != "success" ] || \
+             [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.docker-validation.result }}" != "success" ]; then
+            echo "::error::One or more upstream CI jobs failed."
+            exit 1
+          fi
+
+          echo "All CI checks passed successfully!"
