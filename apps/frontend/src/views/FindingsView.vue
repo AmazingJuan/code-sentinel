@@ -32,7 +32,7 @@ onMounted(loadFindings)
     <PageHeader
       title="Findings"
       breadcrumb="~/ findings"
-      description="Every vulnerability normalized from SAST, secret and port scans."
+      description="Aggregated vulnerabilities from security analysis scans."
     />
 
     <div class="mb-4 rounded-lg border border-border bg-card p-4">

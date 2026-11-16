@@ -102,7 +102,7 @@ function historicalDelta(scan: ScanInterface): number | null {
     <PageHeader
       title="Scan Reports"
       breadcrumb="~/ scan-reports"
-      description="Historical scans performed by Code Sentinel, normalized across all tools."
+      description="Execution history and vulnerability metrics across projects."
     />
 
     <div class="mb-4 rounded-lg border border-border bg-card p-4">

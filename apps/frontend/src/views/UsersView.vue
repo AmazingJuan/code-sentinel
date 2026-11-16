@@ -84,7 +84,7 @@ onMounted(loadUsers)
     <PageHeader
       title="User management"
       breadcrumb="~/ users"
-      description="Create and remove access to the Code Sentinel console."
+      description="Manage user accounts and role permissions."
     />
 
     <p v-if="errorMessage" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">{{ errorMessage }}</p>

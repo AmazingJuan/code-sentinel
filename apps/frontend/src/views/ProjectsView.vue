@@ -83,7 +83,7 @@ onMounted(loadProjects)
     <PageHeader
       title="Projects"
       breadcrumb="~/ projects"
-      description="Register software projects so they can be configured and analyzed by Code Sentinel."
+      description="Configured software repositories and security profiles."
     />
 
     <div class="mb-6 rounded-lg border border-border bg-card p-5">
