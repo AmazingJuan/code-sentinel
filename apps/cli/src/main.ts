@@ -1,0 +1,253 @@
+#!/usr/bin/env node
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+
+import { PortScannerAdapter } from './adapters/port-scanner/port-scanner-adapter.js';
+import { SemgrepAdapter } from './adapters/semgrep/semgrep-adapter.js';
+import { DEFAULT_API_URL } from './config/endpoint.js';
+import type { NormalizedFinding } from './domain/finding.js';
+import type { ToolAdapter } from './domain/tool-adapter.js';
+import { AdapterRegistry } from './pipeline/adapter-registry.js';
+import { runAdapters } from './pipeline/run-adapters.js';
+
+export { DEFAULT_API_URL };
+
+export interface CliOptions {
+  project?: string;
+  target?: string;
+  apiUrl?: string;
+  token?: string;
+  dryRun?: boolean;
+  tools?: string;
+  help?: boolean;
+  version?: boolean;
+}
+
+export function getPackageVersion(): string {
+  try {
+    const pkgPath = fileURLToPath(new URL('../package.json', import.meta.url));
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+      return pkg.version || '0.1.0';
+    }
+  } catch {
+    // fallback if package.json cannot be read
+  }
+  return '0.1.0';
+}
+
+export function printHelp(): void {
+  console.log(`
+Code Sentinel CLI - Security Analysis & Vulnerability Scanner Engine
+
+Usage:
+  code-sentinel scan [options]
+  code-sentinel --help
+  code-sentinel --version
+
+Options:
+  -p, --project <id>    Project ID registered in Code Sentinel console
+  -d, --target <path>   Target directory or file to scan (default: current directory)
+  -u, --api-url <url>   Backend API URL (default: ${DEFAULT_API_URL})
+  -t, --token <jwt>     Authentication token (default: env CODE_SENTINEL_TOKEN)
+      --tools <list>    Comma-separated tools to run: semgrep, port-scanner (default: all)
+      --dry-run         Run scan locally without syncing results to backend
+  -h, --help            Show this help message
+  -v, --version         Show CLI version
+
+Examples:
+  code-sentinel scan --target ./src --dry-run
+  code-sentinel scan --project 005dea16-d57b-46bc-9843-591b4021179f --token <jwt>
+  CODE_SENTINEL_TOKEN=<jwt> code-sentinel scan -p <id>
+`);
+}
+
+export function buildRegistry(): AdapterRegistry {
+  const registry = new AdapterRegistry();
+  registry.register(new SemgrepAdapter());
+  registry.register(new PortScannerAdapter());
+  return registry;
+}
+
+export async function submitScanToBackend(
+  apiUrl: string,
+  token: string,
+  projectId: string,
+  tools: string[],
+  findings: NormalizedFinding[],
+): Promise<{ scanId: string; totalCount: number }> {
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+
+  // Step 1: Create scan in pending state
+  const createRes = await fetch(`${apiUrl}/scans`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ projectId, tools }),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Failed to create scan (HTTP ${createRes.status}): ${errText}`);
+  }
+
+  const scan = (await createRes.json()) as { id: string };
+
+  // Step 2: Transition to running
+  const statusRes = await fetch(`${apiUrl}/scans/${scan.id}/status`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ status: 'running' }),
+  });
+
+  if (!statusRes.ok) {
+    const errText = await statusRes.text();
+    throw new Error(`Failed to update scan status (HTTP ${statusRes.status}): ${errText}`);
+  }
+
+  // Step 3: Ingest findings and complete scan
+  const resultsRes = await fetch(`${apiUrl}/scans/${scan.id}/results`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      status: 'completed',
+      findings,
+    }),
+  });
+
+  if (!resultsRes.ok) {
+    const errText = await resultsRes.text();
+    throw new Error(`Failed to submit scan findings (HTTP ${resultsRes.status}): ${errText}`);
+  }
+
+  const resultData = (await resultsRes.json()) as { totalCount?: number };
+  return {
+    scanId: scan.id,
+    totalCount: resultData.totalCount ?? findings.length,
+  };
+}
+
+export async function runCli(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    options: {
+      project: { type: 'string', short: 'p' },
+      target: { type: 'string', short: 'd', default: '.' },
+      'api-url': { type: 'string', short: 'u', default: DEFAULT_API_URL },
+      token: { type: 'string', short: 't', default: process.env.CODE_SENTINEL_TOKEN },
+      'dry-run': { type: 'boolean', default: false },
+      tools: { type: 'string', default: 'semgrep,port-scanner' },
+      help: { type: 'boolean', short: 'h', default: false },
+      version: { type: 'boolean', short: 'v', default: false },
+    },
+    allowPositionals: true,
+  });
+
+  if (values.version) {
+    console.log(`code-sentinel-cli v${getPackageVersion()}`);
+    return 0;
+  }
+
+  if (values.help || positionals.includes('help')) {
+    printHelp();
+    return 0;
+  }
+
+  const command = positionals[0] || 'scan';
+  if (command !== 'scan') {
+    console.error(`Unknown command: "${command}". Use "code-sentinel --help" for available commands.`);
+    return 1;
+  }
+
+  const targetPath = resolve(values.target || '.');
+  if (!existsSync(targetPath)) {
+    console.error(`Error: Target path does not exist: "${targetPath}"`);
+    return 1;
+  }
+
+  console.log('----------------------------------------------------');
+  console.log(' Code Sentinel - Security Analysis Engine');
+  console.log('----------------------------------------------------');
+  console.log(` Target path : ${targetPath}`);
+  console.log(` Backend API : ${values['api-url']}`);
+
+  const registry = buildRegistry();
+  const allAdapters = registry.list();
+  const requestedTools = (values.tools || '').split(',').map((t: string) => t.trim().toLowerCase());
+
+  const activeAdapters: ToolAdapter[] = allAdapters.filter((adapter: ToolAdapter) => {
+    if (requestedTools.includes('all')) return true;
+    const name = adapter.sourceTool.toLowerCase();
+    const category = adapter.toolCategory.toLowerCase();
+    return requestedTools.some((t: string) => name.includes(t) || category.includes(t));
+  });
+
+  if (activeAdapters.length === 0) {
+    console.warn('Warning: No matching security adapters found for the specified tools.');
+  }
+
+  console.log(` Active tools: ${activeAdapters.map((a: ToolAdapter) => `${a.sourceTool} (${a.toolCategory})`).join(', ') || 'None'}`);
+  console.log(' Running security analysis...');
+
+  const { findings, errors } = await runAdapters(activeAdapters, { rootPath: targetPath });
+
+  if (errors.length > 0) {
+    console.warn(` Warnings encountered (${errors.length}):`);
+    for (const err of errors) {
+      console.warn(`   - ${err}`);
+    }
+  }
+
+  console.log('----------------------------------------------------');
+  console.log(` Analysis finished. Normalized findings: ${findings.length}`);
+
+  const criticals = findings.filter((f) => f.severity === 'critical').length;
+  const highs = findings.filter((f) => f.severity === 'high').length;
+  const mediums = findings.filter((f) => f.severity === 'medium').length;
+  const lows = findings.filter((f) => f.severity === 'low').length;
+
+  console.log(` Severity breakdown: Critical: ${criticals} | High: ${highs} | Medium: ${mediums} | Low: ${lows}`);
+
+  // Backend Sync
+  const isDryRun = values['dry-run'] || !values.token || !values.project;
+
+  if (isDryRun) {
+    if (!values['dry-run'] && (!values.token || !values.project)) {
+      console.log(' Note: Skipping backend sync (either --token or --project was omitted). Run with --help for details.');
+    } else {
+      console.log(' Dry run mode active: findings kept locally.');
+    }
+    return criticals > 0 || highs > 0 ? 1 : 0;
+  }
+
+  try {
+    console.log(` Syncing scan results to Code Sentinel API (${values['api-url']})...`);
+    const { scanId } = await submitScanToBackend(
+      values['api-url'] as string,
+      values.token as string,
+      values.project as string,
+      activeAdapters.map((a) => a.sourceTool),
+      findings,
+    );
+
+    console.log(` Successfully synchronized scan #${scanId}!`);
+    console.log(' You can review the findings and metrics in the Code Sentinel web console.');
+    return criticals > 0 || highs > 0 ? 1 : 0;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(` Error during backend synchronization: ${message}`);
+    return 1;
+  }
+}
+
+// Self-invocation check when executed directly from CLI binary
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  runCli(process.argv.slice(2)).then((code) => {
+    process.exit(code);
+  });
+}
+
