@@ -5,3 +5,4 @@ coverage
 .env*
 cypress
 *.log
+code-sentinel-2
