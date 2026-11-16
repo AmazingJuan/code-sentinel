@@ -5,6 +5,7 @@ import { ChevronRight, FolderPlus } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import PageHeader from '@/components/PageHeader.vue'
 import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
 import { ProjectService } from '@/services/ProjectService'
 
@@ -62,9 +63,9 @@ function statusLabel(status: ProjectStatus): string {
 
 function statusClass(status: ProjectStatus): string {
   const classes: Record<ProjectStatus, string> = {
-    pending: 'border-gray-700 bg-gray-800/40 text-gray-300',
-    completed: 'border-green-800 bg-green-900/30 text-green-300',
-    failed: 'border-red-800 bg-red-900/30 text-red-300',
+    pending: 'border-border bg-muted/40 text-muted-foreground',
+    completed: 'border-primary/30 bg-primary/10 text-primary',
+    failed: 'border-destructive/30 bg-destructive/10 text-destructive',
   }
   return classes[status]
 }
@@ -79,53 +80,53 @@ onMounted(loadProjects)
 
 <template>
   <div class="p-5 sm:p-8">
-    <div class="mb-6">
-      <p class="mb-2 font-mono text-xs text-gray-500">~/ projects</p>
-      <h1 class="text-xl font-semibold tracking-tight text-white md:text-2xl">Projects</h1>
-      <p class="mt-1 max-w-2xl text-sm text-gray-400">Register software projects so they can be configured and analyzed by Code Sentinel.</p>
-    </div>
+    <PageHeader
+      title="Projects"
+      breadcrumb="~/ projects"
+      description="Register software projects so they can be configured and analyzed by Code Sentinel."
+    />
 
-    <div class="mb-6 rounded-lg border border-gray-800 bg-gray-900/40 p-5">
-      <div class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-400">
-        <FolderPlus class="size-4" />
+    <div class="mb-6 rounded-lg border border-border bg-card p-5">
+      <div class="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+        <FolderPlus class="size-4 text-primary" />
         Register a new project
       </div>
 
-      <p v-if="formErrorMessage" class="mb-3 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+      <p v-if="formErrorMessage" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
         {{ formErrorMessage }}
       </p>
-      <p v-if="successMessage" class="mb-3 rounded-md border border-green-900 bg-green-950/40 px-4 py-2 text-sm text-green-300">
+      <p v-if="successMessage" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
         {{ successMessage }}
       </p>
 
       <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="registerProject">
         <div>
-          <label for="project-name" class="mb-1.5 block text-[11px] tracking-wide text-gray-500">PROJECT NAME</label>
+          <label for="project-name" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">PROJECT NAME</label>
           <input
             id="project-name"
             v-model="form.name"
             required
             maxlength="120"
             placeholder="payments-service"
-            class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-600"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>
         <div>
-          <label for="project-repo" class="mb-1.5 block text-[11px] tracking-wide text-gray-500">SOURCE CODE LOCATION</label>
+          <label for="project-repo" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">SOURCE CODE LOCATION</label>
           <input
             id="project-repo"
             v-model="form.repo"
             required
             maxlength="500"
             placeholder="git@github.com:org/payments-service.git"
-            class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-600"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>
         <div class="sm:col-span-2">
           <button
             type="submit"
             :disabled="isSubmitting"
-            class="rounded-md bg-green-500 px-4 py-2 text-sm font-medium text-gray-950 hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
+            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {{ isSubmitting ? 'Registering…' : 'Register project' }}
           </button>
@@ -133,16 +134,16 @@ onMounted(loadProjects)
       </form>
     </div>
 
-    <p v-if="errorMessage" class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+    <p v-if="errorMessage" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
-    <p v-else class="mb-2 font-mono text-xs text-gray-500">
+    <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
       {{ isLoading ? 'Loading…' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
     </p>
 
-    <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-gray-800 bg-gray-900/40">
+    <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[640px] text-left text-sm">
-        <thead class="text-xs uppercase tracking-wider text-gray-500">
+        <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th class="px-4 py-3 font-medium">Project</th>
             <th class="px-4 py-3 font-medium">Source</th>
@@ -160,24 +161,25 @@ onMounted(loadProjects)
             custom
             v-slot="{ navigate }"
           >
-            <tr class="group cursor-pointer border-t border-gray-800/60 transition-colors hover:bg-gray-800/40" @click="navigate">
-              <td class="px-4 py-3 font-mono text-gray-200">{{ project.name }}</td>
-              <td class="max-w-xs truncate px-4 py-3 text-gray-400" :title="project.repo">{{ project.repo }}</td>
+            <tr class="group cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40" @click="navigate">
+              <td class="px-4 py-3 font-mono text-foreground group-hover:text-primary transition-colors">{{ project.name }}</td>
+              <td class="max-w-xs truncate px-4 py-3 text-muted-foreground" :title="project.repo">{{ project.repo }}</td>
               <td class="px-4 py-3">
-                <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium" :class="statusClass(project.status)">
+                <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="statusClass(project.status)">
+                  <span class="size-1.5 rounded-full" :class="project.status === 'completed' ? 'bg-primary' : project.status === 'failed' ? 'bg-destructive' : 'bg-muted-foreground'" aria-hidden="true" />
                   {{ statusLabel(project.status) }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-gray-400">{{ formatDate(project.lastScan) }}</td>
-              <td class="px-3 py-3 text-right font-mono tabular-nums text-white">
+              <td class="px-4 py-3 text-muted-foreground">{{ formatDate(project.lastScan) }}</td>
+              <td class="px-3 py-3 text-right font-mono tabular-nums text-foreground">
                 {{ project.criticalCount + project.highCount + project.mediumCount + project.lowCount }}
               </td>
-              <td class="px-2 py-3 text-gray-500"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
+              <td class="px-2 py-3 text-muted-foreground"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
             </tr>
           </RouterLink>
         </tbody>
       </table>
-      <p v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-gray-500">
+      <p v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-muted-foreground">
         No projects have been registered yet. Use the form above to register your first project.
       </p>
     </div>

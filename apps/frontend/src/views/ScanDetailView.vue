@@ -35,48 +35,50 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-8">
-    <p v-if="errorMessage" class="rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+  <div class="p-5 sm:p-8">
+    <p v-if="errorMessage" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
 
     <template v-else-if="scan">
-      <p class="font-mono text-xs text-gray-500">~/ scan-reports/{{ scan.scanNumber }}</p>
-      <div class="mt-1 flex items-center gap-3">
-        <h1 class="font-mono text-2xl font-semibold text-white">#{{ scan.scanNumber }}</h1>
-        <StatusBadge :status="scan.status" />
-      </div>
-      <p class="mt-1 text-sm text-gray-400">{{ scan.project.name }} · {{ new Date(scan.date).toLocaleDateString() }}</p>
+      <div class="mb-6">
+        <p class="mb-2 font-mono text-xs text-muted-foreground">~/ scan-reports/{{ scan.scanNumber }}</p>
+        <div class="flex items-center gap-3">
+          <h1 class="font-mono text-2xl font-semibold text-foreground">#{{ scan.scanNumber }}</h1>
+          <StatusBadge :status="scan.status" />
+        </div>
+        <p class="mt-1 text-sm text-muted-foreground">{{ scan.project.name }} · {{ new Date(scan.date).toLocaleDateString() }}</p>
 
-      <div class="mt-4 flex gap-2">
-        <span
-          v-for="tool in scan.tools"
-          :key="tool"
-          class="rounded border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-300"
-        >
-          {{ tool }}
-        </span>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <span
+            v-for="tool in scan.tools"
+            :key="tool"
+            class="rounded border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground"
+          >
+            {{ tool }}
+          </span>
+        </div>
       </div>
 
       <p
         v-if="scan.status === 'failed' && scan.errorMessage"
-        class="mt-4 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300"
+        class="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
       >
         {{ scan.errorMessage }}
       </p>
 
-      <h2 class="mt-8 text-sm font-medium tracking-wide text-gray-400">FINDINGS</h2>
-      <p v-if="findings.length === 0" class="mt-2 text-sm text-gray-500">No findings for this scan.</p>
+      <h2 class="mt-8 font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">FINDINGS</h2>
+      <p v-if="findings.length === 0" class="mt-2 text-sm text-muted-foreground">No findings for this scan.</p>
 
-      <div v-else class="mt-2 overflow-hidden rounded-lg border border-gray-800">
+      <div v-else class="mt-2 overflow-hidden rounded-lg border border-border bg-card">
         <div
           v-for="finding in findings"
           :key="finding.id"
-          class="flex items-center justify-between border-t border-gray-800 px-4 py-3 first:border-t-0"
+          class="flex items-center justify-between border-b border-border/60 px-4 py-3 last:border-0 hover:bg-accent/40 transition-colors"
         >
           <div>
-            <p class="text-sm text-gray-200">{{ finding.type }}</p>
-            <p v-if="finding.filePath" class="mt-0.5 font-mono text-xs text-gray-500">
+            <p class="text-sm font-medium text-foreground">{{ finding.type }}</p>
+            <p v-if="finding.filePath" class="mt-0.5 font-mono text-xs text-muted-foreground">
               {{ finding.filePath }}:{{ finding.line }}
             </p>
           </div>

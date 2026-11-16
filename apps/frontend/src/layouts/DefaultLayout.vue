@@ -16,8 +16,8 @@ watch(() => route.fullPath, () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0B0E14] text-gray-200">
-    <aside class="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-gray-800 lg:block">
+  <div class="min-h-screen bg-background text-foreground">
+    <aside class="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-sidebar-border bg-sidebar lg:block">
       <AppSidebar />
     </aside>
 
@@ -27,9 +27,9 @@ watch(() => route.fullPath, () => {
         aria-label="Close navigation"
         @click="mobileOpen = false"
       />
-      <aside class="relative h-full w-64 border-r border-gray-800 bg-[#0B0E14]">
+      <aside class="relative h-full w-64 border-r border-sidebar-border bg-sidebar">
         <button
-          class="absolute right-2 top-3 rounded p-1 text-gray-400 hover:text-gray-200"
+          class="absolute right-2 top-3 rounded p-1 text-muted-foreground hover:text-foreground"
           aria-label="Close navigation"
           @click="mobileOpen = false"
         >

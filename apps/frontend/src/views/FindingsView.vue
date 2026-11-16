@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import FindingFilterBar from '@/components/FindingFilterBar.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
@@ -28,23 +29,26 @@ onMounted(loadFindings)
 
 <template>
   <div class="p-5 sm:p-8">
-    <div class="mb-6">
-      <p class="mb-2 font-mono text-xs text-gray-500">~/ findings</p>
-      <h1 class="text-xl font-semibold tracking-tight text-white md:text-2xl">Findings</h1>
-      <p class="mt-1 max-w-2xl text-sm text-gray-400">Every vulnerability normalized from SAST, secret and port scans.</p>
-    </div>
+    <PageHeader
+      title="Findings"
+      breadcrumb="~/ findings"
+      description="Every vulnerability normalized from SAST, secret and port scans."
+    />
 
-    <div class="mb-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
+    <div class="mb-4 rounded-lg border border-border bg-card p-4">
       <FindingFilterBar v-model="filters" @apply="loadFindings" />
     </div>
 
-    <p v-if="errorMessage" class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+    <p
+      v-if="errorMessage"
+      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
+    >
       {{ errorMessage }}
     </p>
 
-    <div class="overflow-x-auto rounded-lg border border-gray-800 bg-gray-900/40">
+    <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[760px] text-left text-sm">
-        <thead class="text-xs uppercase tracking-wider text-gray-500">
+        <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th class="px-4 py-3 font-medium">Severity</th>
             <th class="px-4 py-3 font-medium">Finding Type</th>
@@ -63,19 +67,35 @@ onMounted(loadFindings)
             custom
             v-slot="{ navigate }"
           >
-            <tr class="group cursor-pointer border-t border-gray-800/60 transition-colors hover:bg-gray-800/40" @click="navigate">
+            <tr
+              class="group cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
+              @click="navigate"
+            >
               <td class="px-4 py-3"><SeverityBadge :severity="finding.severity" /></td>
-              <td class="px-4 py-3"><span class="font-medium text-gray-200 hover:text-green-400">{{ finding.type }}</span></td>
-              <td class="px-4 py-3 font-mono text-xs text-cyan-400">{{ finding.filePath ?? '—' }}</td>
-              <td class="px-4 py-3 font-mono text-gray-500">{{ finding.line ?? '—' }}</td>
-              <td class="px-4 py-3 text-gray-400">{{ finding.sourceTool }}</td>
-              <td class="px-4 py-3"><span class="rounded border border-orange-500/25 bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-400">Open</span></td>
-              <td class="px-2 py-3 text-gray-500"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
+              <td class="px-4 py-3">
+                <span class="font-medium text-foreground transition-colors group-hover:text-primary">
+                  {{ finding.type }}
+                </span>
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-term-cyan">{{ finding.filePath ?? '—' }}</td>
+              <td class="px-4 py-3 font-mono text-muted-foreground">{{ finding.line ?? '—' }}</td>
+              <td class="px-4 py-3 text-muted-foreground">{{ finding.sourceTool }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-high/30 bg-high/15 px-2.5 py-0.5 text-xs font-medium text-high">
+                  <span class="size-1.5 rounded-full bg-high" aria-hidden="true" />
+                  Open
+                </span>
+              </td>
+              <td class="px-2 py-3 text-muted-foreground">
+                <ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" />
+              </td>
             </tr>
           </RouterLink>
         </tbody>
       </table>
-      <p v-if="findings.length === 0" class="px-4 py-12 text-center text-sm text-gray-500">No findings match the selected filters.</p>
+      <p v-if="findings.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
+        No findings match the selected filters.
+      </p>
     </div>
   </div>
 </template>

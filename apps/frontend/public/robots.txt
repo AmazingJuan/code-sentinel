@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://amazingjuan.github.io/code-sentinel/sitemap.xml

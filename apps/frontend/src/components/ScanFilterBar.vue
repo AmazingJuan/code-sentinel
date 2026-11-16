@@ -25,8 +25,8 @@ const statusOptions = SCAN_STATUSES.map(
 )
 
 const selectClass =
-  'h-9 w-full rounded-md border border-gray-700 bg-gray-900 px-2.5 text-sm text-gray-200 outline-none focus:border-green-600'
-const labelClass = 'mb-1.5 block text-[11px] tracking-wide text-gray-500'
+  'h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary'
+const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
 </script>
 
 <template>

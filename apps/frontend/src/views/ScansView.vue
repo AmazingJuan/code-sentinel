@@ -4,6 +4,7 @@ import { ChevronRight, ListFilter } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
+import PageHeader from '@/components/PageHeader.vue'
 import ScanFilterBar from '@/components/ScanFilterBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
@@ -65,12 +66,12 @@ async function loadScans(): Promise<void> {
 onMounted(loadScans)
 
 function severityClass(value: number, tone: 'critical' | 'high' | 'medium' | 'low'): string {
-  if (value === 0) return 'text-gray-600'
+  if (value === 0) return 'text-muted-foreground/40'
   const map = {
-    critical: 'text-red-400',
-    high: 'text-orange-400',
-    medium: 'text-yellow-400',
-    low: 'text-blue-400',
+    critical: 'text-critical',
+    high: 'text-high',
+    medium: 'text-medium',
+    low: 'text-low',
   }
   return map[tone]
 }
@@ -98,16 +99,14 @@ function historicalDelta(scan: ScanInterface): number | null {
 
 <template>
   <div class="p-5 sm:p-8">
-    <div class="mb-6">
-      <p class="mb-2 font-mono text-xs text-gray-500">~/ scan-reports</p>
-      <h1 class="text-xl font-semibold tracking-tight text-white md:text-2xl">Scan Reports</h1>
-      <p class="mt-1 max-w-2xl text-sm text-gray-400">
-        Historical scans performed by Code Sentinel, normalized across all tools.
-      </p>
-    </div>
+    <PageHeader
+      title="Scan Reports"
+      breadcrumb="~/ scan-reports"
+      description="Historical scans performed by Code Sentinel, normalized across all tools."
+    />
 
-    <div class="mb-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4">
-      <div class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-400">
+    <div class="mb-4 rounded-lg border border-border bg-card p-4">
+      <div class="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
         <ListFilter class="size-4" />
         Filters
       </div>
@@ -116,21 +115,21 @@ function historicalDelta(scan: ScanInterface): number | null {
 
     <div
       v-if="selectedProjectSummary"
-      class="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-gray-800 bg-gray-900/40 p-4 sm:grid-cols-6"
+      class="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-6"
     >
       <div class="sm:col-span-2">
-        <p class="text-[11px] uppercase tracking-wide text-gray-500">Project Summary</p>
-        <p class="mt-1 font-mono text-sm font-semibold text-white">
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Project Summary</p>
+        <p class="mt-1 font-mono text-sm font-semibold text-foreground">
           {{ selectedProjectSummary.projectName }}
         </p>
-        <p class="mt-0.5 text-xs text-gray-500">
+        <p class="mt-0.5 text-xs text-muted-foreground">
           {{ selectedProjectSummary.scanCount }} historical scan{{
             selectedProjectSummary.scanCount === 1 ? '' : 's'
           }}
         </p>
       </div>
       <div>
-        <p class="text-[11px] uppercase tracking-wide text-gray-500">Critical</p>
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Critical</p>
         <p
           class="mt-1 font-mono text-lg font-semibold tabular-nums"
           :class="severityClass(selectedProjectSummary.criticalCount, 'critical')"
@@ -139,7 +138,7 @@ function historicalDelta(scan: ScanInterface): number | null {
         </p>
       </div>
       <div>
-        <p class="text-[11px] uppercase tracking-wide text-gray-500">High</p>
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">High</p>
         <p
           class="mt-1 font-mono text-lg font-semibold tabular-nums"
           :class="severityClass(selectedProjectSummary.highCount, 'high')"
@@ -148,7 +147,7 @@ function historicalDelta(scan: ScanInterface): number | null {
         </p>
       </div>
       <div>
-        <p class="text-[11px] uppercase tracking-wide text-gray-500">Medium</p>
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Medium</p>
         <p
           class="mt-1 font-mono text-lg font-semibold tabular-nums"
           :class="severityClass(selectedProjectSummary.mediumCount, 'medium')"
@@ -157,7 +156,7 @@ function historicalDelta(scan: ScanInterface): number | null {
         </p>
       </div>
       <div>
-        <p class="text-[11px] uppercase tracking-wide text-gray-500">Low</p>
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Low</p>
         <p
           class="mt-1 font-mono text-lg font-semibold tabular-nums"
           :class="severityClass(selectedProjectSummary.lowCount, 'low')"
@@ -169,17 +168,17 @@ function historicalDelta(scan: ScanInterface): number | null {
 
     <p
       v-if="errorMessage"
-      class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300"
+      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
     </p>
-    <p v-else class="mb-2 font-mono text-xs text-gray-500">
+    <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
       {{ isLoading ? 'Loading…' : `${scans.length} scan${scans.length === 1 ? '' : 's'}` }}
     </p>
 
-    <div class="overflow-x-auto rounded-lg border border-gray-800 bg-gray-900/40">
+    <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[720px] text-left text-sm">
-        <thead class="text-xs uppercase tracking-wider text-gray-500">
+        <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th class="px-4 py-3 font-medium">Scan</th>
             <th class="px-4 py-3 font-medium">Project</th>
@@ -203,14 +202,14 @@ function historicalDelta(scan: ScanInterface): number | null {
             v-slot="{ navigate }"
           >
             <tr
-              class="group cursor-pointer border-t border-gray-800/60 transition-colors hover:bg-gray-800/40"
+              class="group cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
               @click="navigate"
             >
               <td class="px-4 py-3">
-                <span class="font-mono text-green-400 hover:underline">#{{ scan.scanNumber }}</span>
+                <span class="font-mono text-primary hover:underline">#{{ scan.scanNumber }}</span>
               </td>
-              <td class="px-4 py-3 font-mono text-gray-200">{{ scan.project.name }}</td>
-              <td class="px-4 py-3 text-gray-400">
+              <td class="px-4 py-3 font-mono text-foreground">{{ scan.project.name }}</td>
+              <td class="whitespace-nowrap px-4 py-3 text-muted-foreground">
                 {{
                   new Date(scan.date).toLocaleDateString('en-US', {
                     month: 'short',
@@ -221,13 +220,15 @@ function historicalDelta(scan: ScanInterface): number | null {
               </td>
               <td class="px-4 py-3"><StatusBadge :status="scan.status" /></td>
               <td class="px-4 py-3">
-                <span
-                  v-for="tool in scan.tools"
-                  :key="tool"
-                  class="mr-1 rounded border border-gray-700 bg-gray-800/60 px-1.5 py-0.5 font-mono text-[10px] text-gray-400"
-                >
-                  {{ tool }}
-                </span>
+                <div class="flex flex-wrap gap-1">
+                  <span
+                    v-for="tool in scan.tools"
+                    :key="tool"
+                    class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  >
+                    {{ tool }}
+                  </span>
+                </div>
               </td>
               <td class="px-3 py-3 text-right">
                 <span
@@ -255,17 +256,17 @@ function historicalDelta(scan: ScanInterface): number | null {
                   {{ scan.lowCount }}
                 </span>
               </td>
-              <td class="px-3 py-3 text-right font-mono font-medium tabular-nums text-white">
+              <td class="px-3 py-3 text-right font-mono font-medium tabular-nums text-foreground">
                 {{ scan.totalCount }}
                 <span
                   v-if="historicalDelta(scan) !== null"
                   class="ml-1 text-[10px]"
                   :class="
                     (historicalDelta(scan) ?? 0) > 0
-                      ? 'text-red-400'
+                      ? 'text-critical'
                       : (historicalDelta(scan) ?? 0) < 0
-                        ? 'text-green-400'
-                        : 'text-gray-500'
+                        ? 'text-primary'
+                        : 'text-muted-foreground'
                   "
                 >
                   {{
@@ -277,7 +278,7 @@ function historicalDelta(scan: ScanInterface): number | null {
                   }}
                 </span>
               </td>
-              <td class="px-2 py-3 text-gray-500">
+              <td class="px-2 py-3 text-muted-foreground">
                 <ChevronRight
                   class="size-4 opacity-0 transition-opacity group-hover:opacity-100"
                 />
@@ -288,7 +289,7 @@ function historicalDelta(scan: ScanInterface): number | null {
       </table>
       <p
         v-if="!isLoading && scans.length === 0"
-        class="px-4 py-12 text-center text-sm text-gray-500"
+        class="px-4 py-12 text-center text-sm text-muted-foreground"
       >
         No scans match the selected filters.
       </p>
