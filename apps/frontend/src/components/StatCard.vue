@@ -30,7 +30,7 @@ const toneRing = computed(() => {
 const valueTone = computed(() => {
   const map: Record<string, string> = {
     default: 'text-foreground',
-    primary: 'text-primary',
+    primary: 'text-foreground',
     critical: 'text-critical',
     high: 'text-high',
   }

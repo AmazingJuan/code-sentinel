@@ -1,10 +1,13 @@
 <!-- apps/frontend/src/views/FindingDetailView.vue -->
 <script setup lang="ts">
 import axios from 'axios'
-import { onMounted, ref } from 'vue'
+import { Info, Lightbulb } from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
+import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
+import TerminalWindow from '@/components/TerminalWindow.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { FindingService } from '@/services/FindingService'
 
@@ -26,6 +29,17 @@ onMounted(async () => {
     errorMessage.value = extractErrorMessage(error)
   }
 })
+
+const meta = computed(() => {
+  if (!finding.value) return []
+  return [
+    { label: 'Finding ID', value: finding.value.id, mono: true },
+    { label: 'Type', value: finding.value.type, mono: false },
+    { label: 'Tool', value: finding.value.sourceTool, mono: false },
+    { label: 'File', value: finding.value.filePath ?? '-', mono: true },
+    { label: 'Line', value: finding.value.line !== null ? String(finding.value.line) : '-', mono: true },
+  ]
+})
 </script>
 
 <template>
@@ -35,31 +49,76 @@ onMounted(async () => {
     </p>
 
     <template v-else-if="finding">
-      <div class="mb-6">
-        <p class="mb-2 font-mono text-xs text-muted-foreground">~/ findings</p>
-        <div class="flex items-center gap-3">
-          <h1 class="text-2xl font-semibold text-foreground">{{ finding.type }}</h1>
-          <SeverityBadge :severity="finding.severity" />
+      <PageHeader
+        :title="finding.type"
+        :breadcrumb="`~/ findings / ${finding.id}`"
+      >
+        <template #actions>
+          <div class="flex items-center gap-2">
+            <SeverityBadge :severity="finding.severity" />
+            <span class="inline-flex items-center rounded border border-high/25 bg-high/10 px-2 py-0.5 text-xs font-medium text-high">
+              Open
+            </span>
+          </div>
+        </template>
+      </PageHeader>
+
+      <div class="grid gap-6 lg:grid-cols-3">
+        <div class="space-y-6 lg:col-span-2">
+          <!-- Metadata grid -->
+          <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+            <div
+              v-for="m in meta"
+              :key="m.label"
+              class="bg-card p-3"
+            >
+              <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{{ m.label }}</p>
+              <p class="mt-1 truncate text-sm" :class="m.mono ? 'font-mono text-term-cyan' : 'text-foreground font-medium'">
+                {{ m.value }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="rounded-lg border border-border bg-card p-5">
+            <div class="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+              <Info class="size-4 text-muted-foreground" />
+              Description
+            </div>
+            <p class="text-sm leading-relaxed text-muted-foreground">{{ finding.description }}</p>
+          </div>
+
+          <!-- Recommendation -->
+          <div class="rounded-lg border border-primary/30 bg-primary/5 p-5">
+            <div class="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
+              <Lightbulb class="size-4 text-primary" />
+              Recommendation
+            </div>
+            <p class="text-sm leading-relaxed text-foreground">{{ finding.recommendation }}</p>
+          </div>
+
+          <p v-if="finding.filePath" class="font-mono text-xs text-muted-foreground">
+            {{ finding.filePath }}:{{ finding.line }}
+          </p>
         </div>
 
-        <p v-if="finding.filePath" class="mt-2 font-mono text-sm text-muted-foreground">
-          {{ finding.filePath }}:{{ finding.line }}
-        </p>
+        <!-- Terminal inspector sidebar -->
+        <div class="lg:col-span-1">
+          <TerminalWindow
+            title="zsh - codesentinel"
+            :lines="[
+              [{ text: '$ ', tone: 'prompt' }, { text: `codesentinel findings`, tone: 'default' }],
+              [],
+              [{ text: `[${(finding.severity ?? 'unclassified').toUpperCase()}] ${finding.type}`, tone: (finding.severity as any) ?? 'dim' }],
+              [{ text: `Tool: ${finding.sourceTool}`, tone: 'dim' }],
+              [{ text: `File: ${finding.filePath ?? '-'}`, tone: 'cyan' }],
+              [{ text: `Line: ${finding.line ?? '-'}`, tone: 'cyan' }],
+              [],
+              [{ text: 'Status: Open', tone: 'high' }],
+            ]"
+          />
+        </div>
       </div>
-
-      <div class="mt-6 rounded-lg border border-border bg-card p-5">
-        <p class="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
-        <p class="mt-2 text-sm text-foreground leading-relaxed">{{ finding.description }}</p>
-      </div>
-
-      <div class="mt-4 rounded-lg border border-border bg-card p-5">
-        <p class="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">Recommendation</p>
-        <p class="mt-2 text-sm text-foreground leading-relaxed">{{ finding.recommendation }}</p>
-      </div>
-
-      <span class="mt-4 inline-block rounded border border-border bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
-        {{ finding.sourceTool }}
-      </span>
     </template>
   </div>
 </template>

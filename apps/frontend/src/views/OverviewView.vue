@@ -273,7 +273,7 @@ onMounted(loadOverview)
           <h3 class="text-sm font-medium text-foreground">Severity Distribution</h3>
           <p class="mt-0.5 text-xs text-muted-foreground">Open findings across projects</p>
           <div class="mt-4">
-            <SeverityBar :counts="aggregate" />
+            <SeverityBar :counts="aggregate" show-legend />
           </div>
           <div class="mt-4 grid grid-cols-2 gap-2">
             <div
