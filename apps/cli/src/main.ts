@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -13,6 +13,8 @@ import { AdapterRegistry } from './pipeline/adapter-registry.js';
 import { runAdapters } from './pipeline/run-adapters.js';
 
 export { DEFAULT_API_URL };
+
+export const DEFAULT_TIMEOUT_MS = 25_000;
 
 export interface CliOptions {
   project?: string;
@@ -36,6 +38,41 @@ export function getPackageVersion(): string {
     // fallback if package.json cannot be read
   }
   return '0.1.0';
+}
+
+export async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        throw new Error(
+          `Request to "${url}" timed out after ${timeoutMs / 1000}s. The backend may be offline, suspended, or unreachable.`,
+        );
+      }
+      if ('code' in error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'ENOTFOUND') {
+          throw new Error(
+            `Backend host not found at "${url}". Check network connection or verify the backend address.`,
+          );
+        }
+        if (code === 'ECONNREFUSED') {
+          throw new Error(
+            `Connection refused at "${url}". Verify that the backend service is running and accessible.`,
+          );
+        }
+      }
+    }
+    throw error;
+  }
 }
 
 export function printHelp(): void {
@@ -77,18 +114,23 @@ export async function submitScanToBackend(
   projectId: string,
   tools: string[],
   findings: NormalizedFinding[],
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<{ scanId: string; totalCount: number }> {
   const headers = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
   };
 
-  // Step 1: Create scan in pending state
-  const createRes = await fetch(`${apiUrl}/scans`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ projectId, tools }),
-  });
+  // Step 1: Create scan in pending state with timeout protection
+  const createRes = await fetchWithTimeout(
+    `${apiUrl}/scans`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ projectId, tools }),
+    },
+    timeoutMs,
+  );
 
   if (!createRes.ok) {
     const errText = await createRes.text();
@@ -97,27 +139,35 @@ export async function submitScanToBackend(
 
   const scan = (await createRes.json()) as { id: string };
 
-  // Step 2: Transition to running
-  const statusRes = await fetch(`${apiUrl}/scans/${scan.id}/status`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify({ status: 'running' }),
-  });
+  // Step 2: Transition to running with timeout protection
+  const statusRes = await fetchWithTimeout(
+    `${apiUrl}/scans/${scan.id}/status`,
+    {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'running' }),
+    },
+    timeoutMs,
+  );
 
   if (!statusRes.ok) {
     const errText = await statusRes.text();
     throw new Error(`Failed to update scan status (HTTP ${statusRes.status}): ${errText}`);
   }
 
-  // Step 3: Ingest findings and complete scan
-  const resultsRes = await fetch(`${apiUrl}/scans/${scan.id}/results`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      status: 'completed',
-      findings,
-    }),
-  });
+  // Step 3: Ingest findings and complete scan with timeout protection
+  const resultsRes = await fetchWithTimeout(
+    `${apiUrl}/scans/${scan.id}/results`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        status: 'completed',
+        findings,
+      }),
+    },
+    timeoutMs,
+  );
 
   if (!resultsRes.ok) {
     const errText = await resultsRes.text();
@@ -240,6 +290,17 @@ export async function runCli(argv: string[]): Promise<number> {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(` Error during backend synchronization: ${message}`);
+
+    // Graceful Degradation: persist findings locally so scan effort is never lost
+    try {
+      const fallbackReportPath = resolve(targetPath, 'code-sentinel-findings.json');
+      writeFileSync(fallbackReportPath, JSON.stringify(findings, null, 2), 'utf8');
+      console.log(` Saved ${findings.length} findings locally to: ${fallbackReportPath}`);
+      console.log(' Tip: You can retry synchronization later or override the endpoint with --api-url or CODE_SENTINEL_API_URL.');
+    } catch {
+      // Ignore fallback write errors
+    }
+
     return 1;
   }
 }
@@ -250,4 +311,3 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(code);
   });
 }
-
