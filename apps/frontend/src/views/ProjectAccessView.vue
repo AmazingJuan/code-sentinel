@@ -125,7 +125,7 @@ onMounted(loadDirectory)
     <PageHeader
       title="Project access"
       breadcrumb="~/ project-access"
-      description="Choose which analysts can work on each project. Security content stays private to them."
+      description="Manage analyst assignments and repository permissions."
     />
 
     <p

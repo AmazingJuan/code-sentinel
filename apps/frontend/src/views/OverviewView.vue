@@ -126,7 +126,7 @@ onMounted(loadOverview)
     <PageHeader
       title="Security Overview"
       breadcrumb="~/ overview"
-      description="Findings normalized from CLI scans across all connected projects."
+      description="Security posture and vulnerability metrics across connected projects."
     >
       <template #actions>
         <div v-if="projectSummaries.length > 0" class="w-full sm:w-56">
@@ -190,7 +190,7 @@ onMounted(loadOverview)
 
     <section class="mt-6">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-sm font-medium text-muted-foreground">Latest CLI run</h2>
+        <h2 class="text-sm font-medium text-muted-foreground">Latest scan execution</h2>
         <span class="font-mono text-xs text-muted-foreground">
           scan #{{ latestDisplayScan?.scanNumber ?? '-' }} ·
           {{ latestDisplayScan?.project?.name ?? 'code-sentinel' }}

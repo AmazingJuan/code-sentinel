@@ -108,11 +108,12 @@ function isActive(routeName: string): boolean {
     </div>
 
     <div class="border-t border-sidebar-border p-3">
-      <div class="rounded-md border border-sidebar-border bg-sidebar-accent/40 p-3">
-        <p class="font-mono text-[11px] text-primary">$ codesentinel scan</p>
-        <p class="mt-1 text-xs text-muted-foreground">
-          Run scans from the CLI. This console is the reporting layer.
-        </p>
+      <div class="flex items-center justify-between px-2 text-xs text-muted-foreground">
+        <span class="font-mono text-[11px]">v1.0.0</span>
+        <span class="inline-flex items-center gap-1.5 font-mono text-[11px]">
+          <span class="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+          online
+        </span>
       </div>
     </div>
   </aside>

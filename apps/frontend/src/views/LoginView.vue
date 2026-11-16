@@ -68,11 +68,11 @@ async function onSubmit(): Promise<void> {
 
         <!-- Header -->
         <h1 class="text-xl font-semibold tracking-tight">
-          Sign in to your console
+          Sign in
         </h1>
 
         <p class="mt-1 text-sm text-muted-foreground">
-          Review scan history and findings normalized by the Code Sentinel CLI.
+          Enter your credentials to access the platform.
         </p>
 
         <!-- Form -->
@@ -177,20 +177,11 @@ async function onSubmit(): Promise<void> {
                    disabled:opacity-60"
                  :disabled="isLoading"
           >
-                 {{ isLoading ? 'Signing in…' : 'Sign In' }}
+                 {{ isLoading ? 'Signing in...' : 'Sign In' }}
 
             <ArrowRight class="size-4" />
           </button>
         </form>
-
-        <!-- Footer -->
-        <p
-          class="mt-8 text-center text-xs
-                 text-muted-foreground"
-        >
-          Protected console · Scans run from the CLI, not the browser
-        </p>
-
       </div>
     </div>
 
@@ -318,15 +309,6 @@ async function onSubmit(): Promise<void> {
             ]
           ]"
         />
-
-        <p
-          class="mt-6 max-w-md text-center text-sm
-                 text-muted-foreground"
-        >
-          The CLI orchestrates SAST, secret scanning and port
-          scanning, then normalizes findings into this console.
-        </p>
-
       </div>
     </div>
 
