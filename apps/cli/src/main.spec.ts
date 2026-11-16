@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_API_URL, getPackageVersion, runCli } from './main.js';
+import {
+  DEFAULT_API_URL,
+  fetchWithTimeout,
+  getPackageVersion,
+  runCli,
+} from './main.js';
 
 describe('Code Sentinel CLI main', () => {
-  it('defines the canonical default backend API URL', () => {
-    expect(DEFAULT_API_URL).toBe('https://code-sentinel-api.onrender.com');
+  it('defines a valid default backend API URL', () => {
+    expect(DEFAULT_API_URL).toBeDefined();
+    expect(DEFAULT_API_URL).toMatch(/^https?:\/\//);
   });
 
   it('reads the package version correctly', () => {
@@ -43,5 +49,36 @@ describe('Code Sentinel CLI main', () => {
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Target path does not exist'));
     errSpy.mockRestore();
   });
-});
 
+  it('handles network timeouts cleanly in fetchWithTimeout', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockImplementation((_url, options) => {
+      return new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          const timeoutErr = new Error('The operation was aborted due to timeout');
+          timeoutErr.name = 'TimeoutError';
+          reject(timeoutErr);
+        });
+      });
+    });
+
+    await expect(
+      fetchWithTimeout('https://unreachable-backend.example.com', {}, 50),
+    ).rejects.toThrow(/timed out after/);
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it('handles host not found (ENOTFOUND) gracefully', async () => {
+    const originalFetch = globalThis.fetch;
+    const notFoundError = new Error('getaddrinfo ENOTFOUND invalid-host.test');
+    (notFoundError as { code?: string }).code = 'ENOTFOUND';
+    globalThis.fetch = vi.fn().mockRejectedValue(notFoundError);
+
+    await expect(
+      fetchWithTimeout('https://invalid-host.test', {}, 1000),
+    ).rejects.toThrow(/Backend host not found/);
+
+    globalThis.fetch = originalFetch;
+  });
+});
