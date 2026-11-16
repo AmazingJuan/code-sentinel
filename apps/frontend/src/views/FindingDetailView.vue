@@ -29,33 +29,35 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="p-8">
-    <p v-if="errorMessage" class="rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+  <div class="p-5 sm:p-8">
+    <p v-if="errorMessage" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
 
     <template v-else-if="finding">
-      <p class="font-mono text-xs text-gray-500">~/ findings</p>
-      <div class="mt-1 flex items-center gap-3">
-        <h1 class="text-2xl font-semibold text-white">{{ finding.type }}</h1>
-        <SeverityBadge :severity="finding.severity" />
+      <div class="mb-6">
+        <p class="mb-2 font-mono text-xs text-muted-foreground">~/ findings</p>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-semibold text-foreground">{{ finding.type }}</h1>
+          <SeverityBadge :severity="finding.severity" />
+        </div>
+
+        <p v-if="finding.filePath" class="mt-2 font-mono text-sm text-muted-foreground">
+          {{ finding.filePath }}:{{ finding.line }}
+        </p>
       </div>
 
-      <p v-if="finding.filePath" class="mt-2 font-mono text-sm text-gray-500">
-        {{ finding.filePath }}:{{ finding.line }}
-      </p>
-
-      <div class="mt-6 rounded-lg border border-gray-800 bg-gray-900/30 p-5">
-        <p class="text-sm font-medium text-gray-400">Description</p>
-        <p class="mt-1 text-sm text-gray-200">{{ finding.description }}</p>
+      <div class="mt-6 rounded-lg border border-border bg-card p-5">
+        <p class="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">Description</p>
+        <p class="mt-2 text-sm text-foreground leading-relaxed">{{ finding.description }}</p>
       </div>
 
-      <div class="mt-4 rounded-lg border border-gray-800 bg-gray-900/30 p-5">
-        <p class="text-sm font-medium text-gray-400">Recommendation</p>
-        <p class="mt-1 text-sm text-gray-200">{{ finding.recommendation }}</p>
+      <div class="mt-4 rounded-lg border border-border bg-card p-5">
+        <p class="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">Recommendation</p>
+        <p class="mt-2 text-sm text-foreground leading-relaxed">{{ finding.recommendation }}</p>
       </div>
 
-      <span class="mt-4 inline-block rounded border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-300">
+      <span class="mt-4 inline-block rounded border border-border bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
         {{ finding.sourceTool }}
       </span>
     </template>

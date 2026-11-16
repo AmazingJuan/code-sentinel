@@ -4,7 +4,10 @@ import { Activity, ArrowRight, Bug, ScrollText, ShieldAlert } from 'lucide-vue-n
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
+import SeverityBar from '@/components/SeverityBar.vue'
+import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
@@ -96,12 +99,12 @@ async function loadOverview(): Promise<void> {
 }
 
 function severityClass(value: number, tone: 'critical' | 'high' | 'medium' | 'low'): string {
-  if (value === 0) return 'text-gray-600'
+  if (value === 0) return 'text-muted-foreground/40'
   const map = {
-    critical: 'text-red-400',
-    high: 'text-orange-400',
-    medium: 'text-yellow-400',
-    low: 'text-blue-400',
+    critical: 'text-critical',
+    high: 'text-high',
+    medium: 'text-medium',
+    low: 'text-low',
   }
   return map[tone]
 }
@@ -120,90 +123,75 @@ onMounted(loadOverview)
 
 <template>
   <div class="p-5 sm:p-8">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="font-mono text-xs text-gray-500">~/ overview</p>
-        <h1 class="mt-1 text-2xl font-semibold text-white">Security Overview</h1>
-        <p class="mt-1 text-sm text-gray-400">
-          Findings normalized from CLI scans across all connected projects.
-        </p>
-      </div>
-
-      <div v-if="projectSummaries.length > 0" class="w-full sm:w-56">
-        <label class="mb-1.5 block text-[11px] tracking-wide text-gray-500">PROJECT SCOPE</label>
-        <select
-          v-model="selectedProjectId"
-          class="h-9 w-full rounded-md border border-gray-700 bg-gray-900 px-2.5 text-sm text-gray-200 outline-none focus:border-green-600"
-        >
-          <option :value="undefined">All projects</option>
-          <option
-            v-for="project in projectSummaries"
-            :key="project.projectId"
-            :value="project.projectId"
+    <PageHeader
+      title="Security Overview"
+      breadcrumb="~/ overview"
+      description="Findings normalized from CLI scans across all connected projects."
+    >
+      <template #actions>
+        <div v-if="projectSummaries.length > 0" class="w-full sm:w-56">
+          <label class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            PROJECT SCOPE
+          </label>
+          <select
+            v-model="selectedProjectId"
+            class="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           >
-            {{ project.projectName }}
-          </option>
-        </select>
-      </div>
-    </div>
+            <option :value="undefined">All projects</option>
+            <option
+              v-for="project in projectSummaries"
+              :key="project.projectId"
+              :value="project.projectId"
+            >
+              {{ project.projectName }}
+            </option>
+          </select>
+        </div>
+      </template>
+    </PageHeader>
 
     <p
       v-if="errorMessage"
-      class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300"
+      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
     </p>
 
     <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <div
-        v-for="stat in [
-          {
-            label: 'Total Scans',
-            value: filteredScans.length,
-            hint: selectedProjectId ? 'selected project' : 'all time',
-            icon: Activity,
-            tone: 'text-white',
-          },
-          {
-            label: 'Total Findings',
-            value: totalFindings,
-            hint: 'latest scan posture',
-            icon: Bug,
-            tone: 'text-white',
-          },
-          {
-            label: 'Critical',
-            value: aggregate.critical,
-            hint: 'open',
-            icon: ShieldAlert,
-            tone: 'text-red-400',
-          },
-          {
-            label: 'High',
-            value: aggregate.high,
-            hint: 'open',
-            icon: ShieldAlert,
-            tone: 'text-orange-400',
-          },
-        ]"
-        :key="stat.label"
-        class="rounded-lg border border-gray-800 bg-gray-900/40 p-4"
-      >
-        <div class="flex items-center justify-between">
-          <span class="text-xs text-gray-400">{{ stat.label }}</span>
-          <component :is="stat.icon" class="size-4 text-gray-500" />
-        </div>
-        <p class="mt-3 font-mono text-2xl font-semibold tabular-nums" :class="stat.tone">
-          {{ isLoading ? '—' : stat.value }}
-        </p>
-        <p class="mt-1 text-[11px] text-gray-500">{{ stat.hint }}</p>
-      </div>
+      <StatCard
+        label="Total Scans"
+        :value="isLoading ? '—' : filteredScans.length"
+        :hint="selectedProjectId ? 'selected project' : 'all time'"
+        :icon="Activity"
+        tone="primary"
+      />
+      <StatCard
+        label="Total Findings"
+        :value="isLoading ? '—' : totalFindings"
+        hint="latest scan posture"
+        :icon="Bug"
+        tone="default"
+      />
+      <StatCard
+        label="Critical"
+        :value="isLoading ? '—' : aggregate.critical"
+        hint="open"
+        :icon="ShieldAlert"
+        tone="critical"
+      />
+      <StatCard
+        label="High"
+        :value="isLoading ? '—' : aggregate.high"
+        hint="open"
+        :icon="ShieldAlert"
+        tone="high"
+      />
     </div>
 
     <section class="mt-6">
       <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-sm font-medium text-gray-400">Latest CLI run</h2>
-        <span class="font-mono text-xs text-gray-500">
+        <h2 class="text-sm font-medium text-muted-foreground">Latest CLI run</h2>
+        <span class="font-mono text-xs text-muted-foreground">
           scan #{{ latestDisplayScan?.scanNumber ?? '—' }} ·
           {{ latestDisplayScan?.project?.name ?? 'code-sentinel' }}
         </span>
@@ -281,33 +269,17 @@ onMounted(loadOverview)
           ]"
         />
 
-        <div class="rounded-lg border border-gray-800 bg-gray-900/40 p-4 lg:col-span-2">
-          <h3 class="text-sm font-medium text-white">Severity Distribution</h3>
-          <p class="mt-0.5 text-xs text-gray-500">Open findings across projects</p>
-          <div class="mt-4 flex h-3 overflow-hidden rounded-full bg-gray-800">
-            <span
-              v-for="severity in [
-                { key: 'critical', color: 'bg-red-500' },
-                { key: 'high', color: 'bg-orange-400' },
-                { key: 'medium', color: 'bg-yellow-300' },
-                { key: 'low', color: 'bg-blue-400' },
-              ]"
-              :key="severity.key"
-              :class="severity.color"
-              :style="{
-                width: `${
-                  aggregateTotal
-                    ? (aggregate[severity.key as keyof typeof aggregate] / aggregateTotal) * 100
-                    : 0
-                }%`,
-              }"
-            />
+        <div class="rounded-lg border border-border bg-card p-4 lg:col-span-2">
+          <h3 class="text-sm font-medium text-foreground">Severity Distribution</h3>
+          <p class="mt-0.5 text-xs text-muted-foreground">Open findings across projects</p>
+          <div class="mt-4">
+            <SeverityBar :counts="aggregate" />
           </div>
           <div class="mt-4 grid grid-cols-2 gap-2">
             <div
               v-for="severity in ['critical', 'high', 'medium', 'low'] as const"
               :key="severity"
-              class="rounded-md border border-gray-800 bg-[#0B0E14]/40 p-2.5"
+              class="rounded-md border border-border bg-background/50 p-2.5"
             >
               <SeverityBadge :severity="severity" />
               <p
@@ -324,17 +296,17 @@ onMounted(loadOverview)
 
     <section v-if="projectSummaries.length > 0" class="mt-8">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold text-white">Projects Security Overview</h2>
+        <h2 class="text-base font-semibold text-foreground">Projects Security Overview</h2>
         <RouterLink
           :to="{ name: 'project.index' }"
-          class="flex items-center gap-1 text-sm text-green-400 hover:underline"
+          class="flex items-center gap-1 text-sm text-primary transition-colors hover:underline"
         >
           Manage projects <ArrowRight class="size-3.5" />
         </RouterLink>
       </div>
-      <div class="overflow-x-auto rounded-lg border border-gray-800">
+      <div class="overflow-x-auto rounded-lg border border-border bg-card">
         <table class="w-full min-w-[720px] text-left text-sm">
-          <thead class="bg-gray-900/50 text-[11px] text-gray-500">
+          <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
               <th class="px-4 py-3 font-medium">PROJECT</th>
               <th class="px-4 py-3 font-medium">LATEST STATUS</th>
@@ -351,19 +323,19 @@ onMounted(loadOverview)
             <tr
               v-for="project in projectSummaries"
               :key="project.projectId"
-              class="border-t border-gray-800 hover:bg-gray-900/40"
+              class="border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
             >
               <td class="px-4 py-3">
                 <RouterLink
                   :to="{ name: 'scan.index', query: { projectId: project.projectId } }"
-                  class="font-mono text-green-400 hover:underline"
+                  class="font-mono text-primary hover:underline"
                 >
                   {{ project.projectName }}
                 </RouterLink>
               </td>
               <td class="px-4 py-3"><StatusBadge :status="project.status" /></td>
-              <td class="px-4 py-3 font-mono text-gray-300">{{ project.scanCount }}</td>
-              <td class="px-4 py-3 text-gray-400">{{ formatDate(project.lastScan) }}</td>
+              <td class="px-4 py-3 font-mono text-foreground">{{ project.scanCount }}</td>
+              <td class="px-4 py-3 text-muted-foreground">{{ formatDate(project.lastScan) }}</td>
               <td
                 class="px-3 py-3 text-right font-mono"
                 :class="severityClass(project.criticalCount, 'critical')"
@@ -388,7 +360,7 @@ onMounted(loadOverview)
               >
                 {{ project.lowCount }}
               </td>
-              <td class="px-3 py-3 text-right font-mono font-semibold text-white">
+              <td class="px-3 py-3 text-right font-mono font-semibold text-foreground">
                 {{ project.totalCount }}
               </td>
             </tr>
@@ -399,17 +371,17 @@ onMounted(loadOverview)
 
     <section class="mt-8">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold text-white">Recent Scans</h2>
+        <h2 class="text-base font-semibold text-foreground">Recent Scans</h2>
         <RouterLink
           :to="{ name: 'scan.index' }"
-          class="flex items-center gap-1 text-sm text-green-400 hover:underline"
+          class="flex items-center gap-1 text-sm text-primary transition-colors hover:underline"
         >
           View all <ArrowRight class="size-3.5" />
         </RouterLink>
       </div>
-      <div class="overflow-x-auto rounded-lg border border-gray-800">
+      <div class="overflow-x-auto rounded-lg border border-border bg-card">
         <table class="w-full min-w-[720px] text-left text-sm">
-          <thead class="bg-gray-900/50 text-[11px] text-gray-500">
+          <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
               <th class="px-4 py-3 font-medium">SCAN</th>
               <th class="px-4 py-3 font-medium">PROJECT</th>
@@ -426,18 +398,18 @@ onMounted(loadOverview)
             <tr
               v-for="scan in recentScans"
               :key="scan.id"
-              class="border-t border-gray-800 hover:bg-gray-900/40"
+              class="border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
             >
               <td class="px-4 py-3">
                 <RouterLink
                   :to="{ name: 'scan.show', params: { id: scan.id } }"
-                  class="font-mono text-green-400 hover:underline"
+                  class="font-mono text-primary hover:underline"
                 >
                   #{{ scan.scanNumber }}
                 </RouterLink>
               </td>
-              <td class="px-4 py-3 font-mono text-gray-200">{{ scan.project.name }}</td>
-              <td class="px-4 py-3 text-gray-400">{{ formatDate(scan.date) }}</td>
+              <td class="px-4 py-3 font-mono text-foreground">{{ scan.project.name }}</td>
+              <td class="px-4 py-3 text-muted-foreground">{{ formatDate(scan.date) }}</td>
               <td class="px-4 py-3"><StatusBadge :status="scan.status" /></td>
               <td
                 class="px-3 py-3 text-right font-mono"
@@ -463,13 +435,13 @@ onMounted(loadOverview)
               >
                 {{ scan.lowCount }}
               </td>
-              <td class="px-3 py-3 text-right font-mono font-semibold text-white">
+              <td class="px-3 py-3 text-right font-mono font-semibold text-foreground">
                 {{ scan.totalCount }}
               </td>
             </tr>
           </tbody>
         </table>
-        <p v-if="!isLoading && recentScans.length === 0" class="px-4 py-6 text-sm text-gray-500">
+        <p v-if="!isLoading && recentScans.length === 0" class="px-4 py-6 text-sm text-muted-foreground">
           No scans available yet.
         </p>
       </div>
@@ -477,10 +449,10 @@ onMounted(loadOverview)
 
     <section class="mt-8">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold text-white">Recent Findings</h2>
+        <h2 class="text-base font-semibold text-foreground">Recent Findings</h2>
         <RouterLink
           :to="{ name: 'finding.index' }"
-          class="flex items-center gap-1 text-sm text-green-400 hover:underline"
+          class="flex items-center gap-1 text-sm text-primary transition-colors hover:underline"
         >
           View all <ArrowRight class="size-3.5" />
         </RouterLink>
@@ -490,27 +462,27 @@ onMounted(loadOverview)
           v-for="finding in recentFindings"
           :key="finding.id"
           :to="{ name: 'finding.show', params: { id: finding.id } }"
-          class="group rounded-lg border border-gray-800 bg-gray-900/40 p-4 hover:border-green-500/40"
+          class="group rounded-lg border border-border bg-card p-4 transition-all hover:border-primary/40 hover:bg-accent/20"
         >
           <div class="flex items-center justify-between">
             <SeverityBadge :severity="finding.severity" />
-            <span class="flex items-center gap-1 font-mono text-xs text-gray-500">
+            <span class="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               <ScrollText class="size-3" />Scan report
             </span>
           </div>
-          <p class="mt-3 font-medium text-gray-200 group-hover:text-green-400">
+          <p class="mt-3 font-medium text-foreground transition-colors group-hover:text-primary">
             {{ finding.type }}
           </p>
-          <p class="mt-1 truncate font-mono text-xs text-cyan-400">
+          <p class="mt-1 truncate font-mono text-xs text-term-cyan">
             {{ finding.filePath ?? 'Location unavailable'
             }}{{ finding.line !== null ? `:${finding.line}` : '' }}
           </p>
-          <p class="mt-3 text-xs text-gray-500">{{ finding.sourceTool }}</p>
+          <p class="mt-3 text-xs text-muted-foreground">{{ finding.sourceTool }}</p>
         </RouterLink>
       </div>
       <p
         v-if="!isLoading && recentFindings.length === 0"
-        class="rounded-lg border border-dashed border-gray-800 px-4 py-6 text-sm text-gray-500"
+        class="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground"
       >
         No critical or high findings available yet.
       </p>

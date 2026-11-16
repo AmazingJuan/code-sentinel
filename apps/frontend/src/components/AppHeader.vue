@@ -9,12 +9,13 @@ const emit = defineEmits<{ menu: [] }>()
 const route = useRoute()
 const router = useRouter()
 const user = AuthService.getUser()
-const initials = user?.name
-  .split(' ')
-  .map((part) => part[0])
-  .join('')
-  .slice(0, 2)
-  .toUpperCase() ?? 'U'
+const initials =
+  user?.name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() ?? 'U'
 
 function handleLogout(): void {
   AuthService.logout()
@@ -23,38 +24,38 @@ function handleLogout(): void {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-gray-800 bg-[#0B0E14]/90 px-4 backdrop-blur-sm sm:px-6">
+  <header class="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-sm sm:px-6">
     <button
-      class="rounded p-1.5 text-gray-400 hover:bg-gray-800 hover:text-gray-200 lg:hidden"
+      class="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
       aria-label="Open navigation"
       @click="emit('menu')"
     >
       <Menu class="size-5" />
     </button>
 
-    <div class="flex items-center gap-2 font-mono text-sm text-gray-400">
-      <Terminal class="size-4 text-green-400 lg:hidden" />
+    <div class="flex items-center gap-2 font-mono text-sm text-muted-foreground">
+      <Terminal class="size-4 text-primary lg:hidden" />
       <span>~/</span>
-      <span class="text-gray-200">{{ String(route.meta.breadcrumb ?? route.name ?? '') }}</span>
+      <span class="text-foreground">{{ String(route.meta.breadcrumb ?? route.name ?? '') }}</span>
     </div>
 
     <div class="ml-auto flex items-center gap-2 sm:gap-4">
-      <span class="hidden items-center gap-1.5 rounded border border-gray-800 bg-gray-900/50 px-2 py-1 font-mono text-xs text-gray-500 sm:flex">
-        <span class="size-1.5 rounded-full bg-green-400" aria-hidden="true" />
+      <span class="hidden items-center gap-1.5 rounded border border-border bg-card px-2 py-1 font-mono text-xs text-muted-foreground sm:flex">
+        <span class="size-1.5 rounded-full bg-primary" aria-hidden="true" />
         engine online
       </span>
-      <div class="flex items-center gap-2 rounded-md border border-gray-800 bg-gray-900/40 px-2 py-1">
-        <div class="flex size-6 items-center justify-center rounded-full bg-green-500/15 font-mono text-xs font-medium text-green-300">
+      <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
+        <div class="flex size-6 items-center justify-center rounded-full bg-primary/15 font-mono text-xs font-medium text-primary">
           {{ initials }}
         </div>
         <div class="hidden leading-none sm:block">
-          <p class="text-xs font-medium text-white">{{ user?.name }}</p>
-          <p class="mt-0.5 text-[10px] text-gray-500">{{ user?.email }}</p>
+          <p class="text-xs font-medium text-foreground">{{ user?.name }}</p>
+          <p class="mt-0.5 text-[10px] text-muted-foreground">{{ user?.email }}</p>
         </div>
       </div>
 
       <button
-        class="flex items-center gap-1.5 rounded-md border border-gray-800 px-2.5 py-1.5 text-xs text-gray-400 hover:border-red-900 hover:bg-red-950/30 hover:text-red-300"
+        class="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
         @click="handleLogout"
       >
         <LogOut class="size-3.5" />

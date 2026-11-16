@@ -9,6 +9,7 @@ import axios from 'axios'
 import { KeyRound } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 
+import PageHeader from '@/components/PageHeader.vue'
 import ProjectAssignmentsPanel from '@/components/ProjectAssignmentsPanel.vue'
 import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import type { ProjectDirectoryEntryInterface } from '@/interfaces/ProjectDirectoryEntryInterface'
@@ -121,34 +122,34 @@ onMounted(loadDirectory)
 
 <template>
   <div class="p-5 sm:p-8">
-    <p class="font-mono text-xs text-gray-500">~/ project-access</p>
-    <h1 class="mt-1 text-xl font-semibold tracking-tight text-white md:text-2xl">Project access</h1>
-    <p class="mt-1 text-sm text-gray-500">
-      Choose which analysts can work on each project. Security content stays private to them.
-    </p>
+    <PageHeader
+      title="Project access"
+      breadcrumb="~/ project-access"
+      description="Choose which analysts can work on each project. Security content stays private to them."
+    />
 
     <p
       v-if="errorMessage"
-      class="mt-5 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300"
+      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
     </p>
-    <p v-else-if="isLoading" class="mt-5 text-sm text-gray-500">Loading…</p>
+    <p v-else-if="isLoading" class="mt-5 text-sm text-muted-foreground">Loading…</p>
 
     <template v-else>
-      <div class="mt-6 rounded-lg border border-gray-800 bg-gray-900/40 p-5">
+      <div class="mt-6 rounded-lg border border-border bg-card p-5">
         <label
           for="project-select"
-          class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-400"
+          class="mb-1.5 flex items-center gap-2 text-sm font-medium text-foreground"
         >
-          <KeyRound class="size-4" />
+          <KeyRound class="size-4 text-primary" />
           Project
         </label>
         <select
           id="project-select"
           :value="selectedProjectId"
           :disabled="projects.length === 0"
-          class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60 sm:w-80"
+          class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60 sm:w-80"
           @change="onProjectChange"
         >
           <option value="" disabled>

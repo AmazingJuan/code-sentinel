@@ -151,58 +151,60 @@ onMounted(loadProject)
 
 <template>
   <div class="p-5 sm:p-8">
-    <RouterLink :to="{ name: 'project.index' }" class="mb-4 inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200">
+    <RouterLink :to="{ name: 'project.index' }" class="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
       <ChevronLeft class="size-4" />
       Back to projects
     </RouterLink>
 
-    <p v-if="errorMessage" class="mt-3 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+    <p v-if="errorMessage" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
-    <p v-else-if="isLoading" class="mt-3 text-sm text-gray-500">Loading…</p>
+    <p v-else-if="isLoading" class="mt-3 text-sm text-muted-foreground">Loading…</p>
 
     <template v-else-if="project">
-      <p class="font-mono text-xs text-gray-500">~/ projects/{{ project.name }}</p>
-      <h1 class="mt-1 text-xl font-semibold tracking-tight text-white md:text-2xl">{{ project.name }}</h1>
-      <p class="mt-1 text-sm text-gray-400">Status: {{ statusLabel(project.status) }}</p>
+      <div class="mb-6">
+        <p class="font-mono text-xs text-muted-foreground">~/ projects/{{ project.name }}</p>
+        <h1 class="mt-1 text-xl font-semibold tracking-tight text-foreground md:text-2xl">{{ project.name }}</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Status: {{ statusLabel(project.status) }}</p>
+      </div>
 
-      <div class="mt-6 rounded-lg border border-gray-800 bg-gray-900/40 p-5">
-        <div class="mb-3 flex items-center gap-2 text-sm font-medium text-gray-400">
-          <Settings2 class="size-4" />
+      <div class="mt-6 rounded-lg border border-border bg-card p-5">
+        <div class="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Settings2 class="size-4 text-primary" />
           Security analysis configuration
         </div>
 
-        <p v-if="formErrorMessage" class="mb-3 rounded-md border border-red-900 bg-red-950/40 px-4 py-2 text-sm text-red-300">
+        <p v-if="formErrorMessage" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {{ formErrorMessage }}
         </p>
-        <p v-if="successMessage" class="mb-3 rounded-md border border-green-900 bg-green-950/40 px-4 py-2 text-sm text-green-300">
+        <p v-if="successMessage" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
           {{ successMessage }}
         </p>
 
         <form class="grid gap-4" @submit.prevent="saveConfiguration">
           <div>
-            <label for="project-repo" class="mb-1.5 block text-[11px] tracking-wide text-gray-500">SOURCE CODE LOCATION</label>
+            <label for="project-repo" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">SOURCE CODE LOCATION</label>
             <input
               id="project-repo"
               v-model="form.repo"
               required
               maxlength="500"
-              class="w-full rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-green-600"
+              class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
 
           <div>
-            <p class="mb-1.5 text-[11px] tracking-wide text-gray-500">SECURITY TOOLS</p>
+            <p class="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">SECURITY TOOLS</p>
             <div class="flex flex-wrap gap-3">
               <label
                 v-for="tool in SCAN_TOOLS"
                 :key="tool"
-                class="flex cursor-pointer items-center gap-2 rounded-md border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-200"
+                class="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background/50 px-3 py-2 text-sm text-foreground hover:border-primary/50 transition-colors"
               >
                 <input
                   type="checkbox"
                   :checked="form.tools.includes(tool)"
-                  class="size-4 accent-green-500"
+                  class="size-4 rounded accent-primary"
                   @change="toggleTool(tool)"
                 />
                 {{ tool }}
@@ -214,7 +216,7 @@ onMounted(loadProject)
             <button
               type="submit"
               :disabled="isSaving"
-              class="rounded-md bg-green-500 px-4 py-2 text-sm font-medium text-gray-950 hover:bg-green-400 disabled:cursor-not-allowed disabled:opacity-60"
+              class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {{ isSaving ? 'Saving…' : 'Save configuration' }}
             </button>
