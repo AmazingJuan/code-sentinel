@@ -18,11 +18,17 @@ describe('AdapterRegistry', (): void => {
     const registry = new AdapterRegistry();
     registry.register(fakeAdapter('Semgrep', 'SAST'));
     registry.register(fakeAdapter('Gitleaks', 'Secret Scanner'));
+    registry.register(fakeAdapter('CodeSentinel', 'Port Scanner'));
 
     const selected = registry.forCategories(['Secret Scanner']);
 
     expect(selected.map((adapter: ToolAdapter): string => adapter.sourceTool)).toEqual([
       'Gitleaks',
+    ]);
+
+    const portSelected = registry.forCategories(['Port Scanner']);
+    expect(portSelected.map((adapter: ToolAdapter): string => adapter.sourceTool)).toEqual([
+      'CodeSentinel',
     ]);
   });
 
