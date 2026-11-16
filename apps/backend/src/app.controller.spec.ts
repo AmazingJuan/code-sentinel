@@ -14,9 +14,19 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+  describe('root and health endpoints', () => {
+    it('should return health status with status ok', () => {
+      const response = appController.getRoot();
+      expect(response.status).toBe('ok');
+      expect(response.service).toBe('code-sentinel-api');
+      expect(response.version).toBe('1.0.0');
+      expect(typeof response.uptime).toBe('number');
+      expect(typeof response.timestamp).toBe('string');
+    });
+
+    it('should return the same health status on /health', () => {
+      const response = appController.getHealth();
+      expect(response.status).toBe('ok');
     });
   });
 });
