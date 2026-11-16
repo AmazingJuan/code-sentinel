@@ -118,4 +118,3 @@ describe('ScansController', (): void => {
     expect(scansService.findOne).toHaveBeenCalledWith('scan-1', request.user);
   });
 });
-

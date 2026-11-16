@@ -77,4 +77,3 @@ describe('ProjectsController', (): void => {
     await expect(controller.unassignUser('p1', 'u1')).resolves.toBeUndefined();
   });
 });
-
