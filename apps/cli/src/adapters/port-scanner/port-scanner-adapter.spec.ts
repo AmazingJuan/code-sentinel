@@ -109,3 +109,4 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     await expect(adapter.run({ rootPath: '/test' })).rejects.toThrow(ToolExecutionError);
   });
 });
+

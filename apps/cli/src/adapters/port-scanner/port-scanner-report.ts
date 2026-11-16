@@ -66,11 +66,12 @@ export function isNmapHostReport(value: unknown): value is NmapHostReport {
     typeof value.target === 'string' &&
     Array.isArray(value.ports) &&
     value.ports.every(
-      (p: unknown) =>
-        isRecord(p) &&
-        typeof p.port === 'number' &&
-        typeof p.protocol === 'string' &&
-        typeof p.state === 'string',
+      (portEntry: unknown) =>
+        isRecord(portEntry) &&
+        typeof portEntry.port === 'number' &&
+        typeof portEntry.protocol === 'string' &&
+        typeof portEntry.state === 'string',
     )
   );
 }
+

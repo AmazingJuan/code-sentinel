@@ -37,7 +37,11 @@ const selectedProjectSummary = computed<ProjectScanSummaryInterface | null>(() =
   const summaries = computeProjectSummariesFromScans(
     allKnownScans.value.length > 0 ? allKnownScans.value : scans.value,
   )
-  return summaries.find((s) => s.projectId === filters.value.projectId) ?? null
+  return (
+    summaries.find(
+      (summary) => summary.projectId === filters.value.projectId,
+    ) ?? null
+  )
 })
 
 async function loadScans(): Promise<void> {

@@ -338,7 +338,9 @@ export class ScansService {
         where: { projectId },
         order: { scanNumber: 'DESC' },
       })) ?? [];
-    const allScans = projectScans.some((s) => s.id === latestScan.id)
+    const allScans = projectScans.some(
+      (existingScan) => existingScan.id === latestScan.id,
+    )
       ? projectScans
       : [latestScan, ...projectScans];
 

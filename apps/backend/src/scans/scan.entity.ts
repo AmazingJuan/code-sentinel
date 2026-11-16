@@ -94,9 +94,11 @@ export function computeProjectCountersFromScans(
     | 'lowCount'
   >[],
 ): ProjectScanCounters {
-  const sorted = [...scans].sort((a, b) => b.scanNumber - a.scanNumber);
+  const sorted = [...scans].sort(
+    (firstScan, secondScan) => secondScan.scanNumber - firstScan.scanNumber,
+  );
   const latestFinished = sorted.find(
-    (s) => s.status === 'completed' || s.status === 'failed',
+    (scan) => scan.status === 'completed' || scan.status === 'failed',
   );
   if (!latestFinished) {
     return {
@@ -109,7 +111,7 @@ export function computeProjectCountersFromScans(
     };
   }
 
-  const latestCompleted = sorted.find((s) => s.status === 'completed');
+  const latestCompleted = sorted.find((scan) => scan.status === 'completed');
   return {
     status: latestFinished.status as 'completed' | 'failed',
     lastScan: latestFinished.date,
