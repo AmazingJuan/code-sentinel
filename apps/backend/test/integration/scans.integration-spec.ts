@@ -24,7 +24,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
       projectId: 'p1',
       status: 'completed',
       errorMessage: null,
-      tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+      tools: ['SAST', 'Secret Scanner'],
       criticalCount: 1,
       highCount: 3,
       mediumCount: 5,

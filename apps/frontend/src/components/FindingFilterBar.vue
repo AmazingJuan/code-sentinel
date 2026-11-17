@@ -28,10 +28,8 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
         <option :value="undefined">Any tool</option>
         <option value="SAST">SAST</option>
         <option value="Secret Scanner">Secret Scanner</option>
-        <option value="Port Scanner">Port Scanner</option>
         <option value="Semgrep">Semgrep</option>
         <option value="Gitleaks">Gitleaks</option>
-        <option value="CodeSentinel">CodeSentinel</option>
       </select>
     </div>
     <div>

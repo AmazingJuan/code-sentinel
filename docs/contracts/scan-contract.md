@@ -28,8 +28,8 @@ El backend rechaza con 400 cualquier campo que no esté en este contrato (whitel
 | --- | --- | --- |
 | type | string | obligatorio, no vacío |
 | severity | critical / high / medium / low / null | minúsculas |
-| toolCategory | SAST / Secret Scanner / Port Scanner | obligatorio |
-| sourceTool | string | nombre real: Semgrep, Gitleaks, CodeSentinel |
+| toolCategory | SAST / Secret Scanner | obligatorio |
+| sourceTool | string | nombre real: Semgrep, Gitleaks |
 | filePath | string / null | relativo a la raíz del proyecto |
 | line | entero ≥ 1 / null | |
 | description | string / null | |

@@ -10,7 +10,7 @@ const project: ProjectInterface = {
   id: 'project-1',
   name: 'payments-service',
   repo: 'git@github.com:org/payments-service.git',
-  tools: ['SAST', 'Secret Scanner', 'Port Scanner'],
+  tools: ['SAST', 'Secret Scanner'],
   status: 'pending',
   lastScan: null,
   criticalCount: 0,

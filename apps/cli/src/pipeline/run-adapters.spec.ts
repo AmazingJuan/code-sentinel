@@ -82,12 +82,12 @@ describe('runAdapters', (): void => {
     expect(result.errors[0]).toContain('invalid report');
   });
 
-  it('runs new tools without modifying the pipeline (RF-030)', async (): Promise<void> => {
+  it('runs tools through the pipeline preserving tool category (RF-030)', async (): Promise<void> => {
     const result = await runAdapters(
-      [new FakeAdapter('Nmap', 'Port Scanner', buildReport('open-port'))],
+      [new FakeAdapter('Gitleaks', 'Secret Scanner', buildReport('exposed-token'))],
       target,
     );
 
-    expect(result.findings[0]).toMatchObject({ sourceTool: 'Nmap', toolCategory: 'Port Scanner' });
+    expect(result.findings[0]).toMatchObject({ sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' });
   });
 });

@@ -24,7 +24,7 @@ export class Project {
   @Column()
   repo: string;
 
-  @Column({ type: 'simple-array', default: 'SAST,Secret Scanner,Port Scanner' })
+  @Column({ type: 'simple-array', default: 'SAST,Secret Scanner' })
   tools: ScanTool[];
 
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })

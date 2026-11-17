@@ -185,8 +185,6 @@ onMounted(loadData)
             <option value="Gitleaks">Gitleaks</option>
             <option value="SAST">SAST</option>
             <option value="Secret Scanner">Secret Scanner</option>
-            <option value="Port Scanner">Port Scanner</option>
-            <option value="CodeSentinel">CodeSentinel</option>
           </select>
         </div>
 

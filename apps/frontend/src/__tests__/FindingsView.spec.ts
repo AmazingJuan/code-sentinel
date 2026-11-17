@@ -25,14 +25,14 @@ const findingsFixture: FindingInterface[] = [
   {
     id: 'f2',
     scanId: 's1',
-    type: 'Open Port 8080',
+    type: 'Insecure Evaluation',
     severity: null,
-    toolCategory: 'Port Scanner',
-    sourceTool: 'CodeSentinel',
+    toolCategory: 'SAST',
+    sourceTool: 'Semgrep',
     filePath: null,
     line: null,
-    description: 'Open port.',
-    recommendation: 'Close port.',
+    description: 'Dynamic evaluation.',
+    recommendation: 'Refactor code.',
   },
 ]
 
@@ -71,8 +71,8 @@ describe('FindingsView & SeverityBadge (RF-019, RF-021, RF-022)', () => {
 
     expect(wrapper.text()).toContain('Hardcoded Secret')
     expect(wrapper.text()).toContain('Gitleaks')
-    expect(wrapper.text()).toContain('Open Port 8080')
-    expect(wrapper.text()).toContain('CodeSentinel')
+    expect(wrapper.text()).toContain('Insecure Evaluation')
+    expect(wrapper.text()).toContain('Semgrep')
     expect(wrapper.text()).toContain('unclassified')
   })
 

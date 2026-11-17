@@ -198,19 +198,16 @@ describe('Code Sentinel CLI main', () => {
   describe('isAdapterSelected', () => {
     const semgrep = { sourceTool: 'Semgrep', toolCategory: 'SAST' as const } as unknown as ToolAdapter;
     const gitleaks = { sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' as const } as unknown as ToolAdapter;
-    const portScanner = { sourceTool: 'CodeSentinel', toolCategory: 'Port Scanner' as const } as unknown as ToolAdapter;
 
     it('matches when "all" is requested', () => {
       expect(isAdapterSelected(semgrep, ['all'])).toBe(true);
       expect(isAdapterSelected(gitleaks, ['all'])).toBe(true);
-      expect(isAdapterSelected(portScanner, ['all'])).toBe(true);
     });
 
     it('matches backend project tool categories', () => {
-      const projectTools = ['SAST', 'Secret Scanner'];
+      const projectTools = ['SAST'];
       expect(isAdapterSelected(semgrep, projectTools)).toBe(true);
-      expect(isAdapterSelected(gitleaks, projectTools)).toBe(true);
-      expect(isAdapterSelected(portScanner, projectTools)).toBe(false);
+      expect(isAdapterSelected(gitleaks, projectTools)).toBe(false);
     });
 
     it('matches CLI flags with dashes, spaces, and case-insensitivity', () => {
@@ -218,11 +215,8 @@ describe('Code Sentinel CLI main', () => {
       expect(isAdapterSelected(gitleaks, ['secret-scanner'])).toBe(true);
       expect(isAdapterSelected(gitleaks, ['secrets'])).toBe(true);
       expect(isAdapterSelected(semgrep, ['gitleaks'])).toBe(false);
-
-      expect(isAdapterSelected(portScanner, ['port-scanner'])).toBe(true);
-      expect(isAdapterSelected(portScanner, ['Port Scanner'])).toBe(true);
-      expect(isAdapterSelected(portScanner, ['codesentinel'])).toBe(true);
-      expect(isAdapterSelected(semgrep, ['port-scanner'])).toBe(false);
+      expect(isAdapterSelected(semgrep, ['sast'])).toBe(true);
+      expect(isAdapterSelected(semgrep, ['semgrep'])).toBe(true);
     });
   });
 });

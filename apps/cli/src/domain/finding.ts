@@ -1,5 +1,5 @@
 // Valores que acepta el backend (ver docs/contracts/scan-contract.md).
-export const TOOL_CATEGORIES = ['SAST', 'Secret Scanner', 'Port Scanner'] as const;
+export const TOOL_CATEGORIES = ['SAST', 'Secret Scanner'] as const;
 export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
 
 export const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;

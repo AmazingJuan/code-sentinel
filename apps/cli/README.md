@@ -2,7 +2,7 @@
 
 Official Command Line Interface for **Code Sentinel**, an AppSec and vulnerability management platform.
 
-Centralizes and executes multi-tool security analysis runs (SAST, Secret Scanning, Port Scanning) and synchronizes normalized findings with the Code Sentinel backend.
+Centralizes and executes multi-tool security analysis runs (SAST, Secret Scanning) and synchronizes normalized findings with the Code Sentinel backend.
 
 ## Requirements
 
@@ -48,7 +48,7 @@ code-sentinel scan ./path/to/project
 | `-p, --project <id>` | Project ID or name override (auto-detected if omitted) | Auto-detected |
 | `-u, --api-url <url>` | Code Sentinel backend API URL | Saved session or embedded endpoint |
 | `-t, --token <jwt>` | Authentication token override | Saved session or `CODE_SENTINEL_TOKEN` |
-| `--tools <list>` | Comma-separated tools: `semgrep,port-scanner` | All tools |
+| `--tools <list>` | Comma-separated tools: `semgrep,gitleaks` | All tools |
 | `--dry-run` | Run scan locally without syncing results to backend | `false` |
 | `-v, --version` | Display CLI version | |
 | `-h, --help` | Display usage instructions | |
@@ -57,7 +57,7 @@ code-sentinel scan ./path/to/project
 
 - **Zero-Touch Project Registration (RF-038):** Automatically identifies local projects via Git origin, package definition, or folder name. Projects are automatically created and assigned in Code Sentinel if they do not exist.
 - **Web-Based Authentication (RF-037):** Seamless browser-based login flow with visual feedback, eliminating manual copy-pasting of API tokens.
-- **Multi-Tool Pipeline:** Executes SAST, secrets, and port scanners, normalizing outputs into unified Code Sentinel findings.
+- **Multi-Tool Pipeline:** Executes SAST and secret scanners, normalizing outputs into unified Code Sentinel findings.
 - **Resilient Offline Fallback:** Automatically syncs results to backend. If the backend is unreachable or offline, findings are saved locally to `code-sentinel-findings.json`.
 
 ## License

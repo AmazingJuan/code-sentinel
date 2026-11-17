@@ -30,6 +30,7 @@
 - Integration with DAST.
 - Integration with SCA (dependency analysis).
 - IaC or container scanning.
+- Port scanning or network reconnaissance.
 - Automatic remediation of findings.
 - Native mobile app.
 - Offline data capture.
@@ -37,7 +38,6 @@
 
 ## LATER
 
-- Port scanning on a configured target.
 - Integration with external ticketing systems (Jira, Azure DevOps).
 - Automatic notifications for critical findings.
 - Executive dashboard with metrics and historical trends.

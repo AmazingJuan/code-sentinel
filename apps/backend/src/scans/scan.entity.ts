@@ -57,12 +57,8 @@ export function canTransitionScanStatus(
   return ALLOWED_SCAN_TRANSITIONS[from].includes(to);
 }
 
-export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner';
-export const SCAN_TOOLS: ScanTool[] = [
-  'SAST',
-  'Secret Scanner',
-  'Port Scanner',
-];
+export type ScanTool = 'SAST' | 'Secret Scanner';
+export const SCAN_TOOLS: ScanTool[] = ['SAST', 'Secret Scanner'];
 
 export function isScanTool(value: string): value is ScanTool {
   return (SCAN_TOOLS as readonly string[]).includes(value);

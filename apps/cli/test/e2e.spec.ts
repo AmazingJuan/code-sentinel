@@ -129,8 +129,8 @@ describe('CLI End-to-End Test Suite', () => {
           return;
         }
 
-        // Validate SCAN_TOOLS contract: ['SAST', 'Secret Scanner', 'Port Scanner']
-        const validScanTools = ['SAST', 'Secret Scanner', 'Port Scanner'];
+        // Validate SCAN_TOOLS contract: ['SAST', 'Secret Scanner']
+        const validScanTools = ['SAST', 'Secret Scanner'];
         const tools = body?.tools;
         if (
           !Array.isArray(tools) ||
@@ -142,7 +142,7 @@ describe('CLI End-to-End Test Suite', () => {
             JSON.stringify({
               statusCode: 400,
               message: [
-                'each value in tools must be one of the following values: SAST, Secret Scanner, Port Scanner',
+                'each value in tools must be one of the following values: SAST, Secret Scanner',
               ],
               error: 'Bad Request',
             }),
@@ -233,13 +233,6 @@ describe('CLI End-to-End Test Suite', () => {
           stderr: '',
         };
       }
-      if (command === 'nmap') {
-        return {
-          exitCode: 0,
-          stdout: '<?xml version="1.0"?><nmaprun></nmaprun>',
-          stderr: '',
-        };
-      }
       return { exitCode: 0, stdout: '', stderr: '' };
     });
 
@@ -292,7 +285,7 @@ describe('CLI End-to-End Test Suite', () => {
       repo: 'https://github.com/EAFIT-Works/juice-shop.git',
     });
 
-    // Verify scan creation with strictly valid SCAN_TOOLS: ['SAST', 'Port Scanner']
+    // Verify scan creation with strictly valid SCAN_TOOLS: ['SAST', 'Secret Scanner']
     const scanPostReq = recordedRequests.find((r) => r.method === 'POST' && r.url === '/scans');
     expect(scanPostReq).toBeDefined();
     expect(scanPostReq?.body.projectId).toBe('proj-uuid-1');

@@ -208,16 +208,16 @@ describe('FindingsService', () => {
     });
 
     it('debe retornar el finding sin filePath/line cuando no aplican (RF-021)', async (): Promise<void> => {
-      const portFinding = {
+      const globalFinding = {
         id: 'f4',
         scanId: 's1',
-        type: 'Open Port',
+        type: 'Exposed Service',
         severity: 'medium',
         filePath: null,
         line: null,
-        sourceTool: 'Port Scanner',
+        sourceTool: 'Custom Tool',
       };
-      repository.findOne!.mockResolvedValue(portFinding);
+      repository.findOne!.mockResolvedValue(globalFinding);
 
       const result = await service.findOne('f4', analyst);
 

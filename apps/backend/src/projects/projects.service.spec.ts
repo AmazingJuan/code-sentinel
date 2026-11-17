@@ -306,7 +306,7 @@ describe('ProjectsService', () => {
         id: 'project-1',
         name: 'code-sentinel',
         repo: 'git@github.com:org/repo.git',
-        tools: ['SAST', 'Port Scanner'],
+        tools: ['SAST', 'Secret Scanner'],
       } as Project;
       projectsRepository.findOne.mockResolvedValue(project);
       assignmentsRepository.find.mockResolvedValue([
@@ -318,7 +318,7 @@ describe('ProjectsService', () => {
       expect(projectsRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           repo: 'git@github.com:org/repo.git',
-          tools: ['SAST', 'Port Scanner'],
+          tools: ['SAST', 'Secret Scanner'],
         }),
       );
     });

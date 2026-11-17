@@ -12,8 +12,8 @@ export const SCAN_STATUS_LABELS: Record<ScanStatus, string> = {
   failed: 'Failed',
 }
 
-export type ScanTool = 'SAST' | 'Secret Scanner' | 'Port Scanner'
-export const SCAN_TOOLS: ScanTool[] = ['SAST', 'Secret Scanner', 'Port Scanner']
+export type ScanTool = 'SAST' | 'Secret Scanner'
+export const SCAN_TOOLS: ScanTool[] = ['SAST', 'Secret Scanner']
 
 export interface ScanInterface {
   id: string
