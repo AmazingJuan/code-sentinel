@@ -7,6 +7,10 @@ on:
     paths:
       - 'apps/cli/**'
       - '.github/workflows/publish-cli.yml'
+    paths-ignore:
+      - 'apps/cli/README.md'
+      - 'apps/cli/test/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
@@ -46,10 +50,26 @@ jobs:
           CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
         run: pnpm run build
 
-      - name: Publish to npm
+      - name: Check version and publish to npm
         working-directory: apps/cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "Publishing Code Sentinel CLI to npm..."
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          PKG_NAME=$(node -p "require('./package.json').name")
+          echo "Inspecting npm registry for $PKG_NAME@$CURRENT_VERSION..."
+
+          PUBLISHED_VERSION=$(npm view "$PKG_NAME@$CURRENT_VERSION" version 2>/dev/null || true)
+          if [ "$PUBLISHED_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "Version $CURRENT_VERSION of $PKG_NAME is already published on npm."
+            echo "Skipping publication to avoid conflicts. Bump version in package.json when ready to release."
+            exit 0
+          fi
+
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret is not set. Skipping publish."
+            exit 0
+          fi
+
+          echo "Publishing $PKG_NAME@$CURRENT_VERSION to npm..."
           pnpm publish --access public --no-git-checks --provenance

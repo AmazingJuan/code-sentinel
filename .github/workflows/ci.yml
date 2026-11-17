@@ -42,11 +42,57 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   # ---------------------------------------------------------------------------
-  # 2. CLI Toolsuite (apps/cli)
+  # 2. Detect Changed Components
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect Changed Components
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.filter.outputs.cli }}
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect path changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cli:
+              - 'apps/cli/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/publish-cli.yml'
+            backend:
+              - 'apps/backend/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy-backend.yml'
+            frontend:
+              - 'apps/frontend/**'
+              - '!apps/frontend/code-sentinel-2/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy-pages.yml'
+            docker:
+              - 'docker-compose.yml'
+              - 'apps/backend/Dockerfile'
+              - 'apps/frontend/Dockerfile'
+              - 'apps/frontend/nginx.conf'
+              - '.github/workflows/ci.yml'
+
+  # ---------------------------------------------------------------------------
+  # 3. CLI Toolsuite (apps/cli)
   # ---------------------------------------------------------------------------
   cli:
     name: CLI Checks (Lint, Test, Build)
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop' ||
+      needs.changes.outputs.cli == 'true' ||
+      github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: apps/cli
@@ -81,11 +127,17 @@ jobs:
         run: pnpm run build
 
   # ---------------------------------------------------------------------------
-  # 3. Backend API (apps/backend)
+  # 4. Backend API (apps/backend)
   # ---------------------------------------------------------------------------
   backend:
     name: Backend Checks (Lint, Unit, Integration, Coverage, Build)
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop' ||
+      needs.changes.outputs.backend == 'true' ||
+      github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: apps/backend
@@ -129,11 +181,17 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------------
-  # 4. Frontend Application (apps/frontend)
+  # 5. Frontend Application (apps/frontend)
   # ---------------------------------------------------------------------------
   frontend:
     name: Frontend Checks (Lint, Types, Unit, Build)
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop' ||
+      needs.changes.outputs.frontend == 'true' ||
+      github.event_name == 'workflow_dispatch'
     defaults:
       run:
         working-directory: apps/frontend
@@ -171,11 +229,19 @@ jobs:
         run: pnpm run build
 
   # ---------------------------------------------------------------------------
-  # 5. Docker Compose & Container Integrity
+  # 6. Docker Compose & Container Integrity
   # ---------------------------------------------------------------------------
   docker-validation:
     name: Docker & Compose Integrity
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/develop' ||
+      needs.changes.outputs.docker == 'true' ||
+      needs.changes.outputs.backend == 'true' ||
+      needs.changes.outputs.frontend == 'true' ||
+      github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -190,13 +256,14 @@ jobs:
         run: docker compose build --parallel
 
   # ---------------------------------------------------------------------------
-  # 6. CI Status Gate (Single Required Status Check for Branch Protection)
+  # 7. CI Status Gate (Single Required Status Check for Branch Protection)
   # ---------------------------------------------------------------------------
   ci-status:
     name: CI Status Gate
     runs-on: ubuntu-latest
     needs:
       - secret-scan
+      - changes
       - cli
       - backend
       - frontend
@@ -207,18 +274,22 @@ jobs:
         run: |
           echo "Evaluating CI pipeline status:"
           echo "  Secret scan:       ${{ needs.secret-scan.result }}"
+          echo "  Changes detection: ${{ needs.changes.result }}"
           echo "  CLI checks:        ${{ needs.cli.result }}"
           echo "  Backend checks:    ${{ needs.backend.result }}"
           echo "  Frontend checks:   ${{ needs.frontend.result }}"
           echo "  Docker validation: ${{ needs.docker-validation.result }}"
 
-          if [ "${{ needs.secret-scan.result }}" != "success" ] || \
-             [ "${{ needs.cli.result }}" != "success" ] || \
-             [ "${{ needs.backend.result }}" != "success" ] || \
-             [ "${{ needs.frontend.result }}" != "success" ] || \
-             [ "${{ needs.docker-validation.result }}" != "success" ]; then
-            echo "::error::One or more upstream CI jobs failed."
-            exit 1
-          fi
+          for res in "${{ needs.secret-scan.result }}" \
+                     "${{ needs.changes.result }}" \
+                     "${{ needs.cli.result }}" \
+                     "${{ needs.backend.result }}" \
+                     "${{ needs.frontend.result }}" \
+                     "${{ needs.docker-validation.result }}"; do
+            if [ "$res" = "failure" ] || [ "$res" = "cancelled" ]; then
+              echo "::error::One or more upstream CI jobs failed or were cancelled."
+              exit 1
+            fi
+          done
 
-          echo "All CI checks passed successfully!"
+          echo "All executed CI checks passed successfully!"
