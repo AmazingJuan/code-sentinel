@@ -21,5 +21,10 @@ export const useAuthStore = defineStore(
 
     return { token, user, setSession, logout }
   },
-  { persist: true },
+  {
+    persist: {
+      storage: localStorage,
+      key: 'auth',
+    },
+  },
 )

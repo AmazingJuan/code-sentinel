@@ -20,6 +20,22 @@ export const AuthService = {
     return useAuthStore().user
   },
 
+  async fetchCurrentUser(): Promise<AuthUser | null> {
+    const token = this.getToken()
+    if (!token) return null
+    try {
+      const { data } = await httpClient.get<AuthUser>('/auth/me')
+      useAuthStore().setSession(token, data)
+      return data
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        this.logout()
+        return null
+      }
+      return this.getUser()
+    }
+  },
+
   /**
  * RF-032: each role has its own landing page. The admin never lands on
  * security content; the analyst starts on the security overview.
