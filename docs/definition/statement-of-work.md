@@ -215,7 +215,7 @@ Performance will be assessed through:
 
 The project will be considered successful if it:
 
-* Implements the defined functional requirements RF-001 through RF-036.
+* Implements the defined functional requirements RF-001 through RF-038.
 * Meets the applicable non-functional requirements NFR-001 through NFR-007.
 * Provides a fully navigable frontend experience.
 * Provides real backend functionality for authentication, projects, scans, findings, and reporting.
@@ -500,6 +500,14 @@ The system shall allow authorized administrators to assign projects to users and
 #### RF-036: CLI npm Distribution and Embedded Backend Endpoint Resolution
 
 The system shall package and distribute the Code Sentinel CLI through the npm registry, embedding the canonical backend API endpoint into the build distribution and providing automated, path-conditional CI/CD workflows for independent deployment of frontend, backend, and CLI services.
+
+#### RF-037: Web-Based CLI Authentication Flow (Nessus-Style Login)
+
+The system shall provide a local, browser-based authentication workflow within the CLI (`code-sentinel login`), serving an ephemeral local web application that authenticates with the Code Sentinel backend, persists credentials locally in the user's home configuration directory, and automatically validates active sessions for subsequent commands.
+
+#### RF-038: Automatic Project Identification and Zero-Touch Registration
+
+The system shall automatically determine the project context from the local workspace repository or directory structure when executing scans, query the backend to resolve existing project associations, and automatically register and link the project to the authenticated user if it does not yet exist, removing manual project registration prerequisites for scanning.
 
 ## Non-Functional Requirements
 
