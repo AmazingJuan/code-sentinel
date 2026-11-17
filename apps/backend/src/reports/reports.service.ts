@@ -312,29 +312,39 @@ export class ReportsService {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${data.title}</title>
   <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     :root {
       --bg: #090d16;
       --card: #0f172a;
+      --card-inner: #020617;
       --border: #1e293b;
+      --border-focus: #38bdf8;
       --text: #f8fafc;
       --muted: #94a3b8;
       --primary: #38bdf8;
       --critical: #ef4444;
+      --critical-bg: rgba(239, 68, 68, 0.15);
       --high: #f97316;
+      --high-bg: rgba(249, 115, 22, 0.15);
       --medium: #eab308;
+      --medium-bg: rgba(234, 179, 8, 0.15);
       --low: #3b82f6;
+      --low-bg: rgba(59, 130, 246, 0.15);
     }
     body {
       margin: 0;
       padding: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
     }
     .container {
-      max-width: 1000px;
-      margin: 40px auto;
-      padding: 0 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px;
     }
     .card {
       background: var(--card);
@@ -342,34 +352,50 @@ export class ReportsService {
       border-radius: 12px;
       padding: 24px;
       margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .header-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
     }
     .badge {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      font-size: 12px;
-      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
-    .badge-critical { background: rgba(239, 68, 68, 0.2); color: var(--critical); border: 1px solid var(--critical); }
-    .badge-high { background: rgba(249, 115, 22, 0.2); color: var(--high); border: 1px solid var(--high); }
-    .badge-medium { background: rgba(234, 179, 8, 0.2); color: var(--medium); border: 1px solid var(--medium); }
-    .badge-low { background: rgba(59, 130, 246, 0.2); color: var(--low); border: 1px solid var(--low); }
+    .badge-critical { background: var(--critical-bg); color: var(--critical); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-high { background: var(--high-bg); color: var(--high); border: 1px solid rgba(249, 115, 22, 0.3); }
+    .badge-medium { background: var(--medium-bg); color: var(--medium); border: 1px solid rgba(234, 179, 8, 0.3); }
+    .badge-low { background: var(--low-bg); color: var(--low); border: 1px solid rgba(59, 130, 246, 0.3); }
+
     .auth-box {
       max-width: 440px;
       margin: 100px auto;
       text-align: center;
     }
-    input[type="password"] {
+    input[type="password"], input[type="text"] {
       width: 100%;
       padding: 12px 16px;
-      margin: 16px 0;
-      box-sizing: border-box;
-      background: #020617;
+      background: var(--card-inner);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: #fff;
-      font-size: 15px;
+      font-size: 14px;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--border-focus);
     }
     button {
       width: 100%;
@@ -381,35 +407,135 @@ export class ReportsService {
       font-weight: 600;
       font-size: 15px;
       cursor: pointer;
+      margin-top: 12px;
     }
     button:hover { background: #0369a1; }
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
-      margin: 20px 0;
+      margin-top: 20px;
     }
     .stat-card {
-      background: #020617;
+      background: var(--card-inner);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 16px;
       text-align: center;
     }
-    .stat-val { font-size: 28px; font-weight: 700; margin-top: 8px; }
+    .stat-val { font-size: 28px; font-weight: 700; margin-top: 6px; }
+
+    /* Controls & Search */
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .filter-pill {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .filter-pill.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .search-box {
+      max-width: 320px;
+      width: 100%;
+    }
+
+    /* Table Container: Prevents overflow */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card-inner);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 16px;
+      table-layout: fixed;
+      min-width: 800px;
     }
-    th, td {
-      padding: 12px 14px;
+    th {
+      background: #090e1a;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 16px;
       text-align: left;
       border-bottom: 1px solid var(--border);
-      font-size: 14px;
     }
-    th { color: var(--muted); font-weight: 600; }
+    td {
+      padding: 14px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .col-sev { width: 110px; }
+    .col-type { width: 320px; }
+    .col-tool { width: 160px; }
+    .col-loc { width: 260px; }
+    .col-cwe { width: 90px; text-align: center; }
+
+    .code-pill {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      background: #090d16;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      color: #38bdf8;
+      word-break: break-all;
+      max-width: 100%;
+    }
+    .recommendation-box {
+      margin-top: 6px;
+      padding: 8px 12px;
+      background: rgba(56, 189, 248, 0.06);
+      border-left: 2px solid var(--primary);
+      border-radius: 4px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
     .error { color: var(--critical); font-size: 13px; margin-top: 8px; }
+
+    @media print {
+      body { background: #fff !important; color: #000 !important; }
+      .card { background: #fff !important; color: #000 !important; border: 1px solid #ccc !important; box-shadow: none !important; }
+      .table-container { border: 1px solid #ccc !important; overflow: visible !important; }
+      table { min-width: 100% !important; table-layout: auto !important; }
+      #authSection, .controls-row { display: none !important; }
+      .code-pill { background: #f1f5f9 !important; color: #000 !important; border-color: #ccc !important; }
+    }
   </style>
 </head>
 <body>
@@ -417,7 +543,9 @@ export class ReportsService {
     <div class="card auth-box">
       <h2 style="margin: 0 0 8px 0;">🛡️ Code Sentinel</h2>
       <p style="color: var(--muted); margin: 0 0 20px 0; font-size: 14px;">Protected Security Report</p>
-      <p style="font-size: 13px; color: var(--muted);">This report is encrypted with password protection (RF-033 / RF-034). Enter the report password to view the security findings.</p>
+      <p style="font-size: 13px; color: var(--muted); margin-bottom: 20px;">
+        This report is encrypted with password protection (RF-033 / RF-034). Enter the report password to decrypt and view the findings.
+      </p>
       <form id="unlockForm">
         <input type="password" id="passwordInput" placeholder="Enter report password..." required autofocus />
         <button type="submit" id="unlockBtn">Unlock Security Report</button>
@@ -428,44 +556,65 @@ export class ReportsService {
 
   <div class="container" id="reportSection" style="display: none;">
     <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
+      <div class="header-bar">
         <div>
-          <h1 style="margin: 0; font-size: 24px;">Code Sentinel Security Report</h1>
-          <p id="projInfo" style="margin: 6px 0 0 0; color: var(--muted); font-size: 14px;"></p>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🛡️</span>
+            <h1 style="margin: 0; font-size: 22px;">Code Sentinel Security Report</h1>
+          </div>
+          <p id="projInfo" style="margin: 8px 0 0 0; color: var(--muted); font-size: 14px; word-break: break-all;"></p>
         </div>
         <div style="text-align: right;">
-          <span style="font-size: 12px; color: var(--muted);">Generated:</span>
+          <span style="font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em;">Generated</span>
           <div id="genDate" style="font-size: 13px; font-weight: 500;"></div>
         </div>
       </div>
 
       <div class="stats">
-        <div class="stat-card" style="border-top: 3px solid var(--critical);"><div style="color: var(--muted); font-size: 12px;">CRITICAL</div><div id="countCritical" class="stat-val" style="color: var(--critical);">0</div></div>
-        <div class="stat-card" style="border-top: 3px solid var(--high);"><div style="color: var(--muted); font-size: 12px;">HIGH</div><div id="countHigh" class="stat-val" style="color: var(--high);">0</div></div>
-        <div class="stat-card" style="border-top: 3px solid var(--medium);"><div style="color: var(--muted); font-size: 12px;">MEDIUM</div><div id="countMedium" class="stat-val" style="color: var(--medium);">0</div></div>
-        <div class="stat-card" style="border-top: 3px solid var(--low);"><div style="color: var(--muted); font-size: 12px;">LOW</div><div id="countLow" class="stat-val" style="color: var(--low);">0</div></div>
+        <div class="stat-card" style="border-top: 3px solid var(--critical);"><div style="color: var(--muted); font-size: 12px; font-weight: 600;">CRITICAL</div><div id="countCritical" class="stat-val" style="color: var(--critical);">0</div></div>
+        <div class="stat-card" style="border-top: 3px solid var(--high);"><div style="color: var(--muted); font-size: 12px; font-weight: 600;">HIGH</div><div id="countHigh" class="stat-val" style="color: var(--high);">0</div></div>
+        <div class="stat-card" style="border-top: 3px solid var(--medium);"><div style="color: var(--muted); font-size: 12px; font-weight: 600;">MEDIUM</div><div id="countMedium" class="stat-val" style="color: var(--medium);">0</div></div>
+        <div class="stat-card" style="border-top: 3px solid var(--low);"><div style="color: var(--muted); font-size: 12px; font-weight: 600;">LOW</div><div id="countLow" class="stat-val" style="color: var(--low);">0</div></div>
       </div>
     </div>
 
     <div class="card">
-      <h3 style="margin: 0 0 16px 0;">Identified Findings</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Severity</th>
-            <th>Type</th>
-            <th>Category / Tool</th>
-            <th>Location</th>
-            <th>CWE</th>
-          </tr>
-        </thead>
-        <tbody id="findingsTableBody"></tbody>
-      </table>
+      <div class="controls-row">
+        <div class="filter-pills">
+          <button type="button" class="filter-pill active" data-filter="all">All (<span id="totalFilterCount">0</span>)</button>
+          <button type="button" class="filter-pill" data-filter="critical">Critical</button>
+          <button type="button" class="filter-pill" data-filter="high">High</button>
+          <button type="button" class="filter-pill" data-filter="medium">Medium</button>
+          <button type="button" class="filter-pill" data-filter="low">Low</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Search type, tool, location..." />
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-sev">Severity</th>
+              <th class="col-type">Vulnerability</th>
+              <th class="col-tool">Tool / Category</th>
+              <th class="col-loc">Location</th>
+              <th class="col-cwe">CWE</th>
+            </tr>
+          </thead>
+          <tbody id="findingsTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script id="encryptedPayload" type="application/json">${bundleJson}</script>
   <script>
+    let reportData = null;
+    let currentFilter = 'all';
+    let searchQuery = '';
+
     async function deriveKey(password, salt) {
       const enc = new TextEncoder();
       const baseKey = await window.crypto.subtle.importKey(
@@ -514,47 +663,92 @@ export class ReportsService {
         );
 
         const dec = new TextDecoder();
-        const data = JSON.parse(dec.decode(decrypted));
-        renderReport(data);
+        reportData = JSON.parse(dec.decode(decrypted));
+        renderReport();
       } catch (err) {
         errorDiv.style.display = 'block';
       }
     });
 
-    function renderReport(data) {
+    function renderReport() {
+      if (!reportData) return;
       document.getElementById('authSection').style.display = 'none';
       document.getElementById('reportSection').style.display = 'block';
 
-      document.getElementById('projInfo').textContent = \`\${data.project.name} (\${data.project.repo})\`;
-      document.getElementById('genDate').textContent = new Date(data.generatedAt).toLocaleString();
+      document.getElementById('projInfo').textContent = \`\${reportData.project.name} • \${reportData.project.repo}\`;
+      document.getElementById('genDate').textContent = new Date(reportData.generatedAt).toLocaleString();
 
-      document.getElementById('countCritical').textContent = data.summary.critical;
-      document.getElementById('countHigh').textContent = data.summary.high;
-      document.getElementById('countMedium').textContent = data.summary.medium;
-      document.getElementById('countLow').textContent = data.summary.low;
+      document.getElementById('countCritical').textContent = reportData.summary.critical;
+      document.getElementById('countHigh').textContent = reportData.summary.high;
+      document.getElementById('countMedium').textContent = reportData.summary.medium;
+      document.getElementById('countLow').textContent = reportData.summary.low;
+      document.getElementById('totalFilterCount').textContent = reportData.findings.length;
 
+      filterAndRenderTable();
+    }
+
+    function filterAndRenderTable() {
+      if (!reportData) return;
       const tbody = document.getElementById('findingsTableBody');
       tbody.innerHTML = '';
 
-      if (data.findings.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">No vulnerabilities found.</td></tr>';
+      const filtered = reportData.findings.filter((f) => {
+        const matchesFilter = currentFilter === 'all' || (f.severity || '').toLowerCase() === currentFilter;
+        if (!matchesFilter) return false;
+
+        if (!searchQuery) return true;
+        const text = \`\${f.type} \${f.description || ''} \${f.filePath || ''} \${f.sourceTool} \${f.cwe || ''}\`.toLowerCase();
+        return text.includes(searchQuery.toLowerCase());
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 32px;">No matching findings found.</td></tr>';
         return;
       }
 
-      for (const f of data.findings) {
+      for (const f of filtered) {
         const tr = document.createElement('tr');
-        const sevClass = 'badge-' + (f.severity || 'low');
+        const sev = (f.severity || 'low').toLowerCase();
+        const sevClass = 'badge-' + (['critical', 'high', 'medium', 'low'].includes(sev) ? sev : 'low');
         const loc = f.filePath ? \`\${f.filePath}\${f.line ? ':' + f.line : ''}\` : 'N/A';
+        const rec = f.recommendation ? \`<div class="recommendation-box">💡 <strong>Remediation:</strong> \${escapeHtml(f.recommendation)}</div>\` : '';
+
         tr.innerHTML = \`
-          <td><span class="badge \${sevClass}">\${f.severity || 'UNKNOWN'}</span></td>
-          <td><strong>\${f.type}</strong><br><span style="color: var(--muted); font-size: 12px;">\${f.description || ''}</span></td>
-          <td>\${f.sourceTool} (\${f.toolCategory})</td>
-          <td><code>\${loc}</code></td>
-          <td>\${f.cwe || 'N/A'}</td>
+          <td class="col-sev"><span class="badge \${sevClass}">\${escapeHtml(f.severity || 'UNKNOWN')}</span></td>
+          <td class="col-type">
+            <strong style="color: var(--text); font-size: 14px;">\${escapeHtml(f.type)}</strong>
+            <div style="color: var(--muted); font-size: 12px; margin-top: 4px;">\${escapeHtml(f.description || '')}</div>
+            \${rec}
+          </td>
+          <td class="col-tool">
+            <span style="font-weight: 500;">\${escapeHtml(f.sourceTool)}</span>
+            <div style="font-size: 11px; color: var(--muted);">\${escapeHtml(f.toolCategory)}</div>
+          </td>
+          <td class="col-loc"><code class="code-pill">\${escapeHtml(loc)}</code></td>
+          <td class="col-cwe"><span style="font-family: monospace; font-size: 11px; color: var(--muted);">\${escapeHtml(f.cwe || '-')}</span></td>
         \`;
         tbody.appendChild(tr);
       }
     }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+    }
+
+    document.querySelectorAll('.filter-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.getAttribute('data-filter');
+        filterAndRenderTable();
+      });
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      filterAndRenderTable();
+    });
   </script>
 </body>
 </html>`;
