@@ -126,6 +126,12 @@ describe('UsersService & UsersController', (): void => {
       repository.delete!.mockResolvedValueOnce({ affected: 1 });
       await expect(service.remove('u1')).resolves.toBeUndefined();
     });
+
+    it('ensureDefaultUsers debe crear los usuarios por defecto si no existen', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue(null);
+      await service.ensureDefaultUsers();
+      expect(repository.save).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('UsersController', (): void => {

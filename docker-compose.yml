@@ -27,7 +27,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-code_sentinel}
       DB_NAME: ${POSTGRES_DB:-code_sentinel}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
     depends_on:
       db:
         condition: service_healthy
