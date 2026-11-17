@@ -22,6 +22,8 @@ export interface ScanInterface {
   projectId: string
   date: string
   status: ScanStatus
+  commitSha?: string | null
+  branch?: string | null
   errorMessage?: string | null
   tools: ScanTool[]
   criticalCount: number
