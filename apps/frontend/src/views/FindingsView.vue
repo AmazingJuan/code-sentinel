@@ -1,7 +1,7 @@
 <!-- apps/frontend/src/views/FindingsView.vue -->
 <script setup lang="ts">
-import { ChevronRight } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { ChevronRight, Search } from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import FindingFilterBar from '@/components/FindingFilterBar.vue'
@@ -13,6 +13,7 @@ import { FindingService } from '@/services/FindingService'
 
 const findings = ref<FindingInterface[]>([])
 const filters = ref<FindingFiltersInterface>({})
+const searchQuery = ref('')
 const errorMessage = ref<string | null>(null)
 
 async function loadFindings(): Promise<void> {
@@ -24,6 +25,21 @@ async function loadFindings(): Promise<void> {
   }
 }
 
+const displayedFindings = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return findings.value
+
+  return findings.value.filter((f) => {
+    return (
+      f.type.toLowerCase().includes(query) ||
+      (f.cwe && f.cwe.toLowerCase().includes(query)) ||
+      (f.filePath && f.filePath.toLowerCase().includes(query)) ||
+      f.sourceTool.toLowerCase().includes(query) ||
+      (f.description && f.description.toLowerCase().includes(query))
+    )
+  })
+})
+
 onMounted(loadFindings)
 </script>
 
@@ -32,10 +48,21 @@ onMounted(loadFindings)
     <PageHeader
       title="Findings"
       breadcrumb="~/ findings"
-      description="Aggregated vulnerabilities from security analysis scans."
+      description="Aggregated vulnerabilities and security defects from analysis scans."
     />
 
-    <div class="mb-4 rounded-lg border border-border bg-card p-4">
+    <!-- Filter & Search Toolbar -->
+    <div class="mb-5 space-y-3 rounded-lg border border-border bg-card p-4">
+      <div class="relative">
+        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Filter findings by type, CWE, file path, or source tool..."
+          class="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+      </div>
+
       <FindingFilterBar v-model="filters" @apply="loadFindings" />
     </div>
 
@@ -47,6 +74,7 @@ onMounted(loadFindings)
       {{ errorMessage }}
     </p>
 
+    <!-- Table -->
     <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[760px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -62,7 +90,7 @@ onMounted(loadFindings)
         </thead>
         <tbody>
           <RouterLink
-            v-for="finding in findings"
+            v-for="finding in displayedFindings"
             :key="finding.id"
             :to="{ name: 'finding.show', params: { id: finding.id } }"
             custom
@@ -74,9 +102,17 @@ onMounted(loadFindings)
             >
               <td class="px-4 py-3"><SeverityBadge :severity="finding.severity" /></td>
               <td class="px-4 py-3">
-                <span class="font-medium text-foreground transition-colors group-hover:text-primary">
-                  {{ finding.type }}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-foreground transition-colors group-hover:text-primary">
+                    {{ finding.type }}
+                  </span>
+                  <span
+                    v-if="finding.cwe"
+                    class="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  >
+                    {{ finding.cwe }}
+                  </span>
+                </div>
               </td>
               <td class="px-4 py-3 font-mono text-xs text-term-cyan">{{ finding.filePath ?? '-' }}</td>
               <td class="px-4 py-3 font-mono text-muted-foreground">{{ finding.line ?? '-' }}</td>
@@ -94,8 +130,8 @@ onMounted(loadFindings)
           </RouterLink>
         </tbody>
       </table>
-      <p v-if="findings.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
-        No findings match the selected filters.
+      <p v-if="displayedFindings.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
+        No findings match the selected filters or search query.
       </p>
     </div>
   </div>

@@ -1,5 +1,5 @@
 // apps/frontend/src/interfaces/FindingInterface.ts
-import type { ScanTool } from './ScanInterface'
+import type { ScanInterface, ScanTool } from './ScanInterface'
 
 export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low'
 
@@ -11,7 +11,11 @@ export interface FindingInterface {
   toolCategory?: ScanTool
   filePath: string | null
   line: number | null
+  cwe?: string | null
+  commitSha?: string | null
+  codeSnippet?: string | null
   sourceTool: string
   description: string | null
   recommendation: string | null
+  scan?: ScanInterface
 }

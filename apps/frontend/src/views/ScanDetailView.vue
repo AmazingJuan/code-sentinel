@@ -1,9 +1,9 @@
 <!-- apps/frontend/src/views/ScanDetailView.vue -->
 <script setup lang="ts">
 import axios from 'axios'
-import { Calendar, Hash, FolderKanban } from 'lucide-vue-next'
+import { Calendar, ChevronRight, FolderKanban, GitBranch, GitCommit, Hash } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
@@ -11,6 +11,7 @@ import SeverityBar from '@/components/SeverityBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
+import { buildCommitUrl } from '@/services/GitHelper'
 import { FindingService } from '@/services/FindingService'
 import { ScanService } from '@/services/ScanService'
 
@@ -34,6 +35,10 @@ onMounted(async () => {
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
   }
+})
+
+const commitUrl = computed(() => {
+  return buildCommitUrl(scan.value?.project?.repo, scan.value?.commitSha)
 })
 
 const counts = computed(() => ({
@@ -69,7 +74,7 @@ const summaryItems = computed(() => [
       </PageHeader>
 
       <!-- Meta Strip -->
-      <div class="mb-6 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+      <div class="mb-6 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
         <div class="bg-card p-4">
           <p class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             <FolderKanban class="size-3.5" />
@@ -86,6 +91,29 @@ const summaryItems = computed(() => [
           </p>
           <p class="mt-1.5 font-mono text-sm font-medium text-foreground">
             #{{ scan.scanNumber }}
+          </p>
+        </div>
+        <div class="bg-card p-4">
+          <p class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <GitCommit class="size-3.5" />
+            Git Commit / Branch
+          </p>
+          <p class="mt-1.5 flex items-center gap-1.5 font-mono text-sm font-medium text-foreground">
+            <a
+              v-if="scan.commitSha && commitUrl"
+              :href="commitUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-term-cyan hover:underline"
+            >
+              {{ scan.commitSha.slice(0, 7) }}
+            </a>
+            <span v-else-if="scan.commitSha" class="text-term-cyan">{{ scan.commitSha.slice(0, 7) }}</span>
+            <span v-else class="text-muted-foreground">-</span>
+            <template v-if="scan.branch">
+              <GitBranch class="ml-1.5 size-3 text-muted-foreground" />
+              <span class="text-xs text-muted-foreground">{{ scan.branch }}</span>
+            </template>
           </p>
         </div>
         <div class="bg-card p-4">
@@ -149,19 +177,33 @@ const summaryItems = computed(() => [
       <p v-if="findings.length === 0" class="mt-2 text-sm text-muted-foreground">No findings for this scan.</p>
 
       <div v-else class="mt-2 overflow-hidden rounded-lg border border-border bg-card">
-        <div
+        <RouterLink
           v-for="finding in findings"
           :key="finding.id"
-          class="flex items-center justify-between border-b border-border/60 px-4 py-3 last:border-0 hover:bg-accent/40 transition-colors"
+          :to="{ name: 'finding.show', params: { id: finding.id } }"
+          class="group flex items-center justify-between border-b border-border/60 px-4 py-3.5 transition-colors last:border-0 hover:bg-accent/40 cursor-pointer"
         >
-          <div>
-            <p class="text-sm font-medium text-foreground">{{ finding.type }}</p>
-            <p v-if="finding.filePath" class="mt-0.5 font-mono text-xs text-term-cyan">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                {{ finding.type }}
+              </p>
+              <span
+                v-if="finding.cwe"
+                class="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              >
+                {{ finding.cwe }}
+              </span>
+            </div>
+            <p v-if="finding.filePath" class="font-mono text-xs text-term-cyan">
               {{ finding.filePath }}:{{ finding.line }}
             </p>
           </div>
-          <SeverityBadge :severity="finding.severity" />
-        </div>
+          <div class="flex items-center gap-3">
+            <SeverityBadge :severity="finding.severity" />
+            <ChevronRight class="size-4 text-muted-foreground opacity-40 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+          </div>
+        </RouterLink>
       </div>
     </template>
   </div>
