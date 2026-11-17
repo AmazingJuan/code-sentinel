@@ -537,7 +537,7 @@ The system shall represent normalized security findings using a common internal 
 
 ### NFR-007: Local-Only Processing
 
-Security analysis processing and handling of project source code shall be performed locally according to the defined system architecture. The system shall not require unauthorized external processing or transmission of project source code for the execution of supported security analyses.
+Security analysis processing and handling of project source code shall be performed locally according to the defined system architecture. The system shall not require unauthorized external processing or transmission of project source code for the execution of supported security analyses. Integrated security tools are permitted network access to retrieve necessary security rulesets, vulnerability definitions, and tool updates.
 
 # Sprint Organization
 

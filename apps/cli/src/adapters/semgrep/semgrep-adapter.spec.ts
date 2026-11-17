@@ -96,15 +96,17 @@ describe('SemgrepAdapter.parse', (): void => {
 });
 
 describe('SemgrepAdapter.run', (): void => {
-  it('runs Docker with network none and disabled metrics (NFR-007)', async (): Promise<void> => {
+  it('runs Docker with network enabled, p/default rules, and disabled metrics', async (): Promise<void> => {
     const { adapter, runner } = buildAdapter({ exitCode: 0, stdout: fixtureReport, stderr: '' });
 
     const rawReport = await adapter.run(target);
 
     expect(rawReport).toBe(fixtureReport);
-    expect(runner.receivedArgs.join(' ')).toContain('--network none');
+    expect(runner.receivedArgs).toContain('p/default');
+    expect(runner.receivedArgs).toContain('/rules');
     expect(runner.receivedArgs).toContain('--metrics=off');
     expect(runner.receivedArgs).toContain('C:\\projects\\my-app:/src:ro');
+    expect(runner.receivedArgs.join(' ')).not.toContain('--network none');
   });
 
   it('throws ToolExecutionError with last line of stderr if exit code is non-zero', async (): Promise<void> => {
