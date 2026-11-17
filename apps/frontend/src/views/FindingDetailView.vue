@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Check,
+  ChevronLeft,
   Copy,
   ExternalLink,
   GitBranch,
@@ -14,7 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import CodeViewer from '@/components/CodeViewer.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -26,6 +27,7 @@ import { FindingService } from '@/services/FindingService'
 import { getVulnerabilityIntel } from '@/services/VulnerabilityIntel'
 
 const route = useRoute()
+const router = useRouter()
 const finding = ref<FindingInterface | null>(null)
 const errorMessage = ref<string | null>(null)
 const copiedSha = ref(false)
@@ -44,6 +46,16 @@ onMounted(async () => {
     errorMessage.value = extractErrorMessage(error)
   }
 })
+
+function goBack(): void {
+  if (window.history.state && window.history.state.back) {
+    router.back()
+  } else if (finding.value?.scan?.project?.id) {
+    router.push({ name: 'project.show', params: { id: finding.value.scan.project.id } })
+  } else {
+    router.push({ name: 'finding.index' })
+  }
+}
 
 const effectiveCommitSha = computed(() => {
   return finding.value?.commitSha || finding.value?.scan?.commitSha || null
@@ -75,15 +87,39 @@ const intel = computed(() => {
   return getVulnerabilityIntel(finding.value.type, finding.value.cwe)
 })
 
-const meta = computed(() => {
+interface MetaItem {
+  label: string
+  value: string
+  mono: boolean
+  isCwe?: boolean
+  link?: string | null
+}
+
+const meta = computed<MetaItem[]>(() => {
   if (!finding.value) return []
   return [
-    { label: 'Finding ID', value: finding.value.id, mono: true },
-    { label: 'Type', value: finding.value.type, mono: false },
-    { label: 'CWE', value: intel.value?.cwe ?? 'CWE-Unknown', mono: true, isCwe: true },
-    { label: 'Tool', value: finding.value.sourceTool, mono: false },
-    { label: 'File', value: finding.value.filePath ?? '-', mono: true },
-    { label: 'Line', value: finding.value.line !== null ? String(finding.value.line) : '-', mono: true },
+    {
+      label: 'Project',
+      value: finding.value.scan?.project?.name ?? 'Unassigned',
+      mono: false,
+      link: finding.value.scan?.project?.id
+        ? `/projects/${finding.value.scan.project.id}`
+        : null,
+    },
+    {
+      label: 'Scan Report',
+      value: finding.value.scan ? `#${finding.value.scan.scanNumber}` : 'N/A',
+      mono: true,
+      link: finding.value.scan?.id
+        ? `/scan/${finding.value.scan.id}`
+        : null,
+    },
+    { label: 'Finding ID', value: finding.value.id, mono: true, link: null },
+    { label: 'Type', value: finding.value.type, mono: false, link: null },
+    { label: 'CWE', value: intel.value?.cwe ?? 'CWE-Unknown', mono: true, isCwe: true, link: null },
+    { label: 'Tool', value: finding.value.sourceTool, mono: false, link: null },
+    { label: 'File', value: finding.value.filePath ?? '-', mono: true, link: null },
+    { label: 'Line', value: finding.value.line !== null ? String(finding.value.line) : '-', mono: true, link: null },
   ]
 })
 
@@ -103,6 +139,43 @@ async function copyCommitSha(): Promise<void> {
 
 <template>
   <div class="p-5 sm:p-8">
+    <!-- Navigation toolbar with back button & interactive breadcrumbs -->
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <button
+        type="button"
+        @click="goBack"
+        class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+      >
+        <ChevronLeft class="size-4" />
+        <span>Back</span>
+      </button>
+
+      <nav aria-label="Breadcrumb" class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+        <RouterLink to="/overview" class="hover:text-foreground transition-colors">overview</RouterLink>
+        <span>/</span>
+        <RouterLink
+          v-if="finding?.scan?.project"
+          :to="`/projects/${finding.scan.project.id}`"
+          class="hover:text-primary transition-colors text-foreground font-medium"
+        >
+          {{ finding.scan.project.name }}
+        </RouterLink>
+        <RouterLink v-else to="/finding" class="hover:text-foreground transition-colors">
+          findings
+        </RouterLink>
+        <span>/</span>
+        <RouterLink
+          v-if="finding?.scan"
+          :to="`/scan/${finding.scan.id}`"
+          class="hover:text-primary transition-colors text-muted-foreground"
+        >
+          #scan-{{ finding.scan.scanNumber }}
+        </RouterLink>
+        <span v-if="finding?.scan">/</span>
+        <span class="text-primary truncate max-w-[180px]">{{ finding?.type }}</span>
+      </nav>
+    </div>
+
     <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
@@ -143,14 +216,26 @@ async function copyCommitSha(): Promise<void> {
       <div class="grid gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">
           <!-- Metadata grid -->
-          <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+          <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
             <div
               v-for="m in meta"
               :key="m.label"
               class="bg-card p-3"
             >
               <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{{ m.label }}</p>
-              <p class="mt-1 truncate text-sm" :class="m.mono ? 'font-mono text-term-cyan' : 'text-foreground font-medium'">
+              <RouterLink
+                v-if="m.link"
+                :to="m.link"
+                class="mt-1 block truncate text-sm font-medium text-primary hover:underline"
+                :class="m.mono ? 'font-mono' : ''"
+              >
+                {{ m.value }}
+              </RouterLink>
+              <p
+                v-else
+                class="mt-1 truncate text-sm"
+                :class="m.mono ? 'font-mono text-term-cyan' : 'text-foreground font-medium'"
+              >
                 {{ m.value }}
               </p>
             </div>
@@ -282,6 +367,7 @@ async function copyCommitSha(): Promise<void> {
               [{ text: '$ ', tone: 'prompt' }, { text: `codesentinel inspect ${finding.id}`, tone: 'default' }],
               [],
               [{ text: `[${(finding.severity ?? 'unclassified').toUpperCase()}] ${finding.type}`, tone: (finding.severity as any) ?? 'dim' }],
+              [{ text: `Project: ${finding.scan?.project?.name ?? 'Unassigned'}`, tone: 'default' }],
               [{ text: `CWE: ${intel?.cwe ?? 'N/A'}`, tone: 'default' }],
               [{ text: `Tool: ${finding.sourceTool}`, tone: 'dim' }],
               [{ text: `File: ${finding.filePath ?? '-'}`, tone: 'cyan' }],

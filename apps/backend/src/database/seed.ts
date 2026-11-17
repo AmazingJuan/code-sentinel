@@ -2,13 +2,19 @@
 import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { User } from '../users/entities/user.entity';
 import { Project } from '../projects/project.entity';
 import { ProjectAssignment } from '../projects/project-assignment.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
-import { User } from '../users/entities/user.entity';
 import { DEFAULT_USERS } from '../users/users.service';
 
+/**
+ * Production-ready seeder.
+ * Only idempotently provisions the initial default users with deterministic UUIDs.
+ * Does NOT generate dummy projects, scans, or sample findings.
+ * Does NOT delete or overwrite existing user data or project records.
+ */
 async function seed(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;
   const isSsl = process.env.DB_SSL === 'true' || Boolean(databaseUrl);
@@ -32,7 +38,6 @@ async function seed(): Promise<void> {
   await dataSource.initialize();
   const userRepo = dataSource.getRepository(User);
 
-  // Idempotently seed default users with stable UUIDs without dropping existing data
   for (const def of DEFAULT_USERS) {
     const existing = await userRepo.findOne({
       where: { email: def.email.toLowerCase() },

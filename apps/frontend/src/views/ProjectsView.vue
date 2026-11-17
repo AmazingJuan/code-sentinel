@@ -1,18 +1,18 @@
 <!-- apps/frontend/src/views/ProjectsView.vue -->
 <script setup lang="ts">
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight, ExternalLink, FolderKanban, Search, Terminal } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
-import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
+import StatusBadge from '@/components/StatusBadge.vue'
+import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { ProjectService } from '@/services/ProjectService'
 
 const projects = ref<ProjectInterface[]>([])
+const searchQuery = ref('')
 const isLoading = ref<boolean>(false)
 const errorMessage = ref<string | null>(null)
-
-const hasProjects = computed<boolean>(() => projects.value.length > 0)
 
 async function loadProjects(): Promise<void> {
   isLoading.value = true
@@ -26,19 +26,23 @@ async function loadProjects(): Promise<void> {
   }
 }
 
-function statusLabel(status: ProjectStatus): string {
-  const labels: Record<ProjectStatus, string> = { pending: 'Pending scan', completed: 'Completed', failed: 'Failed' }
-  return labels[status]
-}
+const filteredProjects = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return projects.value
+  return projects.value.filter(
+    (p) => p.name.toLowerCase().includes(q) || p.repo.toLowerCase().includes(q),
+  )
+})
 
-function statusClass(status: ProjectStatus): string {
-  const classes: Record<ProjectStatus, string> = {
-    pending: 'border-border bg-muted/40 text-muted-foreground',
-    completed: 'border-primary/30 bg-primary/10 text-primary',
-    failed: 'border-destructive/30 bg-destructive/10 text-destructive',
+const stats = computed(() => {
+  const all = projects.value
+  return {
+    total: all.length,
+    critical: all.filter((p) => p.criticalCount > 0).length,
+    scanned: all.filter((p) => p.status === 'completed').length,
+    pending: all.filter((p) => p.status === 'pending').length,
   }
-  return classes[status]
-}
+})
 
 function formatDate(value: string | null): string {
   if (!value) return 'Never scanned'
@@ -51,26 +55,60 @@ onMounted(loadProjects)
 <template>
   <div class="p-5 sm:p-8">
     <PageHeader
-      title="Projects"
+      title="Projects & Repositories"
       breadcrumb="~/ projects"
-      description="Configured software repositories and security profiles."
+      description="Manage registered codebases, security postures, and scan configurations."
     />
 
+    <!-- Quick Stats Cards -->
+    <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="rounded-lg border border-border bg-card p-4">
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Total Projects</p>
+        <p class="mt-1 font-mono text-2xl font-bold text-foreground">{{ stats.total }}</p>
+      </div>
+      <div class="rounded-lg border border-critical/30 bg-critical/5 p-4">
+        <p class="font-mono text-[10px] uppercase tracking-wider text-critical">Projects with Criticals</p>
+        <p class="mt-1 font-mono text-2xl font-bold text-critical">{{ stats.critical }}</p>
+      </div>
+      <div class="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <p class="font-mono text-[10px] uppercase tracking-wider text-primary">Analyzed Projects</p>
+        <p class="mt-1 font-mono text-2xl font-bold text-primary">{{ stats.scanned }}</p>
+      </div>
+      <div class="rounded-lg border border-border bg-muted/20 p-4">
+        <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Pending Initial Scan</p>
+        <p class="mt-1 font-mono text-2xl font-bold text-muted-foreground">{{ stats.pending }}</p>
+      </div>
+    </div>
+
+    <!-- Zero-Touch CLI Discovery Banner -->
     <div class="mb-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
-        <div class="flex size-8 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 font-mono text-xs font-bold text-primary">
-          &gt;_
+        <div class="flex size-9 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 font-mono text-xs font-bold text-primary">
+          <Terminal class="size-4" />
         </div>
         <div>
-          <div class="text-sm font-medium text-foreground">Zero-Touch Project Discovery</div>
+          <div class="text-sm font-semibold text-foreground">Zero-Touch Project Discovery</div>
           <div class="text-xs text-muted-foreground">
-            Projects are automatically identified and registered in your console as soon as you run a security scan.
+            Projects are automatically recognized and registered the moment you run a scan from the CLI.
           </div>
         </div>
       </div>
-      <div class="flex items-center gap-2 rounded border border-border bg-muted/50 px-3 py-1.5 font-mono text-xs text-muted-foreground">
-        <span class="font-semibold text-primary">$</span>
+      <div class="flex items-center gap-2 rounded border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs text-foreground">
+        <span class="font-bold text-primary">$</span>
         <code>npx @amazingwalin/code-sentinel-cli scan</code>
+      </div>
+    </div>
+
+    <!-- Search Toolbar -->
+    <div class="mb-4">
+      <div class="relative">
+        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Filter projects by repository or name..."
+          class="w-full rounded-md border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
       </div>
     </div>
 
@@ -81,47 +119,108 @@ onMounted(loadProjects)
       {{ isLoading ? 'Loading...' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
     </p>
 
+    <!-- Table -->
     <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
-      <table class="w-full min-w-[640px] text-left text-sm">
+      <table class="w-full min-w-[760px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th scope="col" class="px-4 py-3 font-medium">Project</th>
-            <th scope="col" class="px-4 py-3 font-medium">Source</th>
-            <th scope="col" class="px-4 py-3 font-medium">Status</th>
-            <th scope="col" class="px-4 py-3 font-medium">Last scan</th>
-            <th scope="col" class="px-3 py-3 text-right font-medium">Findings</th>
-            <th scope="col" class="px-2 py-3"><span class="sr-only">Actions</span></th>
+            <th scope="col" class="px-5 py-3 font-medium">Project Name</th>
+            <th scope="col" class="px-5 py-3 font-medium">Repository</th>
+            <th scope="col" class="px-5 py-3 font-medium">Status</th>
+            <th scope="col" class="px-5 py-3 font-medium">Vulnerabilities</th>
+            <th scope="col" class="px-5 py-3 font-medium">Last Scan</th>
+            <th scope="col" class="px-3 py-3"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
-        <tbody>
-          <RouterLink
-            v-for="project in projects"
+        <tbody class="divide-y divide-border">
+          <tr
+            v-for="project in filteredProjects"
             :key="project.id"
-            :to="{ name: 'project.show', params: { id: project.id } }"
-            custom
-            v-slot="{ navigate }"
+            class="group transition-colors hover:bg-accent/40"
           >
-            <tr class="group cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40" @click="navigate">
-              <td class="px-4 py-3 font-mono font-medium text-primary hover:underline">{{ project.name }}</td>
-              <td class="max-w-xs truncate px-4 py-3 font-mono text-xs text-term-cyan" :title="project.repo">{{ project.repo }}</td>
-              <td class="px-4 py-3">
-                <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium" :class="statusClass(project.status)">
-                  <span class="size-1.5 rounded-full" :class="project.status === 'completed' ? 'bg-primary' : project.status === 'failed' ? 'bg-destructive' : 'bg-muted-foreground'" aria-hidden="true" />
-                  {{ statusLabel(project.status) }}
+            <td class="px-5 py-4">
+              <RouterLink
+                :to="{ name: 'project.show', params: { id: project.id } }"
+                class="flex items-center gap-2 font-medium text-foreground transition-colors group-hover:text-primary hover:underline"
+              >
+                <FolderKanban class="size-4 text-muted-foreground" />
+                <span class="text-sm font-semibold">{{ project.name }}</span>
+              </RouterLink>
+            </td>
+
+            <td class="max-w-[260px] truncate px-5 py-4 font-mono text-xs text-muted-foreground" :title="project.repo">
+              <span v-if="project.repo" class="inline-flex items-center gap-1.5">
+                <ExternalLink class="size-3 shrink-0" />
+                <span class="truncate">{{ project.repo }}</span>
+              </span>
+              <span v-else>-</span>
+            </td>
+
+            <td class="px-5 py-4">
+              <StatusBadge :status="project.status === 'pending' ? 'pending' : project.status === 'completed' ? 'completed' : 'failed'" />
+            </td>
+
+            <td class="px-5 py-4">
+              <div class="flex items-center gap-1.5 font-mono text-xs">
+                <span
+                  v-if="project.criticalCount > 0"
+                  class="rounded bg-critical/15 px-1.5 py-0.5 font-bold text-critical"
+                  title="Critical issues"
+                >
+                  {{ project.criticalCount }}C
                 </span>
-              </td>
-              <td class="px-4 py-3 text-muted-foreground">{{ formatDate(project.lastScan) }}</td>
-              <td class="px-3 py-3 text-right font-mono tabular-nums text-foreground">
-                {{ project.criticalCount + project.highCount + project.mediumCount + project.lowCount }}
-              </td>
-              <td class="px-2 py-3 text-muted-foreground"><ChevronRight class="size-4 opacity-0 transition-opacity group-hover:opacity-100" /></td>
-            </tr>
-          </RouterLink>
+                <span
+                  v-if="project.highCount > 0"
+                  class="rounded bg-high/15 px-1.5 py-0.5 font-bold text-high"
+                  title="High issues"
+                >
+                  {{ project.highCount }}H
+                </span>
+                <span
+                  v-if="project.mediumCount > 0"
+                  class="rounded bg-medium/15 px-1.5 py-0.5 font-medium text-medium"
+                  title="Medium issues"
+                >
+                  {{ project.mediumCount }}M
+                </span>
+                <span
+                  v-if="project.lowCount > 0"
+                  class="rounded bg-low/15 px-1.5 py-0.5 text-low"
+                  title="Low issues"
+                >
+                  {{ project.lowCount }}L
+                </span>
+                <span
+                  v-if="project.criticalCount === 0 && project.highCount === 0 && project.mediumCount === 0 && project.lowCount === 0"
+                  class="text-muted-foreground"
+                >
+                  0 issues
+                </span>
+              </div>
+            </td>
+
+            <td class="px-5 py-4 font-mono text-xs text-muted-foreground">
+              {{ formatDate(project.lastScan) }}
+            </td>
+
+            <td class="px-3 py-4 text-right">
+              <RouterLink
+                :to="{ name: 'project.show', params: { id: project.id } }"
+                class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                <span>Dashboard</span>
+                <ChevronRight class="size-3.5" />
+              </RouterLink>
+            </td>
+          </tr>
         </tbody>
       </table>
-      <div v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-muted-foreground">
+
+      <div v-if="!isLoading && projects.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
         <p class="font-medium text-foreground">No projects detected yet</p>
-        <p class="mt-1 text-xs">Run <code class="rounded bg-muted px-1.5 py-0.5 text-primary">npx @amazingwalin/code-sentinel-cli scan</code> inside any repository to automatically register and analyze it.</p>
+        <p class="mt-1 text-xs">
+          Run <code class="rounded bg-muted px-1.5 py-0.5 text-primary">npx @amazingwalin/code-sentinel-cli scan</code> inside any repository to automatically register and analyze it.
+        </p>
       </div>
     </div>
   </div>
