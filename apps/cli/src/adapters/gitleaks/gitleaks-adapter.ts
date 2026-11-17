@@ -40,7 +40,8 @@ export class GitleaksAdapter implements ToolAdapter {
       '-v',
       `${target.rootPath}:${CONTAINER_TARGET_DIR}:ro`,
       GITLEAKS_IMAGE,
-      'dir',
+      'detect',
+      '--source',
       CONTAINER_TARGET_DIR,
       '--report-format',
       'json',
@@ -48,6 +49,7 @@ export class GitleaksAdapter implements ToolAdapter {
       '/dev/stdout',
       '--redact',
       '--no-git',
+      '--no-banner',
     ];
   }
 
@@ -55,7 +57,17 @@ export class GitleaksAdapter implements ToolAdapter {
     const result = await this.execute(this.buildDockerArgs(target));
 
     // Gitleaks: exit code 0 = no leaks found; exit code 1 = leaks found.
-    // Both are successful analysis outcomes. Any other exit code is an error.
+    // However, Gitleaks also exits with code 1 on command/syntax errors.
+    // When exit code is 1 and stdout does not contain a JSON array, it is a fatal execution error.
+    if (result.exitCode === 1 && !result.stdout.includes('[')) {
+      const detail = result.stderr.trim().split('\n').at(-1) || 'no detail provided';
+      throw new ToolExecutionError(
+        this.sourceTool,
+        `execution failed: ${detail}`,
+      );
+    }
+
+    // Both 0 and 1 are successful analysis outcomes when report is emitted. Any other exit code is an error.
     if (result.exitCode !== 0 && result.exitCode !== 1) {
       const detail = result.stderr.trim().split('\n').at(-1) || 'no detail provided';
       throw new ToolExecutionError(

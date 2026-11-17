@@ -54,9 +54,11 @@ describe('GitleaksAdapter.buildDockerArgs', (): void => {
     expect(args).toContain('none');
     expect(args).toContain('/projects/my-app:/path:ro');
     expect(args).toContain(GITLEAKS_IMAGE);
-    expect(args).toContain('dir');
+    expect(args).toContain('detect');
+    expect(args).toContain('--source');
     expect(args).toContain('/path');
     expect(args).toContain('--redact');
+    expect(args).toContain('--no-banner');
   });
 });
 
@@ -71,6 +73,17 @@ describe('GitleaksAdapter.run', (): void => {
     const { adapter } = buildAdapter({ exitCode: 1, stdout: fixtureReport, stderr: '' });
     const output = await adapter.run(target);
     expect(output).toBe(fixtureReport);
+  });
+
+  it('throws ToolExecutionError when exit code is 1 without JSON array in stdout', async (): Promise<void> => {
+    const { adapter } = buildAdapter({
+      exitCode: 1,
+      stdout: '',
+      stderr: 'unknown command "dir" for "gitleaks"',
+    });
+
+    await expect(adapter.run(target)).rejects.toThrow(ToolExecutionError);
+    await expect(adapter.run(target)).rejects.toThrow('execution failed: unknown command "dir" for "gitleaks"');
   });
 
   it('throws ToolExecutionError when exit code is not 0 or 1', async (): Promise<void> => {
