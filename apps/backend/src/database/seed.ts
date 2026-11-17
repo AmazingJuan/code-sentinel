@@ -211,6 +211,8 @@ async function seed(): Promise<void> {
       scanItem.critical + scanItem.high + scanItem.medium + scanItem.low;
     const scan = await scanRepo.save(
       scanRepo.create({
+        commitSha: '9594a268e15a27027ea2ba2c3a243bcbabd86749',
+        branch: 'main',
         scanNumber: scanItem.scanNumber,
         projectId: projects[scanItem.project].id,
         date: new Date(scanItem.date),
@@ -238,9 +240,20 @@ async function seed(): Promise<void> {
           toolCategory: 'Secret Scanner',
           filePath: 'src/config.js',
           line: 12,
+          cwe: 'CWE-798',
+          commitSha: '9594a268e15a27027ea2ba2c3a243bcbabd86749',
           sourceTool: 'Gitleaks',
-          description: 'API key exposed in plain text.',
-          recommendation: 'Move it to environment variables.',
+          description:
+            'A sensitive credential or API token was detected hardcoded directly in source code. Secrets committed to version control can be extracted by attackers and lead to unauthorized access to production resources.',
+          recommendation:
+            'Remove the secret from version control history, rotate the compromised key immediately, and use environment variables or a vault secrets manager.',
+          codeSnippet: JSON.stringify([
+            { line: 10, text: "const path = require('path');" },
+            { line: 11, text: '' },
+            { line: 12, text: "const API_SECRET = 'example-secret-token-placeholder';", highlight: true },
+            { line: 13, text: '' },
+            { line: 14, text: 'module.exports = { API_SECRET };' },
+          ]),
         }),
         findingRepo.create({
           scanId: scan.id,
@@ -249,9 +262,20 @@ async function seed(): Promise<void> {
           toolCategory: 'SAST',
           filePath: 'src/users.js',
           line: 45,
+          cwe: 'CWE-89',
+          commitSha: '9594a268e15a27027ea2ba2c3a243bcbabd86749',
           sourceTool: 'Semgrep',
-          description: 'Direct concatenation of input into an SQL query.',
-          recommendation: 'Use parameterized queries.',
+          description:
+            'User-controlled input is concatenated directly into a raw SQL query without parameterized binding. This allows an attacker to alter the query logic and bypass authentication or dump database contents.',
+          recommendation:
+            'Use parameterized queries, prepared statements, or an ORM like TypeORM/Prisma. Never build SQL strings by concatenating untrusted user input.',
+          codeSnippet: JSON.stringify([
+            { line: 43, text: 'async function getUser(req, res) {' },
+            { line: 44, text: '  const userId = req.query.id;' },
+            { line: 45, text: "  const query = 'SELECT * FROM users WHERE id = ' + userId;", highlight: true },
+            { line: 46, text: '  const user = await db.query(query);' },
+            { line: 47, text: '  res.json(user);' },
+          ]),
         }),
         findingRepo.create({
           scanId: scan.id,
@@ -260,9 +284,13 @@ async function seed(): Promise<void> {
           toolCategory: 'Port Scanner',
           filePath: null,
           line: null,
+          cwe: 'CWE-200',
+          commitSha: '9594a268e15a27027ea2ba2c3a243bcbabd86749',
           sourceTool: 'CodeSentinel',
-          description: 'Port 8080 is open without authentication.',
-          recommendation: 'Restrict access with a firewall.',
+          description:
+            'TCP port 8080 was detected open and listening on external interfaces without authentication or encryption.',
+          recommendation:
+            'Bind the service to 127.0.0.1 if it is internal only, or restrict inbound traffic using firewall rules (iptables/security groups) and require TLS authentication.',
         }),
       ]);
     }

@@ -78,6 +78,8 @@ export class ScansService {
     const scan = this.scanRepository.create({
       scanNumber: nextScanNumber,
       projectId: createScanDto.projectId,
+      commitSha: createScanDto.commitSha ?? null,
+      branch: createScanDto.branch ?? null,
       status: 'pending',
       errorMessage: null,
       tools: createScanDto.tools,
@@ -179,6 +181,13 @@ export class ScansService {
       else if (item.severity === 'low') lowCount += 1;
     }
 
+    if (submitScanResultsDto.commitSha) {
+      scan.commitSha = submitScanResultsDto.commitSha;
+    }
+    if (submitScanResultsDto.branch) {
+      scan.branch = submitScanResultsDto.branch;
+    }
+
     if (findingsInput.length > 0 && this.findingRepository) {
       const findingEntities = findingsInput.map((item) =>
         this.findingRepository!.create({
@@ -189,6 +198,9 @@ export class ScansService {
           sourceTool: item.sourceTool,
           filePath: item.filePath ?? null,
           line: item.line ?? null,
+          commitSha: item.commitSha ?? scan.commitSha ?? null,
+          cwe: item.cwe ?? null,
+          codeSnippet: item.codeSnippet ?? null,
           description: item.description ?? null,
           recommendation: item.recommendation ?? null,
         }),

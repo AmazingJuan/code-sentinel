@@ -48,6 +48,18 @@ export class ScanFindingItemDto {
 
   @IsOptional()
   @IsString()
+  commitSha?: string | null;
+
+  @IsOptional()
+  @IsString()
+  cwe?: string | null;
+
+  @IsOptional()
+  @IsString()
+  codeSnippet?: string | null;
+
+  @IsOptional()
+  @IsString()
   description?: string | null;
 
   @IsOptional()
@@ -58,6 +70,14 @@ export class ScanFindingItemDto {
 export class SubmitScanResultsDto {
   @IsIn(RESULT_SCAN_STATUSES)
   status: ResultScanStatus;
+
+  @IsOptional()
+  @IsString()
+  commitSha?: string | null;
+
+  @IsOptional()
+  @IsString()
+  branch?: string | null;
 
   @IsOptional()
   @IsString()

@@ -50,6 +50,15 @@ export class Finding {
   @Column({ type: 'int', nullable: true })
   line: number | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true, default: null })
+  commitSha: string | null;
+
+  @Column({ type: 'varchar', length: 32, nullable: true, default: null })
+  cwe: string | null;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  codeSnippet: string | null;
+
   @Column()
   sourceTool: string; // Real tool name: 'Semgrep', 'Gitleaks', 'CodeSentinel' (RF-018)
 

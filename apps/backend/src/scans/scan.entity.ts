@@ -140,6 +140,12 @@ export class Scan {
   @CreateDateColumn({ type: 'timestamptz' })
   date: Date;
 
+  @Column({ type: 'varchar', length: 64, nullable: true, default: null })
+  commitSha: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true, default: null })
+  branch: string | null;
+
   @Column({ type: 'varchar', default: 'pending' })
   status: ScanStatus;
 
