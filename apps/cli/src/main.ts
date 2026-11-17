@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -305,8 +305,19 @@ export async function runCli(argv: string[]): Promise<number> {
   }
 }
 
-// Self-invocation check when executed directly from CLI binary
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// Self-invocation check when executed directly from CLI binary or symlink (e.g. npx)
+function isRunningAsCli(): boolean {
+  if (!process.argv[1]) return false;
+  const currentPath = fileURLToPath(import.meta.url);
+  if (currentPath === process.argv[1]) return true;
+  try {
+    return existsSync(process.argv[1]) && currentPath === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+
+if (isRunningAsCli()) {
   runCli(process.argv.slice(2)).then((code) => {
     process.exit(code);
   });
