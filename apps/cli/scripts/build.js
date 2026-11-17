@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,7 +29,20 @@ writeFileSync(endpointConfigPath, content, 'utf8');
 // 3. Run TypeScript compilation
 execSync('tsc -p tsconfig.build.json', { cwd: rootDir, stdio: 'inherit' });
 
-// 4. Ensure executable permissions
+// 4. Copy static assets (rules and auth HTML pages) to dist
+const rulesSrc = resolve(rootDir, 'rules');
+const rulesDest = resolve(rootDir, 'dist/rules');
+if (existsSync(rulesSrc)) {
+  cpSync(rulesSrc, rulesDest, { recursive: true });
+}
+
+const pagesSrc = resolve(rootDir, 'src/auth/pages');
+const pagesDest = resolve(rootDir, 'dist/auth/pages');
+if (existsSync(pagesSrc)) {
+  cpSync(pagesSrc, pagesDest, { recursive: true });
+}
+
+// 5. Ensure executable permissions
 try {
   execSync('chmod +x dist/main.js', { cwd: rootDir, stdio: 'inherit' });
 } catch {

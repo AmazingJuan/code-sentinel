@@ -1,12 +1,15 @@
 import { exec } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Server } from 'node:http';
+import { fileURLToPath } from 'node:url';
 
 import { saveSession, type StoredSession } from './credentials.js';
 
 export interface LoginResult {
   token: string;
   user: {
+    id?: string;
     email: string;
     name?: string;
     role?: string;
@@ -29,404 +32,124 @@ export function openBrowser(url: string): void {
   });
 }
 
-export function renderLoginPage(port: number, apiUrl: string): string {
+function resolvePagePath(pageName: string): string {
+  // 1. In dist/auth/pages (when running bundled from dist)
+  const distPath = fileURLToPath(new URL(`./pages/${pageName}`, import.meta.url));
+  if (existsSync(distPath)) return distPath;
+
+  // 2. In src/auth/pages (when running from src or tests)
+  const srcPath = fileURLToPath(new URL(`../pages/${pageName}`, import.meta.url));
+  if (existsSync(srcPath)) return srcPath;
+
+  return distPath;
+}
+
+export function renderLoginPage(): string {
+  try {
+    const pagePath = resolvePagePath('login.html');
+    if (existsSync(pagePath)) {
+      return readFileSync(pagePath, 'utf8');
+    }
+  } catch {
+    // Fallback if file read fails
+  }
+
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Sentinel - CLI Authentication</title>
   <style>
-    :root {
-      --bg: #090d16;
-      --card: #111827;
-      --border: #1f293d;
-      --primary: #10b981;
-      --primary-hover: #059669;
-      --text: #f3f4f6;
-      --muted: #9ca3af;
-      --error: #ef4444;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: var(--font-sans);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1.5rem;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2.25rem;
-      width: 100%;
-      max-width: 440px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-    .badge {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--primary);
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-weight: bold;
-      font-size: 1.1rem;
-    }
-    .logo-text {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 1.25rem;
-      letter-spacing: -0.025em;
-    }
-    .logo-text span { color: var(--primary); }
-    .subtitle {
-      color: var(--muted);
-      font-size: 0.875rem;
-      margin-top: 0.25rem;
-      margin-bottom: 1.5rem;
-      line-height: 1.4;
-    }
-    .target-api {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      background: rgba(255, 255, 255, 0.05);
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      color: #6ee7b7;
-      word-break: break-all;
-    }
-    .form-group {
-      margin-bottom: 1rem;
-    }
-    label {
-      display: block;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      margin-bottom: 0.5rem;
-      font-family: var(--font-mono);
-    }
-    input {
-      width: 100%;
-      background: #060911;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.65rem 0.85rem;
-      color: var(--text);
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 1px var(--primary);
-    }
-    .btn {
-      width: 100%;
-      background: var(--primary);
-      color: #04100c;
-      font-weight: 600;
-      border: none;
-      border-radius: 6px;
-      padding: 0.75rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-      margin-top: 0.5rem;
-      transition: background-color 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-    .btn:hover { background: var(--primary-hover); }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .alert {
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-      display: none;
-    }
-    .alert-error {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #fca5a5;
-    }
-    .alert-success {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #6ee7b7;
-    }
-    .quick-fills {
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .quick-title {
-      font-size: 0.75rem;
-      color: var(--muted);
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-    }
-    .pill-group {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .pill {
-      background: #1e293b;
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-size: 0.75rem;
-      padding: 0.35rem 0.65rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .pill:hover { background: #334155; }
-    .success-view {
-      display: none;
-      text-align: center;
-      padding: 1rem 0;
-    }
-    .checkmark {
-      font-size: 3rem;
-      color: var(--primary);
-      margin-bottom: 0.75rem;
-    }
+    body { background: #090d16; color: #f3f4f6; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+    .card { background: #111827; border: 1px solid #1f293d; border-radius: 12px; padding: 2.25rem; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    p { color: #9ca3af; font-size: 0.875rem; margin-bottom: 1.5rem; }
+    label { display: block; font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; margin-bottom: 0.5rem; }
+    input { width: 100%; box-sizing: border-box; background: #060911; border: 1px solid #1f293d; border-radius: 6px; padding: 0.7rem; color: #fff; margin-bottom: 1rem; }
+    button { width: 100%; background: #10b981; color: #04100c; font-weight: 600; border: none; border-radius: 6px; padding: 0.75rem; cursor: pointer; }
+    .alert { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="brand">
-      <div class="badge">&gt;_</div>
-      <div>
-        <div class="logo-text">code<span>sentinel</span></div>
-        <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.1em;">CLI Auth : Port ${port}</div>
-      </div>
-    </div>
-
-    <div id="login-container">
-      <p class="subtitle">Enter your credentials to authorize the CLI with <span class="target-api">${apiUrl}</span></p>
-    label {
-      display: block;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      margin-bottom: 0.5rem;
-      font-family: var(--font-mono);
-    }
-    input {
-      width: 100%;
-      background: #060911;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.65rem 0.85rem;
-      color: var(--text);
-      font-size: 0.9rem;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 1px var(--primary);
-    }
-    .btn {
-      width: 100%;
-      background: var(--primary);
-      color: #04100c;
-      font-weight: 600;
-      border: none;
-      border-radius: 6px;
-      padding: 0.75rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-      margin-top: 0.5rem;
-      transition: background-color 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-    .btn:hover { background: var(--primary-hover); }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .alert {
-      padding: 0.75rem 1rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-      display: none;
-    }
-    .alert-error {
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      color: #fca5a5;
-    }
-    .alert-success {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      color: #6ee7b7;
-    }
-    .quick-fills {
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .quick-title {
-      font-size: 0.75rem;
-      color: var(--muted);
-      font-family: var(--font-mono);
-      text-transform: uppercase;
-    }
-    .pill-group {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .pill {
-      background: #1e293b;
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-size: 0.75rem;
-      padding: 0.35rem 0.65rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .pill:hover { background: #334155; }
-    .success-view {
-      display: none;
-      text-align: center;
-      padding: 1rem 0;
-    }
-    .checkmark {
-      font-size: 3rem;
-      color: var(--primary);
-      margin-bottom: 0.75rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="brand">
-      <div class="badge">&gt;_</div>
-      <div>
-        <div class="logo-text">code<span>sentinel</span></div>
-        <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.1em;">CLI Authentication</div>
-      </div>
-    </div>
-
-    <div id="login-container">
-      <p class="subtitle">Enter your credentials to authorize the Code Sentinel Command Line Interface.</p>
-
-      <div id="error-alert" class="alert alert-error"></div>
-
-      <form id="login-form">
-        <div class="form-group">
-          <label for="email">Email address</label>
-          <input id="email" type="email" required autocomplete="email" placeholder="you@company.com" />
-        </div>
-
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input id="password" type="password" required autocomplete="current-password" placeholder="••••••••" />
-        </div>
-
-        <button id="submit-btn" type="submit" class="btn">Authorize CLI</button>
-      </form>
-
-      <div class="quick-fills">
-        <span class="quick-title">Quick demo fill</span>
-        <div class="pill-group">
-          <button type="button" class="pill" onclick="fill('demo@code-sentinel.local', 'Demo1234!')">Demo Analyst</button>
-          <button type="button" class="pill" onclick="fill('admin@code-sentinel.local', 'Admin1234!')">Demo Admin</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="success-view" class="success-view">
-      <div class="checkmark">✓</div>
-      <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Authentication Successful</h2>
-      <p id="success-user-text" style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1.25rem;"></p>
-      <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--primary);">You may now close this browser tab and return to your terminal.</p>
-    </div>
+    <h2>Code Sentinel</h2>
+    <p>Inicia sesión para autorizar la CLI de Code Sentinel.</p>
+    <div id="error" class="alert"></div>
+    <form id="form">
+      <label>Correo electrónico</label>
+      <input id="email" type="email" required />
+      <label>Contraseña</label>
+      <input id="password" type="password" required />
+      <button id="btn" type="submit">Iniciar sesión</button>
+    </form>
   </div>
-
   <script>
-    function fill(email, pass) {
-      document.getElementById('email').value = email;
-      document.getElementById('password').value = pass;
-    }
-
-    const form = document.getElementById('login-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const errorAlert = document.getElementById('error-alert');
-    const loginContainer = document.getElementById('login-container');
-    const successView = document.getElementById('success-view');
-    const successUserText = document.getElementById('success-user-text');
-
-    form.addEventListener('submit', async (e) => {
+    document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
-      submitBtn.disabled = true;
-      submitBtn.innerText = 'Authenticating...';
-      errorAlert.style.display = 'none';
-
+      const btn = document.getElementById('btn');
+      btn.disabled = true;
+      btn.innerText = 'Verificando...';
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-
       try {
-        const response = await fetch('/api/login', {
+        const res = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-
-        const data = await response.json();
-        if (response.ok && data.success) {
-          loginContainer.style.display = 'none';
-          successUserText.innerText = 'Logged in as ' + (data.user?.name || email) + ' (' + email + ')';
-          successView.style.display = 'block';
+        const data = await res.json();
+        if (res.ok && data.success) {
+          window.location.href = '/success';
         } else {
-          errorAlert.innerText = data.error || 'Authentication failed. Please verify credentials.';
-          errorAlert.style.display = 'block';
-          submitBtn.disabled = false;
-          submitBtn.innerText = 'Authorize CLI';
+          document.getElementById('error').innerText = data.error || 'Credenciales incorrectas.';
+          document.getElementById('error').style.display = 'block';
+          btn.disabled = false;
+          btn.innerText = 'Iniciar sesión';
         }
       } catch (err) {
-        errorAlert.innerText = 'Unable to reach backend service: ' + err.message;
-        errorAlert.style.display = 'block';
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Authorize CLI';
+        document.getElementById('error').innerText = err.message;
+        document.getElementById('error').style.display = 'block';
+        btn.disabled = false;
+        btn.innerText = 'Iniciar sesión';
       }
-    });
+    };
   </script>
+</body>
+</html>`;
+}
+
+export function renderSuccessPage(): string {
+  try {
+    const pagePath = resolvePagePath('success.html');
+    if (existsSync(pagePath)) {
+      return readFileSync(pagePath, 'utf8');
+    }
+  } catch {
+    // Fallback if file read fails
+  }
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Code Sentinel - Autenticación Exitosa</title>
+  <style>
+    body { background: #090d16; color: #f3f4f6; font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+    .card { background: #111827; border: 1px solid #1f293d; border-radius: 12px; padding: 2.5rem; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .check { font-size: 3rem; color: #10b981; margin-bottom: 1rem; }
+    h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    p { color: #9ca3af; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.5rem; }
+    .hint { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; color: #10b981; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="check">✓</div>
+    <h2>Autenticación exitosa</h2>
+    <p>La sesión para Code Sentinel CLI ha sido autorizada correctamente.</p>
+    <div class="hint">Ya puedes cerrar esta ventana y regresar a tu terminal.</div>
+  </div>
 </body>
 </html>`;
 }
@@ -435,7 +158,7 @@ export async function authenticateViaBackend(
   apiUrl: string,
   email: string,
   password: string,
-): Promise<{ token: string; user: { email: string; name?: string; role?: string } }> {
+): Promise<{ token: string; user: { id?: string; email: string; name?: string; role?: string } }> {
   const loginRes = await fetch(`${apiUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -443,30 +166,27 @@ export async function authenticateViaBackend(
   });
 
   if (!loginRes.ok) {
-    const errData = await loginRes.json().catch(() => ({ message: 'Invalid credentials' }));
+    const errData = await loginRes.json().catch(() => ({ message: 'Credenciales incorrectas' }));
     const message = Array.isArray(errData?.message)
       ? errData.message.join(' ')
-      : errData?.message || `HTTP ${loginRes.status}: Authentication failed`;
+      : errData?.message || `HTTP ${loginRes.status}: Error al iniciar sesión`;
     throw new Error(message);
   }
 
-  const { access_token } = (await loginRes.json()) as { access_token: string };
+  const data = (await loginRes.json()) as {
+    accessToken?: string;
+    access_token?: string;
+    token?: string;
+    user?: { id?: string; email: string; name?: string; role?: string };
+  };
 
-  // Fetch authenticated user profile details
-  let user: { email: string; name?: string; role?: string } = { email };
-  try {
-    const meRes = await fetch(`${apiUrl}/auth/me`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    if (meRes.ok) {
-      const meData = (await meRes.json()) as { email: string; name?: string; role?: string };
-      user = { email: meData.email, name: meData.name, role: meData.role };
-    }
-  } catch {
-    // If /auth/me fails, keep baseline user email
+  const token = data.accessToken || data.access_token || data.token;
+  if (!token) {
+    throw new Error('La respuesta del servidor no incluyó un token de acceso válido');
   }
 
-  return { token: access_token, user };
+  const user = data.user || { email };
+  return { token, user };
 }
 
 export function startLoginServer(
@@ -493,7 +213,13 @@ export function startLoginServer(
 
         if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/login')) {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(renderLoginPage((server.address() as { port: number }).port, apiUrl));
+          res.end(renderLoginPage());
+          return;
+        }
+
+        if (req.method === 'GET' && url.pathname === '/success') {
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(renderSuccessPage());
           return;
         }
 
@@ -508,7 +234,7 @@ export function startLoginServer(
               const { email, password } = JSON.parse(body);
               if (!email || !password) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Email and password are required' }));
+                res.end(JSON.stringify({ error: 'Correo y contraseña requeridos' }));
                 return;
               }
 
@@ -519,7 +245,7 @@ export function startLoginServer(
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: true, user }));
 
-              // Close server gracefully after sending response to browser
+              // Permitir que el navegador complete la redirección a /success antes de cerrar
               setTimeout(() => {
                 server.close();
                 resolveSession({
@@ -528,7 +254,7 @@ export function startLoginServer(
                   user,
                   savedAt: new Date().toISOString(),
                 });
-              }, 1200);
+              }, 2500);
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               res.writeHead(401, { 'Content-Type': 'application/json' });
