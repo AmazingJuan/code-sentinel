@@ -135,7 +135,6 @@ export async function resolveOrCreateProject(
     body: JSON.stringify({
       name: detected.name,
       repo: detected.repo,
-      tools: ['Semgrep', 'Port Scanner'],
     }),
   });
 
