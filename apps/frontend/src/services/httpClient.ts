@@ -19,3 +19,18 @@ httpClient.interceptors.request.use((config) => {
 
   return config
 })
+
+httpClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Only clear session on an explicit 401 from an authenticated endpoint
+    // Never clear on network failures or 5xx server reboots
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const url = error.config?.url || ''
+      if (!url.includes('/auth/login')) {
+        useAuthStore().logout()
+      }
+    }
+    return Promise.reject(error)
+  },
+)

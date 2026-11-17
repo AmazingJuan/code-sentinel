@@ -96,8 +96,9 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
-  const isAuthenticated = Boolean(AuthService.getToken())
+router.beforeEach(async (to) => {
+  const token = AuthService.getToken()
+  const isAuthenticated = Boolean(token)
 
   if (to.name !== 'login' && !isAuthenticated) {
     return { name: 'login' }
@@ -112,12 +113,17 @@ router.beforeEach((to) => {
   const allowedRoles = to.meta.roles
   if (!allowedRoles) return
 
-  const role = AuthService.getUser()?.role
+  let user = AuthService.getUser()
+  if (!user && token) {
+    user = await AuthService.fetchCurrentUser()
+  }
+
+  const role = user?.role
   if (!role) {
-    // Token without a user: inconsistent session. Clearing it avoids a
-    // redirect loop between login and the home page.
-    AuthService.logout()
-    return { name: 'login' }
+    if (!AuthService.getToken()) {
+      return { name: 'login' }
+    }
+    return
   }
   if (!allowedRoles.includes(role)) {
     return { name: AuthService.getHomeRouteName() }
