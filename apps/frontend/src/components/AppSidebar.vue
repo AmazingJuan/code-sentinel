@@ -94,12 +94,8 @@ function isActive(routeName: string): boolean {
     </div>
 
     <div class="border-t border-sidebar-border p-3">
-      <div class="flex items-center justify-between px-2 text-xs text-muted-foreground">
+      <div class="px-2 text-center text-xs text-muted-foreground">
         <span class="font-mono text-[11px]">v1.0.0</span>
-        <span class="inline-flex items-center gap-1.5 font-mono text-[11px]">
-          <span class="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-          online
-        </span>
       </div>
     </div>
   </aside>
