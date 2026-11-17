@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { ReportParseError, ToolExecutionError } from '../../domain/errors.js';
@@ -14,8 +15,22 @@ import { mapSemgrepSeverity } from './semgrep-severity.js';
 /** Versión fija de la imagen: el mismo código siempre da el mismo resultado. */
 export const SEMGREP_IMAGE = 'semgrep/semgrep:1.181.1';
 
-/** apps/cli/rules, tanto desde src/ (tests) como desde dist/ (build): ambos están a 3 niveles. */
-const DEFAULT_RULES_DIR = fileURLToPath(new URL('../../../rules', import.meta.url));
+/** Resuelve la ruta al directorio de reglas tanto en desarrollo como en distribución npm. */
+export function resolveRulesDir(): string {
+  // 1. En dist/rules (copiado durante build dentro del paquete)
+  const distRules = fileURLToPath(new URL('../../rules', import.meta.url));
+  if (existsSync(distRules)) return distRules;
+
+  // 2. En la raíz del paquete (tanto en src/adapters/semgrep como en dist/adapters/semgrep)
+  const pkgRules = fileURLToPath(new URL('../../../rules', import.meta.url));
+  if (existsSync(pkgRules)) return pkgRules;
+
+  // 3. Fallback directo a nivel relativo
+  const directRules = fileURLToPath(new URL('../rules', import.meta.url));
+  if (existsSync(directRules)) return directRules;
+
+  return pkgRules;
+}
 
 const CONTAINER_SOURCE_DIR = '/src';
 const CONTAINER_RULES_DIR = '/rules';
@@ -36,7 +51,7 @@ export class SemgrepAdapter implements ToolAdapter {
 
   constructor(options: SemgrepAdapterOptions = {}) {
     this.runner = options.runner ?? new NodeCommandRunner();
-    this.rulesDir = options.rulesDir ?? DEFAULT_RULES_DIR;
+    this.rulesDir = options.rulesDir ?? resolveRulesDir();
   }
 
   buildDockerArgs(target: ScanTarget): string[] {

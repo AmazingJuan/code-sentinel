@@ -195,13 +195,12 @@ export async function handleLoginCommand(apiUrl: string): Promise<number> {
   console.log('----------------------------------------------------');
   console.log(' Code Sentinel - Web Authentication');
   console.log('----------------------------------------------------');
-  console.log(` Target API : ${apiUrl}`);
   console.log(' Starting local authentication server...');
 
   try {
     const { port, sessionPromise } = await startLoginServer(apiUrl);
     const loginUrl = `http://127.0.0.1:${port}`;
-    console.log(` Opening authentication portal in browser: ${loginUrl}`);
+    console.log(` Opening authentication portal: ${loginUrl}`);
     console.log(' (If your browser does not open automatically, please open the link above)');
     openBrowser(loginUrl);
     console.log(' Waiting for authorization in browser...');
@@ -312,7 +311,6 @@ export async function runCli(argv: string[]): Promise<number> {
   console.log(' Code Sentinel - Security Analysis Engine');
   console.log('----------------------------------------------------');
   console.log(` Target path : ${targetPath}`);
-  console.log(` Backend API : ${effectiveApiUrl}`);
 
   let token = resolveEffectiveToken(values.token);
   const isDryRun = Boolean(values['dry-run']);
@@ -411,7 +409,7 @@ export async function runCli(argv: string[]): Promise<number> {
   }
 
   try {
-    console.log(` Syncing scan results to Code Sentinel API (${effectiveApiUrl})...`);
+    console.log(' Syncing scan results to Code Sentinel...');
     const { scanId } = await submitScanToBackend(
       effectiveApiUrl,
       token as string,
