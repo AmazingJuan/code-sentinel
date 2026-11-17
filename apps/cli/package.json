@@ -1,5 +1,5 @@
 {
-  "name": "@amazinwalin/code-sentinel-cli",
+  "name": "@amazingjuan/code-sentinel-cli",
   "version": "0.1.0",
   "description": "Official CLI for Code Sentinel AppSec and vulnerability management platform",
   "type": "module",
