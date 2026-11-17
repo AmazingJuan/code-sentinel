@@ -1,21 +1,21 @@
 import { isToolCategory, type ToolCategory } from '../domain/finding.js';
 import type { ToolAdapter } from '../domain/tool-adapter.js';
 
-/** RF-030: catálogo de herramientas. El pipeline no conoce herramientas concretas, solo este registro. */
+/** RF-030: Tool catalog registry. The pipeline does not hardcode tools, only references this registry. */
 export class AdapterRegistry {
   private readonly adapters = new Map<string, ToolAdapter>();
 
   register(adapter: ToolAdapter): void {
     if (adapter.sourceTool.trim() === '') {
-      throw new Error('Un adaptador necesita sourceTool');
+      throw new Error('An adapter requires sourceTool');
     }
     if (!isToolCategory(adapter.toolCategory)) {
       throw new Error(
-        `${adapter.sourceTool}: categoría desconocida "${String(adapter.toolCategory)}"`,
+        `${adapter.sourceTool}: unknown category "${String(adapter.toolCategory)}"`,
       );
     }
     if (this.adapters.has(adapter.sourceTool)) {
-      throw new Error(`El adaptador ${adapter.sourceTool} ya está registrado`);
+      throw new Error(`Adapter ${adapter.sourceTool} is already registered`);
     }
     this.adapters.set(adapter.sourceTool, adapter);
   }

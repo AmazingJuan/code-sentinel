@@ -9,6 +9,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import SeverityBar from '@/components/SeverityBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
 import { buildCommitUrl } from '@/services/GitHelper'
@@ -19,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const scan = ref<ScanInterface | null>(null)
 const findings = ref<FindingInterface[]>([])
+const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
 
 function extractErrorMessage(error: unknown): string {
@@ -30,11 +32,14 @@ function extractErrorMessage(error: unknown): string {
 
 onMounted(async () => {
   const id = route.params.id as string
+  isLoading.value = true
   try {
     scan.value = await ScanService.getScanById(id)
     findings.value = await FindingService.getFindings({ scanId: id })
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
+  } finally {
+    isLoading.value = false
   }
 })
 
@@ -102,6 +107,13 @@ const summaryItems = computed(() => [
     <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
+
+    <div v-else-if="isLoading" class="mt-6">
+      <LoadingState
+        title="Loading scan report..."
+        description="Retrieving execution metadata, findings breakdown, and tool logs..."
+      />
+    </div>
 
     <template v-else-if="scan">
       <PageHeader

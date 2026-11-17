@@ -32,6 +32,12 @@ async function onSubmit(): Promise<void> {
   }
 }
 
+async function quickLogin(demoEmail: string, demoPassword: string): Promise<void> {
+  if (isLoading.value) return
+  email.value = demoEmail
+  password.value = demoPassword
+  await onSubmit()
+}
 </script>
 
 <template>
@@ -182,6 +188,62 @@ async function onSubmit(): Promise<void> {
             <ArrowRight class="size-4" />
           </button>
         </form>
+
+        <!-- Quick Demo Login Section -->
+        <div class="mt-8 border-t border-border/80 pt-6">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Demo Accounts (1-Click Login)
+            </span>
+            <span class="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+              Instant
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <button
+              type="button"
+              data-testid="demo-login-demo"
+              @click="quickLogin('demo@code-sentinel.local', 'Demo1234!')"
+              :disabled="isLoading"
+              class="flex items-center justify-between rounded-md border border-border bg-card/60 px-3 py-2 text-xs font-mono transition-colors hover:border-primary/50 hover:bg-card hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 text-left"
+            >
+              <div>
+                <span class="font-semibold text-foreground">Demo Analyst</span>
+                <span class="block text-[11px] text-muted-foreground">demo@code-sentinel.local</span>
+              </div>
+              <span class="text-[11px] text-primary">Login &rarr;</span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="demo-login-admin"
+              @click="quickLogin('admin@code-sentinel.local', 'Admin1234!')"
+              :disabled="isLoading"
+              class="flex items-center justify-between rounded-md border border-border bg-card/60 px-3 py-2 text-xs font-mono transition-colors hover:border-primary/50 hover:bg-card hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 text-left"
+            >
+              <div>
+                <span class="font-semibold text-foreground">Administrator</span>
+                <span class="block text-[11px] text-muted-foreground">admin@code-sentinel.local</span>
+              </div>
+              <span class="text-[11px] text-primary">Login &rarr;</span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="demo-login-analyst"
+              @click="quickLogin('analyst@code-sentinel.local', 'Analyst1234!')"
+              :disabled="isLoading"
+              class="flex items-center justify-between rounded-md border border-border bg-card/60 px-3 py-2 text-xs font-mono transition-colors hover:border-primary/50 hover:bg-card hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 text-left"
+            >
+              <div>
+                <span class="font-semibold text-foreground">Security Analyst</span>
+                <span class="block text-[11px] text-muted-foreground">analyst@code-sentinel.local</span>
+              </div>
+              <span class="text-[11px] text-primary">Login &rarr;</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

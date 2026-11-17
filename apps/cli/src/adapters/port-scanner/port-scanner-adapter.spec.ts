@@ -39,7 +39,7 @@ const sampleXmlReport = `<?xml version="1.0" encoding="UTF-8"?>
 </nmaprun>`;
 
 describe('PortScannerAdapter (RF-013)', (): void => {
-  it('ejecuta nmap con argumentos TCP connect y formato XML', async (): Promise<void> => {
+  it('executes nmap with TCP connect arguments and XML format', async (): Promise<void> => {
     const runner = new FakeCommandRunner({ exitCode: 0, stdout: sampleXmlReport, stderr: '' });
     const adapter = new PortScannerAdapter({ runner, defaultHost: '127.0.0.1', ports: '80,8080' });
 
@@ -49,7 +49,7 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     expect(rawReport).toBe(sampleXmlReport);
   });
 
-  it('parsea puertos abiertos como findings normalizados (RF-016, RF-021, RF-022)', (): void => {
+  it('parses open ports as normalized findings (RF-016, RF-021, RF-022)', (): void => {
     const adapter = new PortScannerAdapter();
     const findings = adapter.parse(sampleXmlReport);
 
@@ -72,7 +72,7 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     });
   });
 
-  it('ignora puertos cerrados o filtrados', (): void => {
+  it('ignores closed or filtered ports', (): void => {
     const xmlWithClosed = `<?xml version="1.0"?>
     <nmaprun>
       <host>
@@ -90,7 +90,7 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     expect(findings).toEqual([]);
   });
 
-  it('lanza ReportParseError si el reporte no es XML de nmap', (): void => {
+  it('throws ReportParseError if report is not valid nmap XML', (): void => {
     const adapter = new PortScannerAdapter();
 
     expect((): void => {
@@ -98,7 +98,7 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     }).toThrow(ReportParseError);
   });
 
-  it('lanza ToolExecutionError si nmap falla con código de salida distinto de 0', async (): Promise<void> => {
+  it('throws ToolExecutionError if nmap exits with non-zero code', async (): Promise<void> => {
     const runner = new FakeCommandRunner({
       exitCode: 1,
       stdout: '',
@@ -109,4 +109,3 @@ describe('PortScannerAdapter (RF-013)', (): void => {
     await expect(adapter.run({ rootPath: '/test' })).rejects.toThrow(ToolExecutionError);
   });
 });
-

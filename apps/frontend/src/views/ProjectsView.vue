@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { ProjectService } from '@/services/ProjectService'
 
@@ -121,7 +122,14 @@ onMounted(loadProjects)
 
     <!-- Table -->
     <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
-      <table class="w-full min-w-[760px] text-left text-sm">
+      <div v-if="isLoading" class="p-10">
+        <LoadingState
+          title="Loading security projects..."
+          description="Fetching registered repositories, vulnerability metrics, and scan assignments..."
+        />
+      </div>
+
+      <table v-else-if="projects.length > 0" class="w-full min-w-[760px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th scope="col" class="px-5 py-3 font-medium">Project Name</th>

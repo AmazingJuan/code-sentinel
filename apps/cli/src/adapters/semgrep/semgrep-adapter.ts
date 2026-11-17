@@ -84,12 +84,12 @@ export class SemgrepAdapter implements ToolAdapter {
   async run(target: ScanTarget): Promise<string> {
     const result = await this.execute(this.buildDockerArgs(target));
 
-    // Semgrep sale con 0 haya o no hallazgos; cualquier otro código es un fallo real.
+    // Semgrep exits with 0 regardless of findings; any non-zero exit is a real failure.
     if (result.exitCode !== 0) {
-      const detail = result.stderr.trim().split('\n').at(-1) || 'sin detalle';
+      const detail = result.stderr.trim().split('\n').at(-1) || 'no detail provided';
       throw new ToolExecutionError(
         this.sourceTool,
-        `código de salida ${result.exitCode}: ${detail}`,
+        `exit code ${result.exitCode}: ${detail}`,
       );
     }
     return result.stdout;
@@ -100,12 +100,12 @@ export class SemgrepAdapter implements ToolAdapter {
     try {
       report = JSON.parse(rawReport);
     } catch {
-      throw new ReportParseError(this.sourceTool, 'la salida no es JSON');
+      throw new ReportParseError(this.sourceTool, 'output is not valid JSON');
     }
     if (!isSemgrepReport(report)) {
       throw new ReportParseError(
         this.sourceTool,
-        'falta el arreglo "results" o tiene elementos inválidos',
+        'missing "results" array or invalid items',
       );
     }
     return report.results.map((semgrepResult: SemgrepResult): ParsedFinding =>
@@ -118,7 +118,7 @@ export class SemgrepAdapter implements ToolAdapter {
       return await this.runner.run('docker', args);
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      throw new ToolExecutionError(this.sourceTool, `no se pudo iniciar Docker (${detail})`);
+      throw new ToolExecutionError(this.sourceTool, `could not start Docker (${detail})`);
     }
   }
 

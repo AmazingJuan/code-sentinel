@@ -3,7 +3,7 @@ export class ToolExecutionError extends Error {
     public readonly sourceTool: string,
     detail: string,
   ) {
-    super(`${sourceTool} no se pudo ejecutar: ${detail}`);
+    super(`${sourceTool} failed to execute: ${detail}`);
     this.name = 'ToolExecutionError';
   }
 }
@@ -13,7 +13,7 @@ export class ReportParseError extends Error {
     public readonly sourceTool: string,
     detail: string,
   ) {
-    super(`${sourceTool} generó un reporte inválido: ${detail}`);
+    super(`${sourceTool} generated an invalid report: ${detail}`);
     this.name = 'ReportParseError';
   }
 }
@@ -23,7 +23,7 @@ export class InvalidFindingError extends Error {
     public readonly sourceTool: string,
     detail: string,
   ) {
-    super(`${sourceTool} produjo un finding inválido: ${detail}`);
+    super(`${sourceTool} produced an invalid finding: ${detail}`);
     this.name = 'InvalidFindingError';
   }
 }

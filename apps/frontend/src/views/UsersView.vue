@@ -5,6 +5,7 @@ import { UserPlus } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 
 import PageHeader from '@/components/PageHeader.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { ManagedUser } from '@/interfaces/UserInterface'
 import { UserService } from '@/services/UserService'
 
@@ -165,7 +166,9 @@ onMounted(loadUsers)
     </div>
 
     <div class="mt-6 overflow-hidden rounded-lg border border-border bg-card">
-      <p v-if="isLoading" class="p-5 text-sm text-muted-foreground">Loading users...</p>
+      <div v-if="isLoading" class="p-8">
+        <LoadingState compact title="Loading user directory..." description="Fetching administrators and security analysts..." />
+      </div>
       <table v-else class="w-full text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
