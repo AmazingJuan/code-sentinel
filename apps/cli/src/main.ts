@@ -104,7 +104,7 @@ Options:
   -d, --target <path>   Target directory or file to scan (default: current directory)
   -u, --api-url <url>   Backend API URL (default: ${DEFAULT_API_URL})
   -t, --token <jwt>     Authentication token (default: saved session or env)
-      --tools <list>    Comma-separated tools to run: semgrep, gitleaks, port-scanner (default: all)
+      --tools <list>    Comma-separated tools to run: semgrep, gitleaks, port-scanner (default: project tools or all)
       --dry-run         Run scan locally without syncing results to backend
   -h, --help            Show this help message
   -v, --version         Show CLI version
@@ -125,6 +125,29 @@ export function buildRegistry(): AdapterRegistry {
   registry.register(new GitleaksAdapter());
   registry.register(new PortScannerAdapter());
   return registry;
+}
+
+export function isAdapterSelected(adapter: ToolAdapter, toolPatterns: string[]): boolean {
+  if (toolPatterns.some((p) => p.toLowerCase().trim() === 'all')) {
+    return true;
+  }
+
+  const name = adapter.sourceTool.toLowerCase().replace(/[-_ ]/g, '');
+  const category = adapter.toolCategory.toLowerCase().replace(/[-_ ]/g, '');
+
+  return toolPatterns.some((pattern) => {
+    const p = pattern.toLowerCase().trim().replace(/[-_ ]/g, '');
+    if (!p) return false;
+    return (
+      name.includes(p) ||
+      category.includes(p) ||
+      p.includes(name) ||
+      p.includes(category) ||
+      (p.includes('secret') && category.includes('secret')) ||
+      (p.includes('port') && category.includes('port')) ||
+      (p.includes('sast') && category.includes('sast'))
+    );
+  });
 }
 
 export function detectGitMetadata(targetPath: string): { commitSha: string | null; branch: string | null } {
@@ -345,7 +368,7 @@ export async function runCli(argv: string[]): Promise<number> {
       'api-url': { type: 'string', short: 'u', default: DEFAULT_API_URL },
       token: { type: 'string', short: 't' },
       'dry-run': { type: 'boolean', default: false },
-      tools: { type: 'string', default: 'semgrep,port-scanner' },
+      tools: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', short: 'v', default: false },
     },
@@ -464,20 +487,31 @@ export async function runCli(argv: string[]): Promise<number> {
 
   const registry = buildRegistry();
   const allAdapters = registry.list();
-  const requestedTools = (values.tools || '').split(',').map((t: string) => t.trim().toLowerCase());
 
-  const activeAdapters: ToolAdapter[] = allAdapters.filter((adapter: ToolAdapter) => {
-    if (requestedTools.includes('all')) return true;
-    const name = adapter.sourceTool.toLowerCase();
-    const category = adapter.toolCategory.toLowerCase();
-    return requestedTools.some((t: string) => name.includes(t) || category.includes(t));
-  });
+  let requestedTools: string[];
+  let toolsSource: 'project' | 'cli' | 'default';
+
+  if (values.tools && typeof values.tools === 'string' && values.tools.trim().length > 0) {
+    requestedTools = values.tools.split(',').map((t: string) => t.trim()).filter(Boolean);
+    toolsSource = 'cli';
+  } else if (resolvedProject?.tools && resolvedProject.tools.length > 0) {
+    requestedTools = resolvedProject.tools;
+    toolsSource = 'project';
+  } else {
+    requestedTools = ['all'];
+    toolsSource = 'default';
+  }
+
+  const activeAdapters: ToolAdapter[] = allAdapters.filter((adapter: ToolAdapter) =>
+    isAdapterSelected(adapter, requestedTools),
+  );
 
   if (activeAdapters.length === 0) {
     console.warn('Warning: No matching security adapters found for the specified tools.');
   }
 
-  console.log(` Active tools: ${activeAdapters.map((a: ToolAdapter) => `${a.sourceTool} (${a.toolCategory})`).join(', ') || 'None'}`);
+  const toolsOriginLabel = toolsSource === 'project' ? ' (from project config)' : '';
+  console.log(` Active tools${toolsOriginLabel}: ${activeAdapters.map((a: ToolAdapter) => `${a.sourceTool} (${a.toolCategory})`).join(', ') || 'None'}`);
   console.log(' Running security analysis...');
 
   const { findings, errors } = await runAdapters(activeAdapters, { rootPath: targetPath });

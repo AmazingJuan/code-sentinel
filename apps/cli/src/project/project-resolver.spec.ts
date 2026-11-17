@@ -48,7 +48,12 @@ describe('Project Resolver (RF-038)', () => {
           ok: true,
           json: () =>
             Promise.resolve([
-              { id: 'proj-123', name: 'payments-service', repo: 'git@github.com:org/payments.git' },
+              {
+                id: 'proj-123',
+                name: 'payments-service',
+                repo: 'git@github.com:org/payments.git',
+                tools: ['SAST', 'Secret Scanner'],
+              },
             ]),
         });
       }
@@ -59,6 +64,7 @@ describe('Project Resolver (RF-038)', () => {
 
     expect(result.id).toBe('proj-123');
     expect(result.name).toBe('payments-service');
+    expect(result.tools).toEqual(['SAST', 'Secret Scanner']);
     expect(result.isNew).toBe(false);
   });
 

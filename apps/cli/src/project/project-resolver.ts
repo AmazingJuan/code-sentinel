@@ -7,6 +7,19 @@ export interface ProjectInfo {
   name: string;
   repo: string;
   isNew: boolean;
+  tools?: string[];
+}
+
+export function normalizeTools(tools: unknown): string[] | undefined {
+  if (Array.isArray(tools)) {
+    const list = tools.map((t) => String(t).trim()).filter(Boolean);
+    return list.length > 0 ? list : undefined;
+  }
+  if (typeof tools === 'string' && tools.trim().length > 0) {
+    const list = tools.split(',').map((t) => t.trim()).filter(Boolean);
+    return list.length > 0 ? list : undefined;
+  }
+  return undefined;
 }
 
 export function extractCanonicalSlug(gitUrl: string): string | null {
@@ -124,7 +137,12 @@ export async function resolveOrCreateProject(
     throw new Error(`Failed to list projects (HTTP ${listRes.status}): ${errText}`);
   }
 
-  const existingProjects = (await listRes.json()) as Array<{ id: string; name: string; repo: string }>;
+  const existingProjects = (await listRes.json()) as Array<{
+    id: string;
+    name: string;
+    repo: string;
+    tools?: unknown;
+  }>;
 
   // 2. Handle explicit project flag
   if (explicitProject && explicitProject.trim().length > 0) {
@@ -134,13 +152,36 @@ export async function resolveOrCreateProject(
     );
 
     if (matched) {
-      return { id: matched.id, name: matched.name, repo: matched.repo, isNew: false };
+      return {
+        id: matched.id,
+        name: matched.name,
+        repo: matched.repo,
+        isNew: false,
+        tools: normalizeTools(matched.tools),
+      };
     }
 
     // If query is already a valid UUID, allow direct binding
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(explicitProject.trim())) {
-      return { id: explicitProject.trim(), name: explicitProject.trim(), repo: explicitProject.trim(), isNew: false };
+      const projId = explicitProject.trim();
+      let tools: string[] | undefined;
+      try {
+        const getRes = await fetch(`${apiUrl}/projects/${projId}`, { headers });
+        if (getRes.ok) {
+          const p = (await getRes.json()) as { name?: string; repo?: string; tools?: unknown };
+          return {
+            id: projId,
+            name: p.name || projId,
+            repo: p.repo || projId,
+            isNew: false,
+            tools: normalizeTools(p.tools),
+          };
+        }
+      } catch {
+        // ignore lookup error
+      }
+      return { id: projId, name: projId, repo: projId, isNew: false, tools };
     }
 
     throw new Error(
@@ -172,6 +213,7 @@ export async function resolveOrCreateProject(
       name: existingMatch.name,
       repo: existingMatch.repo,
       isNew: false,
+      tools: normalizeTools(existingMatch.tools),
     };
   }
 
@@ -229,12 +271,13 @@ export async function resolveOrCreateProject(
     throw new Error(`Failed to auto-register project "${detected.name}" (HTTP ${createRes.status}): ${errText}`);
   }
 
-  const createdProject = (await createRes.json()) as { id: string; name: string; repo: string };
+  const createdProject = (await createRes.json()) as { id: string; name: string; repo: string; tools?: unknown };
   return {
     id: createdProject.id,
     name: createdProject.name,
     repo: createdProject.repo,
     isNew: true,
+    tools: normalizeTools(createdProject.tools),
   };
 }
 

@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import * as credentialsModule from './auth/credentials.js';
 import * as loginServerModule from './auth/login-server.js';
+import type { ToolAdapter } from './domain/tool-adapter.js';
 import {
   DEFAULT_API_URL,
   fetchWithTimeout,
   getPackageVersion,
+  isAdapterSelected,
   runCli,
 } from './main.js';
 import * as runAdaptersModule from './pipeline/run-adapters.js';
@@ -191,5 +193,36 @@ describe('Code Sentinel CLI main', () => {
     ).rejects.toThrow(/Backend host not found/);
 
     globalThis.fetch = originalFetch;
+  });
+
+  describe('isAdapterSelected', () => {
+    const semgrep = { sourceTool: 'Semgrep', toolCategory: 'SAST' as const } as unknown as ToolAdapter;
+    const gitleaks = { sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' as const } as unknown as ToolAdapter;
+    const portScanner = { sourceTool: 'CodeSentinel', toolCategory: 'Port Scanner' as const } as unknown as ToolAdapter;
+
+    it('matches when "all" is requested', () => {
+      expect(isAdapterSelected(semgrep, ['all'])).toBe(true);
+      expect(isAdapterSelected(gitleaks, ['all'])).toBe(true);
+      expect(isAdapterSelected(portScanner, ['all'])).toBe(true);
+    });
+
+    it('matches backend project tool categories', () => {
+      const projectTools = ['SAST', 'Secret Scanner'];
+      expect(isAdapterSelected(semgrep, projectTools)).toBe(true);
+      expect(isAdapterSelected(gitleaks, projectTools)).toBe(true);
+      expect(isAdapterSelected(portScanner, projectTools)).toBe(false);
+    });
+
+    it('matches CLI flags with dashes, spaces, and case-insensitivity', () => {
+      expect(isAdapterSelected(gitleaks, ['gitleaks'])).toBe(true);
+      expect(isAdapterSelected(gitleaks, ['secret-scanner'])).toBe(true);
+      expect(isAdapterSelected(gitleaks, ['secrets'])).toBe(true);
+      expect(isAdapterSelected(semgrep, ['gitleaks'])).toBe(false);
+
+      expect(isAdapterSelected(portScanner, ['port-scanner'])).toBe(true);
+      expect(isAdapterSelected(portScanner, ['Port Scanner'])).toBe(true);
+      expect(isAdapterSelected(portScanner, ['codesentinel'])).toBe(true);
+      expect(isAdapterSelected(semgrep, ['port-scanner'])).toBe(false);
+    });
   });
 });
