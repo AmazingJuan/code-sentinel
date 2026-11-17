@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,12 +11,58 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { User, UserRole } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+export const DEFAULT_USERS = [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    email: 'demo@code-sentinel.local',
+    name: 'Demo User',
+    password: 'Demo1234!',
+    role: UserRole.ANALYST,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    email: 'admin@code-sentinel.local',
+    name: 'Admin User',
+    password: 'Admin1234!',
+    role: UserRole.ADMIN,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    email: 'analyst@code-sentinel.local',
+    name: 'Analyst User',
+    password: 'Analyst1234!',
+    role: UserRole.ANALYST,
+  },
+];
+
 @Injectable()
-export class UsersService {
+export class UsersService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
   ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.ensureDefaultUsers();
+  }
+
+  async ensureDefaultUsers(): Promise<void> {
+    for (const def of DEFAULT_USERS) {
+      const existing = await this.findByEmail(def.email);
+      if (!existing) {
+        const passwordHash = await bcrypt.hash(def.password, 12);
+        await this.usersRepository.save(
+          this.usersRepository.create({
+            id: def.id,
+            email: def.email.toLowerCase(),
+            name: def.name,
+            passwordHash,
+            role: def.role,
+          }),
+        );
+      }
+    }
+  }
 
   async create(
     createUserDto: CreateUserDto,

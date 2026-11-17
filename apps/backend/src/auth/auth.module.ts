@@ -24,7 +24,7 @@ import { LocalStrategy } from './strategies/local.strategy';
         signOptions: {
           expiresIn: configService.get<string>(
             'JWT_EXPIRES_IN',
-            '1h',
+            '7d',
           ) as NonNullable<JwtModuleOptions['signOptions']>['expiresIn'],
         },
       }),
