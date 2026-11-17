@@ -28,7 +28,7 @@ describe('LoginView.vue', () => {
     vi.clearAllMocks();
   });
 
-  it('renderiza campos de email y password', async () => {
+  it('renders email and password fields', async () => {
     await router.push('/login');
     await router.isReady();
 
@@ -40,7 +40,7 @@ describe('LoginView.vue', () => {
     expect(wrapper.find('input[type="password"]').exists()).toBe(true);
   });
 
-  it('procesa login exitoso y navega a la ruta principal', async () => {
+  it('handles successful login and navigates to the home route', async () => {
     await router.push('/login');
     await router.isReady();
 
@@ -65,7 +65,7 @@ describe('LoginView.vue', () => {
     expect(router.currentRoute.value.name).toBe('overview');
   });
 
-  it('muestra mensaje de error si el login falla', async () => {
+  it('displays error message on failed login', async () => {
     await router.push('/login');
     await router.isReady();
 
@@ -82,5 +82,31 @@ describe('LoginView.vue', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Invalid email or password');
+  });
+
+  it('triggers 1-click demo login when clicking demo user button', async () => {
+    await router.push('/login');
+    await router.isReady();
+
+    const wrapper = mount(LoginView, {
+      global: { plugins: [router] },
+    });
+
+    vi.mocked(AuthService.login).mockResolvedValueOnce({
+      id: 'd1',
+      email: 'demo@code-sentinel.local',
+      name: 'Demo Analyst',
+      role: 'analyst',
+      createdAt: '2026-08-01',
+    });
+
+    const demoBtn = wrapper.find('[data-testid="demo-login-demo"]');
+    expect(demoBtn.exists()).toBe(true);
+
+    await demoBtn.trigger('click');
+    await flushPromises();
+
+    expect(AuthService.login).toHaveBeenCalledWith('demo@code-sentinel.local', 'Demo1234!');
+    expect(router.currentRoute.value.name).toBe('overview');
   });
 });

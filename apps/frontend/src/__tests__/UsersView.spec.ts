@@ -37,7 +37,7 @@ describe('UsersView.vue', () => {
     vi.clearAllMocks();
   });
 
-  it('carga y muestra la lista de usuarios', async () => {
+  it('loads and displays the list of users', async () => {
     vi.mocked(UserService.findAll).mockResolvedValueOnce(sampleUsers);
 
     const wrapper = mount(UsersView);
@@ -48,7 +48,7 @@ describe('UsersView.vue', () => {
     expect(wrapper.text()).toContain('admin@code-sentinel.local');
   });
 
-  it('permite crear un usuario nuevo y recarga la lista', async () => {
+  it('creates a new user and reloads the list', async () => {
     vi.mocked(UserService.findAll)
       .mockResolvedValueOnce(sampleUsers)
       .mockResolvedValueOnce([
@@ -89,7 +89,7 @@ describe('UsersView.vue', () => {
     expect(wrapper.text()).toContain('User created successfully.');
   });
 
-  it('permite eliminar un usuario existente', async () => {
+  it('deletes an existing user', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(UserService.findAll).mockResolvedValueOnce(sampleUsers).mockResolvedValueOnce([sampleUsers[1]!]);
     vi.mocked(UserService.remove).mockResolvedValueOnce(undefined);

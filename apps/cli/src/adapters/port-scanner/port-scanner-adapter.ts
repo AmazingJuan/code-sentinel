@@ -42,10 +42,10 @@ export class PortScannerAdapter implements ToolAdapter {
     const result = await this.execute('nmap', this.buildArgs(host));
 
     if (result.exitCode !== 0) {
-      const detail = result.stderr.trim().split('\n').at(-1) || 'sin detalle';
+      const detail = result.stderr.trim().split('\n').at(-1) || 'no detail provided';
       throw new ToolExecutionError(
         this.sourceTool,
-        `código de salida ${result.exitCode}: ${detail}`,
+        `exit code ${result.exitCode}: ${detail}`,
       );
     }
 
@@ -54,7 +54,7 @@ export class PortScannerAdapter implements ToolAdapter {
 
   parse(rawReport: string): ParsedFinding[] {
     if (!rawReport.trim().startsWith('<?xml') && !rawReport.includes('<nmaprun')) {
-      throw new ReportParseError(this.sourceTool, 'la salida no es un reporte XML válido');
+      throw new ReportParseError(this.sourceTool, 'output is not a valid XML report');
     }
 
     const hostReports = parseNmapXmlOutput(rawReport);
@@ -91,7 +91,7 @@ export class PortScannerAdapter implements ToolAdapter {
       return await this.runner.run(command, args);
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      throw new ToolExecutionError(this.sourceTool, `no se pudo ejecutar nmap (${detail})`);
+      throw new ToolExecutionError(this.sourceTool, `failed to execute nmap (${detail})`);
     }
   }
 }

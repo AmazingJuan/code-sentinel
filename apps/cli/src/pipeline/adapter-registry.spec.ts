@@ -14,7 +14,7 @@ function fakeAdapter(sourceTool: string, toolCategory: ToolCategory): ToolAdapte
 }
 
 describe('AdapterRegistry', (): void => {
-  it('devuelve solo los adaptadores de las categorías pedidas', (): void => {
+  it('returns only the adapters for requested categories', (): void => {
     const registry = new AdapterRegistry();
     registry.register(fakeAdapter('Semgrep', 'SAST'));
     registry.register(fakeAdapter('Gitleaks', 'Secret Scanner'));
@@ -32,19 +32,19 @@ describe('AdapterRegistry', (): void => {
     ]);
   });
 
-  it('rechaza registrar dos veces la misma herramienta', (): void => {
+  it('rejects registering the same tool twice', (): void => {
     const registry = new AdapterRegistry();
     registry.register(fakeAdapter('Semgrep', 'SAST'));
 
     expect((): void => registry.register(fakeAdapter('Semgrep', 'SAST'))).toThrow(
-      'ya está registrado',
+      'is already registered',
     );
   });
 
-  it('rechaza una categoría que el backend no acepta', (): void => {
+  it('rejects a category not supported by the backend', (): void => {
     const registry = new AdapterRegistry();
     const unknownCategoryAdapter = fakeAdapter('Raro', 'DAST' as ToolCategory);
 
-    expect((): void => registry.register(unknownCategoryAdapter)).toThrow('categoría desconocida');
+    expect((): void => registry.register(unknownCategoryAdapter)).toThrow('unknown category');
   });
 });

@@ -6,6 +6,7 @@ import { RouterLink } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
@@ -224,12 +225,25 @@ onMounted(loadData)
         </thead>
         <tbody>
           <tr
-            v-if="displayedFindings.length === 0"
+            v-if="isLoading"
+            class="border-b border-border/60"
+          >
+            <td colspan="7" class="p-8 text-center">
+              <LoadingState
+                compact
+                title="Loading security findings..."
+                description="Filtering vulnerabilities across projects, tools, and severity thresholds..."
+              />
+            </td>
+          </tr>
+
+          <tr
+            v-else-if="displayedFindings.length === 0"
             class="border-b border-border/60"
           >
             <td colspan="7" class="py-12 text-center text-sm text-muted-foreground">
               <ShieldAlert class="mx-auto mb-2 size-6 opacity-40" />
-              {{ isLoading ? 'Loading security findings...' : 'No security findings match the selected filters.' }}
+              No security findings match the selected filters.
             </td>
           </tr>
 

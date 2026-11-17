@@ -21,6 +21,7 @@ import CodeViewer from '@/components/CodeViewer.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { buildCommitUrl, buildFileDeepLink } from '@/services/GitHelper'
 import { FindingService } from '@/services/FindingService'
@@ -29,6 +30,7 @@ import { getVulnerabilityIntel } from '@/services/VulnerabilityIntel'
 const route = useRoute()
 const router = useRouter()
 const finding = ref<FindingInterface | null>(null)
+const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
 const copiedSha = ref(false)
 
@@ -40,10 +42,13 @@ function extractErrorMessage(error: unknown): string {
 }
 
 onMounted(async () => {
+  isLoading.value = true
   try {
     finding.value = await FindingService.getFindingById(route.params.id as string)
   } catch (error) {
     errorMessage.value = extractErrorMessage(error)
+  } finally {
+    isLoading.value = false
   }
 })
 
@@ -179,6 +184,13 @@ async function copyCommitSha(): Promise<void> {
     <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
+
+    <div v-else-if="isLoading" class="mt-6">
+      <LoadingState
+        title="Loading vulnerability details..."
+        description="Retrieving finding telemetry, code snippet, and mitigation intelligence..."
+      />
+    </div>
 
     <template v-else-if="finding">
       <PageHeader

@@ -15,7 +15,7 @@
                 "offset": 35
             },
             "extra": {
-                "message": "v-html renderiza HTML sin escapar y permite XSS",
+                "message": "v-html renders unescaped HTML and can lead to XSS vulnerabilities",
                 "metadata": {},
                 "severity": "WARNING",
                 "fingerprint": "requires login",
@@ -38,7 +38,7 @@
                 "offset": 83
             },
             "extra": {
-                "message": "eval() con datos externos permite ejecutar código arbitrario",
+                "message": "Use of eval() with external data allows arbitrary code execution",
                 "metadata": {},
                 "severity": "ERROR",
                 "fingerprint": "requires login",

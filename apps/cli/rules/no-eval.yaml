@@ -2,7 +2,7 @@ rules:
   - id: no-eval
     languages: [typescript, javascript]
     severity: ERROR
-    message: eval() con datos externos permite ejecutar código arbitrario
+    message: Use of eval() with external data allows arbitrary code execution.
     metadata:
-      recommendation: Reemplaza eval() por JSON.parse() o por una función explícita que no ejecute texto como código.
+      recommendation: Replace eval() with JSON.parse() or an explicit function that does not execute text as code.
     pattern: eval($X)

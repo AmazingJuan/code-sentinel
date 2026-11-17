@@ -21,6 +21,7 @@ import SeverityBadge from '@/components/SeverityBadge.vue'
 import SeverityBar from '@/components/SeverityBar.vue'
 import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
@@ -219,7 +220,12 @@ onMounted(loadProjectData)
     <p v-if="errorMessage" role="alert" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
-    <p v-else-if="isLoading" class="mt-3 text-sm text-muted-foreground">Loading project details...</p>
+    <div v-else-if="isLoading" class="mt-6">
+      <LoadingState
+        title="Loading project details..."
+        description="Fetching repository configuration, scan execution logs, and team permissions..."
+      />
+    </div>
 
     <template v-else-if="project">
       <!-- Project Header -->

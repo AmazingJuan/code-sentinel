@@ -20,8 +20,8 @@ function cleanLine(value: number | null | undefined): number | null {
 }
 
 /**
- * RF-017: convierte un finding parseado al formato común.
- * Construye el objeto campo por campo: cualquier propiedad extra (Secret, Match...) se descarta.
+ * RF-017: Converts a parsed finding into the normalized common format.
+ * Builds the object field by field: any extra properties (Secret, Match, etc.) are discarded.
  */
 export function normalizeFinding(
   parsedFinding: ParsedFinding,
@@ -29,7 +29,7 @@ export function normalizeFinding(
 ): NormalizedFinding {
   const type = cleanText(parsedFinding.type);
   if (type === null) {
-    throw new InvalidFindingError(tool.sourceTool, 'falta el campo type');
+    throw new InvalidFindingError(tool.sourceTool, 'missing type field');
   }
 
   return {

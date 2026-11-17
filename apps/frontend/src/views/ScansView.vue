@@ -7,6 +7,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import ScanFilterBar from '@/components/ScanFilterBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
@@ -288,8 +289,11 @@ function historicalDelta(scan: ScanInterface): number | null {
           </RouterLink>
         </tbody>
       </table>
+      <div v-if="isLoading" class="p-8">
+        <LoadingState compact title="Loading security scans..." description="Filtering scans across projects, date ranges, and statuses..." />
+      </div>
       <p
-        v-if="!isLoading && scans.length === 0"
+        v-else-if="scans.length === 0"
         class="px-4 py-12 text-center text-sm text-muted-foreground"
       >
         No scans match the selected filters.

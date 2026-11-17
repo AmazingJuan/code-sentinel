@@ -10,6 +10,7 @@ import SeverityBar from '@/components/SeverityBar.vue'
 import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
@@ -444,7 +445,10 @@ onMounted(loadOverview)
             </tr>
           </tbody>
         </table>
-        <p v-if="!isLoading && recentScans.length === 0" class="px-4 py-6 text-sm text-muted-foreground">
+        <div v-if="isLoading" class="p-8">
+          <LoadingState compact title="Loading recent scans..." description="Retrieving scan executions and findings telemetry..." />
+        </div>
+        <p v-else-if="recentScans.length === 0" class="px-4 py-6 text-sm text-muted-foreground">
           No scans available yet.
         </p>
       </div>
@@ -460,7 +464,10 @@ onMounted(loadOverview)
           View all <ArrowRight class="size-3.5" />
         </RouterLink>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-if="isLoading">
+        <LoadingState compact title="Loading recent findings..." description="Aggregating critical and high severity vulnerabilities..." />
+      </div>
+      <div v-else-if="recentFindings.length > 0" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <RouterLink
           v-for="finding in recentFindings"
           :key="finding.id"
@@ -484,7 +491,7 @@ onMounted(loadOverview)
         </RouterLink>
       </div>
       <p
-        v-if="!isLoading && recentFindings.length === 0"
+        v-else
         class="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground"
       >
         No critical or high findings available yet.
