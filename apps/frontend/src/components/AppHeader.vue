@@ -40,10 +40,6 @@ function handleLogout(): void {
     </div>
 
     <div class="ml-auto flex items-center gap-2 sm:gap-4">
-      <span class="hidden items-center gap-1.5 rounded border border-border bg-card px-2 py-1 font-mono text-xs text-muted-foreground sm:flex">
-        <span class="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-        engine online
-      </span>
       <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
         <div class="flex size-6 items-center justify-center rounded-full bg-primary/15 font-mono text-xs font-medium text-primary">
           {{ initials }}
