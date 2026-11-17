@@ -6,7 +6,8 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-} from '@lucide/vue'
+  AlertCircle,
+} from 'lucide-vue-next'
 import TerminalWindow from '../components/TerminalWindow.vue'
 import { AuthService } from '@/services/AuthService'
 
@@ -164,13 +165,14 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
             </div>
           </div>
 
-          <p
+          <div
             v-if="errorMessage"
             role="alert"
-            class="rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+            class="flex items-center gap-2.5 rounded-md border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive"
           >
-            {{ errorMessage }}
-          </p>
+            <AlertCircle class="size-4 shrink-0" />
+            <span>{{ errorMessage }}</span>
+          </div>
 
           <!-- Submit -->
           <button

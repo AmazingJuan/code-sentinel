@@ -16,7 +16,9 @@ import type { ProjectDirectoryEntryInterface } from '@/interfaces/ProjectDirecto
 import type { ManagedUser } from '@/interfaces/UserInterface'
 import { ProjectService } from '@/services/ProjectService'
 import { UserService } from '@/services/UserService'
+import { getToastStore } from '@/stores/toastStore'
 
+const toastStore = getToastStore()
 const projects = ref<ProjectDirectoryEntryInterface[]>([])
 const selectedProjectId = ref<string>('')
 const assignments = ref<ProjectAssignment[]>([])
@@ -89,6 +91,7 @@ async function assignUser(userId: string): Promise<void> {
   try {
     const assignment = await ProjectService.assignUser(selectedProjectId.value, userId)
     assignments.value = [...assignments.value, assignment]
+    toastStore.success('Analyst assigned', 'User granted access to project.')
   } catch (error) {
     assignmentErrorMessage.value = extractErrorMessage(error, 'We could not assign this user.')
   } finally {
@@ -103,6 +106,7 @@ async function unassignUser(userId: string): Promise<void> {
   try {
     await ProjectService.unassignUser(selectedProjectId.value, userId)
     assignments.value = assignments.value.filter((assignment) => assignment.userId !== userId)
+    toastStore.success('Analyst removed', 'Project access revoked.')
   } catch (error) {
     assignmentErrorMessage.value = extractErrorMessage(
       error,

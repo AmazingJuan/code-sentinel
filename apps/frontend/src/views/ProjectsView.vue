@@ -7,8 +7,11 @@ import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { ProjectService } from '@/services/ProjectService'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 
 const projects = ref<ProjectInterface[]>([])
 const searchQuery = ref('')
@@ -20,8 +23,8 @@ async function loadProjects(): Promise<void> {
   errorMessage.value = null
   try {
     projects.value = await ProjectService.getProjects()
-  } catch {
-    errorMessage.value = 'We could not load the registered projects. Please try again in a few seconds.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load the registered projects. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -113,9 +116,13 @@ onMounted(loadProjects)
       </div>
     </div>
 
-    <p v-if="errorMessage" role="alert" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-5">
+      <ErrorState
+        title="Failed to Load Projects"
+        :message="errorMessage"
+        @retry="loadProjects"
+      />
+    </div>
     <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
       {{ isLoading ? 'Loading...' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
     </p>
@@ -129,7 +136,7 @@ onMounted(loadProjects)
         />
       </div>
 
-      <table v-else-if="projects.length > 0" class="w-full min-w-[760px] text-left text-sm">
+      <table v-else-if="filteredProjects.length > 0" class="w-full min-w-[760px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
             <th scope="col" class="px-5 py-3 font-medium">Project Name</th>
@@ -224,11 +231,29 @@ onMounted(loadProjects)
         </tbody>
       </table>
 
-      <div v-if="!isLoading && projects.length === 0" class="px-4 py-12 text-center text-sm text-muted-foreground">
-        <p class="font-medium text-foreground">No projects detected yet</p>
-        <p class="mt-1 text-xs">
-          Run <code class="rounded bg-muted px-1.5 py-0.5 text-primary">npx @amazingwalin/code-sentinel-cli scan</code> inside any repository to automatically register and analyze it.
-        </p>
+      <!-- Empty state when search yields no matches -->
+      <div v-else-if="!isLoading && projects.length > 0 && filteredProjects.length === 0" class="p-8">
+        <EmptyState
+          title="No matching projects found"
+          :description="`No repositories match '${searchQuery}'. Try searching with a different term.`"
+          action-label="Clear filter"
+          @action="searchQuery = ''"
+        />
+      </div>
+
+      <!-- Empty state when no projects are registered -->
+      <div v-else-if="!isLoading && projects.length === 0" class="p-8">
+        <EmptyState
+          title="No projects detected yet"
+          description="Projects are registered automatically when you run a scan with Code Sentinel CLI."
+        >
+          <template #extra>
+            <div class="mt-4 flex items-center gap-2 rounded border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs text-foreground">
+              <span class="font-bold text-primary">$</span>
+              <code>npx @amazingwalin/code-sentinel-cli scan</code>
+            </div>
+          </template>
+        </EmptyState>
       </div>
     </div>
   </div>

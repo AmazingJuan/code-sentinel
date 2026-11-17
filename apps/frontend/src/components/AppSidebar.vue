@@ -5,11 +5,9 @@ import {
   FolderKanban,
   KeyRound,
   LayoutGrid,
-  Settings,
   ShieldAlert,
   Terminal,
   UserRound,
-  Wrench,
 } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -24,7 +22,7 @@ const emit = defineEmits<{ navigate: [] }>()
 interface NavItem {
   label: string
   icon: typeof LayoutGrid
-  routeName: string | null // null = route does not exist yet (another module)
+  routeName: string
   roles: AuthUser['role'][] // RF-032: who sees the item
 }
 
@@ -35,8 +33,6 @@ const navItems: NavItem[] = [
   { label: 'Findings', icon: ShieldAlert, routeName: 'finding.index', roles: ['analyst'] },
   { label: 'Users', icon: UserRound, routeName: 'users', roles: ['admin'] },
   { label: 'Project Access', icon: KeyRound, routeName: 'project-access.index', roles: ['admin'] },
-  { label: 'Security Tools', icon: Wrench, routeName: null, roles: ['analyst'] },
-  { label: 'Settings', icon: Settings, routeName: null, roles: ['analyst'] },
 ]
 
 const visibleNavItems = computed<NavItem[]>(() => {
@@ -72,7 +68,6 @@ function isActive(routeName: string): boolean {
         </p>
         <template v-for="item in visibleNavItems" :key="item.label">
           <RouterLink
-            v-if="item.routeName"
             :to="{ name: item.routeName }"
             class="group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors"
             :class="
@@ -94,15 +89,6 @@ function isActive(routeName: string): boolean {
               aria-hidden="true"
             />
           </RouterLink>
-
-          <span
-            v-else
-            class="flex cursor-not-allowed items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground/40"
-            title="Coming soon"
-          >
-            <component :is="item.icon" class="size-4" />
-            {{ item.label }}
-          </span>
         </template>
       </nav>
     </div>

@@ -10,15 +10,18 @@ import SeverityBadge from '@/components/SeverityBadge.vue'
 import SeverityBar from '@/components/SeverityBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
 import { buildCommitUrl } from '@/services/GitHelper'
 import { FindingService } from '@/services/FindingService'
 import { ReportService } from '@/services/ReportService'
 import { ScanService } from '@/services/ScanService'
+import { getToastStore } from '@/stores/toastStore'
 
 const route = useRoute()
 const router = useRouter()
+const toastStore = getToastStore()
 const scan = ref<ScanInterface | null>(null)
 const findings = ref<FindingInterface[]>([])
 const isLoading = ref<boolean>(true)
@@ -42,6 +45,7 @@ async function handleDownloadReport(): Promise<void> {
     await ReportService.downloadProtectedReport(scan.value.id, reportPassword.value, reportFormat.value)
     isExportModalOpen.value = false
     reportPassword.value = ''
+    toastStore.success('Report downloaded', 'Protected security report generated successfully.')
   } catch {
     exportError.value = 'Failed to generate protected report. Please verify your permissions.'
   } finally {
@@ -56,9 +60,10 @@ function extractErrorMessage(error: unknown): string {
   return 'We could not load the details for this scan.'
 }
 
-onMounted(async () => {
+async function loadScanDetails(): Promise<void> {
   const id = route.params.id as string
   isLoading.value = true
+  errorMessage.value = null
   try {
     scan.value = await ScanService.getScanById(id)
     findings.value = await FindingService.getFindings({ scanId: id })
@@ -67,7 +72,9 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadScanDetails)
 
 function goBack(): void {
   if (window.history.state && window.history.state.back) {
@@ -130,9 +137,23 @@ const summaryItems = computed(() => [
       </nav>
     </div>
 
-    <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-4">
+      <ErrorState
+        title="Scan Report Unavailable"
+        :message="errorMessage"
+        @retry="loadScanDetails"
+      >
+        <template #extra-actions>
+          <button
+            type="button"
+            @click="goBack"
+            class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 font-mono text-xs font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            <span>Back to Scans</span>
+          </button>
+        </template>
+      </ErrorState>
+    </div>
 
     <div v-else-if="isLoading" class="mt-6">
       <LoadingState

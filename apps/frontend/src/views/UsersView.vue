@@ -1,14 +1,16 @@
 <!-- apps/frontend/src/views/UsersView.vue -->
 <script setup lang="ts">
-import axios from 'axios'
-import { UserPlus } from 'lucide-vue-next'
+import { AlertCircle, CheckCircle2, UserPlus } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 
 import PageHeader from '@/components/PageHeader.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import type { ManagedUser } from '@/interfaces/UserInterface'
 import { UserService } from '@/services/UserService'
+import { extractErrorMessage } from '@/services/ErrorHelper'
+import { getToastStore } from '@/stores/toastStore'
 
+const toastStore = getToastStore()
 const users = ref<ManagedUser[]>([])
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -18,10 +20,11 @@ const editingUserId = ref<string | null>(null)
 
 async function loadUsers(): Promise<void> {
   isLoading.value = true
+  errorMessage.value = ''
   try {
     users.value = await UserService.findAll()
-  } catch {
-    errorMessage.value = 'We could not load users.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load users.')
   } finally {
     isLoading.value = false
   }
@@ -34,14 +37,10 @@ async function createUser(): Promise<void> {
     await UserService.create(form.value)
     form.value = { name: '', email: '', password: '', role: 'analyst' }
     successMessage.value = 'User created successfully.'
+    toastStore.success('User created', 'The user account has been successfully created.')
     await loadUsers()
   } catch (error) {
-    if (axios.isAxiosError<{ message?: string | string[] }>(error)) {
-      const message = error.response?.data?.message
-      errorMessage.value = Array.isArray(message) ? message.join(' ') : message ?? 'We could not create this user.'
-    } else {
-      errorMessage.value = 'We could not create this user.'
-    }
+    errorMessage.value = extractErrorMessage(error, 'We could not create this user.')
   }
 }
 
@@ -62,18 +61,22 @@ async function saveUser(): Promise<void> {
     const updatedUser = await UserService.update(editingUserId.value, form.value)
     users.value = users.value.map((user) => user.id === updatedUser.id ? updatedUser : user)
     cancelEditing()
-  } catch {
-    errorMessage.value = 'We could not update this user.'
+    successMessage.value = 'User updated successfully.'
+    toastStore.success('User updated', 'User details have been saved.')
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not update this user.')
   }
 }
 
 async function deleteUser(id: string): Promise<void> {
   if (!window.confirm('Delete this user?')) return
+  errorMessage.value = ''
   try {
     await UserService.remove(id)
     users.value = users.value.filter((user) => user.id !== id)
-  } catch {
-    errorMessage.value = 'We could not delete this user.'
+    toastStore.success('User deleted', 'The user has been removed.')
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not delete this user.')
   }
 }
 
@@ -88,8 +91,29 @@ onMounted(loadUsers)
       description="Manage user accounts and role permissions."
     />
 
-    <p v-if="errorMessage" role="alert" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">{{ errorMessage }}</p>
-    <p v-if="successMessage" role="status" class="mt-5 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">{{ successMessage }}</p>
+    <div
+      v-if="errorMessage"
+      role="alert"
+      class="mt-5 flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+    >
+      <div class="flex items-center gap-2">
+        <AlertCircle class="size-4 shrink-0" />
+        <span>{{ errorMessage }}</span>
+      </div>
+      <button type="button" @click="errorMessage = ''" class="text-xs hover:underline">Dismiss</button>
+    </div>
+
+    <div
+      v-if="successMessage"
+      role="status"
+      class="mt-5 flex items-start justify-between gap-3 rounded-md border border-primary/30 bg-primary/10 p-3 text-sm text-primary"
+    >
+      <div class="flex items-center gap-2">
+        <CheckCircle2 class="size-4 shrink-0" />
+        <span>{{ successMessage }}</span>
+      </div>
+      <button type="button" @click="successMessage = ''" class="text-xs hover:underline">Dismiss</button>
+    </div>
 
     <div class="mt-6 rounded-lg border border-border bg-card p-5">
       <div class="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">

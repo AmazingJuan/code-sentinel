@@ -22,6 +22,7 @@ import SeverityBar from '@/components/SeverityBar.vue'
 import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import type { ProjectInterface, ProjectStatus } from '@/interfaces/ProjectInterface'
@@ -32,8 +33,10 @@ import { FindingService } from '@/services/FindingService'
 import { ProjectService } from '@/services/ProjectService'
 import { ScanService } from '@/services/ScanService'
 import { UserService } from '@/services/UserService'
+import { getToastStore } from '@/stores/toastStore'
 
 const route = useRoute()
+const toastStore = getToastStore()
 const project = ref<ProjectInterface | null>(null)
 const scans = ref<ScanInterface[]>([])
 const findings = ref<FindingInterface[]>([])
@@ -170,6 +173,7 @@ async function saveConfiguration(): Promise<void> {
     })
     form.value = { repo: project.value.repo, tools: [...project.value.tools] }
     successMessage.value = 'Configuration saved. These settings will be used for future scans.'
+    toastStore.success('Configuration saved', 'These settings will be used for future scans.')
   } catch (error) {
     formErrorMessage.value = extractErrorMessage(error, 'We could not save this configuration.')
   } finally {
@@ -217,9 +221,13 @@ onMounted(loadProjectData)
       Back to projects
     </RouterLink>
 
-    <p v-if="errorMessage" role="alert" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-3">
+      <ErrorState
+        title="Project Unavailable"
+        :message="errorMessage"
+        @retry="loadProjectData"
+      />
+    </div>
     <div v-else-if="isLoading" class="mt-6">
       <LoadingState
         title="Loading project details..."

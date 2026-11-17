@@ -11,11 +11,13 @@ import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
 import { FindingService } from '@/services/FindingService'
 import { ScanService } from '@/services/ScanService'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 
 const scans = ref<ScanInterface[]>([])
 const findings = ref<FindingInterface[]>([])
@@ -92,8 +94,8 @@ async function loadOverview(): Promise<void> {
     ])
     scans.value = loadedScans
     findings.value = loadedFindings
-  } catch {
-    errorMessage.value = 'We could not load the overview. Please try again in a few seconds.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load the overview. Please try again in a few seconds.')
   } finally {
     isLoading.value = false
   }
@@ -153,13 +155,13 @@ onMounted(loadOverview)
       </template>
     </PageHeader>
 
-    <p
-      v-if="errorMessage"
-      role="alert"
-      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-    >
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-5">
+      <ErrorState
+        title="Failed to Load Security Overview"
+        :message="errorMessage"
+        @retry="loadOverview"
+      />
+    </div>
 
     <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard

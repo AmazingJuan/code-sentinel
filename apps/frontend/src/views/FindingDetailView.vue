@@ -22,6 +22,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { buildCommitUrl, buildFileDeepLink } from '@/services/GitHelper'
 import { FindingService } from '@/services/FindingService'
@@ -181,9 +182,23 @@ async function copyCommitSha(): Promise<void> {
       </nav>
     </div>
 
-    <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-4">
+      <ErrorState
+        title="Vulnerability Finding Unavailable"
+        :message="errorMessage"
+        :retry="false"
+      >
+        <template #extra-actions>
+          <button
+            type="button"
+            @click="goBack"
+            class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 font-mono text-xs font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            <span>Back to Findings</span>
+          </button>
+        </template>
+      </ErrorState>
+    </div>
 
     <div v-else-if="isLoading" class="mt-6">
       <LoadingState

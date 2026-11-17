@@ -1,17 +1,20 @@
 <!-- apps/frontend/src/views/FindingsView.vue -->
 <script setup lang="ts">
-import { ChevronRight, FolderKanban, RotateCcw, Search, ShieldAlert } from 'lucide-vue-next'
+import { ChevronRight, FolderKanban, RotateCcw, Search } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { FindingService } from '@/services/FindingService'
 import { ProjectService } from '@/services/ProjectService'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 
 const findings = ref<FindingInterface[]>([])
 const projects = ref<ProjectInterface[]>([])
@@ -31,8 +34,8 @@ async function loadData(): Promise<void> {
     ])
     findings.value = loadedFindings
     projects.value = loadedProjects
-  } catch {
-    errorMessage.value = 'We could not load the findings.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load the findings. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -42,8 +45,8 @@ async function applyFilters(): Promise<void> {
   errorMessage.value = null
   try {
     findings.value = await FindingService.getFindings(filters.value)
-  } catch {
-    errorMessage.value = 'We could not load the findings.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load the findings. Please try again.')
   }
 }
 
@@ -201,16 +204,16 @@ onMounted(loadData)
       </div>
     </div>
 
-    <p
-      v-if="errorMessage"
-      role="alert"
-      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-    >
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-5">
+      <ErrorState
+        title="Failed to Load Findings"
+        :message="errorMessage"
+        @retry="loadData"
+      />
+    </div>
 
     <!-- Table -->
-    <div class="overflow-x-auto rounded-lg border border-border bg-card">
+    <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[840px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
@@ -241,9 +244,14 @@ onMounted(loadData)
             v-else-if="displayedFindings.length === 0"
             class="border-b border-border/60"
           >
-            <td colspan="7" class="py-12 text-center text-sm text-muted-foreground">
-              <ShieldAlert class="mx-auto mb-2 size-6 opacity-40" />
-              No security findings match the selected filters.
+            <td colspan="7" class="p-8 text-center">
+              <EmptyState
+                compact
+                title="No security findings found"
+                description="No vulnerabilities match the current filter criteria."
+                action-label="Reset filters"
+                @action="resetFilters"
+              />
             </td>
           </tr>
 

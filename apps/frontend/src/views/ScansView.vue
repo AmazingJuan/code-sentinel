@@ -8,10 +8,13 @@ import PageHeader from '@/components/PageHeader.vue'
 import ScanFilterBar from '@/components/ScanFilterBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import LoadingState from '@/components/LoadingState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
 import { ScanService } from '@/services/ScanService'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 
 const route = useRoute()
 const scans = ref<ScanInterface[]>([])
@@ -57,8 +60,8 @@ async function loadScans(): Promise<void> {
     } else if (allKnownScans.value.length === 0) {
       allKnownScans.value = loaded
     }
-  } catch {
-    errorMessage.value = 'We could not load the scans. Please try again in a few seconds.'
+  } catch (error) {
+    errorMessage.value = extractErrorMessage(error, 'We could not load the scans. Please try again.')
   } finally {
     isLoading.value = false
   }
@@ -167,18 +170,18 @@ function historicalDelta(scan: ScanInterface): number | null {
       </div>
     </div>
 
-    <p
-      v-if="errorMessage"
-      role="alert"
-      class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
-    >
-      {{ errorMessage }}
-    </p>
+    <div v-if="errorMessage" class="mt-5">
+      <ErrorState
+        title="Failed to Load Scans"
+        :message="errorMessage"
+        @retry="loadScans"
+      />
+    </div>
     <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
       {{ isLoading ? 'Loading...' : `${scans.length} scan${scans.length === 1 ? '' : 's'}` }}
     </p>
 
-    <div class="overflow-x-auto rounded-lg border border-border bg-card">
+    <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[720px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
@@ -292,12 +295,17 @@ function historicalDelta(scan: ScanInterface): number | null {
       <div v-if="isLoading" class="p-8">
         <LoadingState compact title="Loading security scans..." description="Filtering scans across projects, date ranges, and statuses..." />
       </div>
-      <p
+      <div
         v-else-if="scans.length === 0"
-        class="px-4 py-12 text-center text-sm text-muted-foreground"
+        class="p-8"
       >
-        No scans match the selected filters.
-      </p>
+        <EmptyState
+          title="No security scans found"
+          description="No scans match the selected project, status, or date range filters."
+          action-label="Reset filters"
+          @action="filters = {}; loadScans()"
+        />
+      </div>
     </div>
   </div>
 </template>
