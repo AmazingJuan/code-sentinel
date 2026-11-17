@@ -130,11 +130,13 @@ onMounted(loadOverview)
     >
       <template #actions>
         <div v-if="projectSummaries.length > 0" class="w-full sm:w-56">
-          <label class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <label for="project-scope-select" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             PROJECT SCOPE
           </label>
           <select
+            id="project-scope-select"
             v-model="selectedProjectId"
+            aria-label="Filter overview by project scope"
             class="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           >
             <option :value="undefined">All projects</option>
@@ -152,6 +154,7 @@ onMounted(loadOverview)
 
     <p
       v-if="errorMessage"
+      role="alert"
       class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
@@ -308,15 +311,15 @@ onMounted(loadOverview)
         <table class="w-full min-w-[720px] text-left text-sm">
           <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th class="px-4 py-3 font-medium">PROJECT</th>
-              <th class="px-4 py-3 font-medium">LATEST STATUS</th>
-              <th class="px-4 py-3 font-medium">SCANS</th>
-              <th class="px-4 py-3 font-medium">LAST SCAN</th>
-              <th class="px-3 py-3 text-right font-medium">CRIT</th>
-              <th class="px-3 py-3 text-right font-medium">HIGH</th>
-              <th class="px-3 py-3 text-right font-medium">MED</th>
-              <th class="px-3 py-3 text-right font-medium">LOW</th>
-              <th class="px-3 py-3 text-right font-medium">TOTAL</th>
+              <th scope="col" class="px-4 py-3 font-medium">PROJECT</th>
+              <th scope="col" class="px-4 py-3 font-medium">LATEST STATUS</th>
+              <th scope="col" class="px-4 py-3 font-medium">SCANS</th>
+              <th scope="col" class="px-4 py-3 font-medium">LAST SCAN</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">CRIT</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">HIGH</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">MED</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">LOW</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">TOTAL</th>
             </tr>
           </thead>
           <tbody>
@@ -383,15 +386,15 @@ onMounted(loadOverview)
         <table class="w-full min-w-[720px] text-left text-sm">
           <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th class="px-4 py-3 font-medium">SCAN</th>
-              <th class="px-4 py-3 font-medium">PROJECT</th>
-              <th class="px-4 py-3 font-medium">DATE</th>
-              <th class="px-4 py-3 font-medium">STATUS</th>
-              <th class="px-3 py-3 text-right font-medium">CRIT</th>
-              <th class="px-3 py-3 text-right font-medium">HIGH</th>
-              <th class="px-3 py-3 text-right font-medium">MED</th>
-              <th class="px-3 py-3 text-right font-medium">LOW</th>
-              <th class="px-3 py-3 text-right font-medium">TOTAL</th>
+              <th scope="col" class="px-4 py-3 font-medium">SCAN</th>
+              <th scope="col" class="px-4 py-3 font-medium">PROJECT</th>
+              <th scope="col" class="px-4 py-3 font-medium">DATE</th>
+              <th scope="col" class="px-4 py-3 font-medium">STATUS</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">CRIT</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">HIGH</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">MED</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">LOW</th>
+              <th scope="col" class="px-3 py-3 text-right font-medium">TOTAL</th>
             </tr>
           </thead>
           <tbody>

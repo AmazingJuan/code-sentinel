@@ -56,6 +56,7 @@ function handleLogout(): void {
 
       <button
         class="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+        aria-label="Log out"
         @click="handleLogout"
       >
         <LogOut class="size-3.5" />

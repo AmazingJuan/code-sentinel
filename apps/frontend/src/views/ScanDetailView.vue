@@ -54,7 +54,7 @@ const summaryItems = computed(() => [
 
 <template>
   <div class="p-5 sm:p-8">
-    <p v-if="errorMessage" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+    <p v-if="errorMessage" role="alert" class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
 
@@ -113,6 +113,7 @@ const summaryItems = computed(() => [
 
       <p
         v-if="scan.status === 'failed' && scan.errorMessage"
+        role="alert"
         class="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
       >
         {{ scan.errorMessage }}

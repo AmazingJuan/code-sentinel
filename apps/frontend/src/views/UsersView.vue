@@ -87,8 +87,8 @@ onMounted(loadUsers)
       description="Manage user accounts and role permissions."
     />
 
-    <p v-if="errorMessage" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">{{ errorMessage }}</p>
-    <p v-if="successMessage" class="mt-5 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">{{ successMessage }}</p>
+    <p v-if="errorMessage" role="alert" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">{{ errorMessage }}</p>
+    <p v-if="successMessage" role="status" class="mt-5 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">{{ successMessage }}</p>
 
     <div class="mt-6 rounded-lg border border-border bg-card p-5">
       <div class="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -97,35 +97,54 @@ onMounted(loadUsers)
       </div>
 
       <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="editingUserId ? saveUser() : createUser()">
-        <input
-          v-model="form.name"
-          required
-          placeholder="Name"
-          class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-        />
-        <input
-          v-model="form.email"
-          required
-          type="email"
-          placeholder="Email"
-          class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-        />
-        <input
-          v-if="!editingUserId"
-          v-model="form.password"
-          required
-          minlength="8"
-          type="password"
-          placeholder="Temporary password"
-          class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-        />
-        <select
-          v-model="form.role"
-          class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-        >
-          <option value="analyst">Analyst</option>
-          <option value="admin">Admin</option>
-        </select>
+        <div>
+          <label for="user-name" class="sr-only">Name</label>
+          <input
+            id="user-name"
+            v-model="form.name"
+            required
+            aria-label="User name"
+            placeholder="Name"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label for="user-email" class="sr-only">Email</label>
+          <input
+            id="user-email"
+            v-model="form.email"
+            required
+            type="email"
+            aria-label="User email"
+            placeholder="Email"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div v-if="!editingUserId">
+          <label for="user-password" class="sr-only">Temporary password</label>
+          <input
+            id="user-password"
+            v-model="form.password"
+            required
+            minlength="8"
+            type="password"
+            aria-label="Temporary password"
+            placeholder="Temporary password"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label for="user-role" class="sr-only">Role</label>
+          <select
+            id="user-role"
+            v-model="form.role"
+            aria-label="User role"
+            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+          >
+            <option value="analyst">Analyst</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
         <div class="flex gap-3 sm:col-span-2">
           <button
             class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
@@ -150,10 +169,10 @@ onMounted(loadUsers)
       <table v-else class="w-full text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-4 py-3 font-medium">Name</th>
-            <th class="px-4 py-3 font-medium">Email</th>
-            <th class="px-4 py-3 font-medium">Role</th>
-            <th class="px-4 py-3 font-medium"></th>
+            <th scope="col" class="px-4 py-3 font-medium">Name</th>
+            <th scope="col" class="px-4 py-3 font-medium">Email</th>
+            <th scope="col" class="px-4 py-3 font-medium">Role</th>
+            <th scope="col" class="px-4 py-3 font-medium text-right"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -166,8 +185,8 @@ onMounted(loadUsers)
               </span>
             </td>
             <td class="space-x-3 px-4 py-3 text-right">
-              <button class="text-sm font-medium text-primary hover:underline" @click="startEditing(user)">Edit</button>
-              <button class="text-sm font-medium text-destructive hover:underline" @click="deleteUser(user.id)">Delete</button>
+              <button class="text-sm font-medium text-primary hover:underline" :aria-label="'Edit user ' + user.name" @click="startEditing(user)">Edit</button>
+              <button class="text-sm font-medium text-destructive hover:underline" :aria-label="'Delete user ' + user.name" @click="deleteUser(user.id)">Delete</button>
             </td>
           </tr>
         </tbody>

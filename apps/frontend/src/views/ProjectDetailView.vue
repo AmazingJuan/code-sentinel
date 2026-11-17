@@ -156,10 +156,10 @@ onMounted(loadProject)
       Back to projects
     </RouterLink>
 
-    <p v-if="errorMessage" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+    <p v-if="errorMessage" role="alert" class="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
-    <p v-else-if="isLoading" class="mt-3 text-sm text-muted-foreground">Loading…</p>
+    <p v-else-if="isLoading" class="mt-3 text-sm text-muted-foreground">Loading...</p>
 
     <template v-else-if="project">
       <div class="mb-6">
@@ -174,10 +174,10 @@ onMounted(loadProject)
           Security analysis configuration
         </div>
 
-        <p v-if="formErrorMessage" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <p v-if="formErrorMessage" role="alert" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {{ formErrorMessage }}
         </p>
-        <p v-if="successMessage" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
+        <p v-if="successMessage" role="status" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
           {{ successMessage }}
         </p>
 
@@ -199,9 +199,11 @@ onMounted(loadProject)
               <label
                 v-for="tool in SCAN_TOOLS"
                 :key="tool"
+                :for="`tool-${tool}`"
                 class="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background/50 px-3 py-2 text-sm text-foreground hover:border-primary/50 transition-colors"
               >
                 <input
+                  :id="`tool-${tool}`"
                   type="checkbox"
                   :checked="form.tools.includes(tool)"
                   class="size-4 rounded accent-primary"
@@ -218,7 +220,7 @@ onMounted(loadProject)
               :disabled="isSaving"
               class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {{ isSaving ? 'Saving…' : 'Save configuration' }}
+              {{ isSaving ? 'Saving...' : 'Save configuration' }}
             </button>
           </div>
         </form>

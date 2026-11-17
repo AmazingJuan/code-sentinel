@@ -41,6 +41,7 @@ onMounted(loadFindings)
 
     <p
       v-if="errorMessage"
+      role="alert"
       class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
@@ -50,13 +51,13 @@ onMounted(loadFindings)
       <table class="w-full min-w-[760px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-4 py-3 font-medium">Severity</th>
-            <th class="px-4 py-3 font-medium">Finding Type</th>
-            <th class="px-4 py-3 font-medium">File / Path</th>
-            <th class="px-4 py-3 font-medium">Line</th>
-            <th class="px-4 py-3 font-medium">Tool</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-2 py-3"></th>
+            <th scope="col" class="px-4 py-3 font-medium">Severity</th>
+            <th scope="col" class="px-4 py-3 font-medium">Finding Type</th>
+            <th scope="col" class="px-4 py-3 font-medium">File / Path</th>
+            <th scope="col" class="px-4 py-3 font-medium">Line</th>
+            <th scope="col" class="px-4 py-3 font-medium">Tool</th>
+            <th scope="col" class="px-4 py-3 font-medium">Status</th>
+            <th scope="col" class="px-2 py-3"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>

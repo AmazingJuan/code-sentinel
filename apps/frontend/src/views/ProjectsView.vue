@@ -92,10 +92,10 @@ onMounted(loadProjects)
         Register a new project
       </div>
 
-      <p v-if="formErrorMessage" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+      <p v-if="formErrorMessage" role="alert" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
         {{ formErrorMessage }}
       </p>
-      <p v-if="successMessage" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
+      <p v-if="successMessage" role="status" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
         {{ successMessage }}
       </p>
 
@@ -128,29 +128,29 @@ onMounted(loadProjects)
             :disabled="isSubmitting"
             class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {{ isSubmitting ? 'Registering…' : 'Register project' }}
+            {{ isSubmitting ? 'Registering...' : 'Register project' }}
           </button>
         </div>
       </form>
     </div>
 
-    <p v-if="errorMessage" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+    <p v-if="errorMessage" role="alert" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ errorMessage }}
     </p>
     <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
-      {{ isLoading ? 'Loading…' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
+      {{ isLoading ? 'Loading...' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
     </p>
 
     <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[640px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-4 py-3 font-medium">Project</th>
-            <th class="px-4 py-3 font-medium">Source</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Last scan</th>
-            <th class="px-3 py-3 text-right font-medium">Findings</th>
-            <th class="px-2 py-3"></th>
+            <th scope="col" class="px-4 py-3 font-medium">Project</th>
+            <th scope="col" class="px-4 py-3 font-medium">Source</th>
+            <th scope="col" class="px-4 py-3 font-medium">Status</th>
+            <th scope="col" class="px-4 py-3 font-medium">Last scan</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">Findings</th>
+            <th scope="col" class="px-2 py-3"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>

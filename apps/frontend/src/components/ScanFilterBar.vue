@@ -32,8 +32,8 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
 <template>
   <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
     <div>
-      <label :class="labelClass">PROJECT</label>
-      <select v-model="filters.projectId" :class="selectClass" @change="$emit('apply')">
+      <label for="scan-filter-project" :class="labelClass">PROJECT</label>
+      <select id="scan-filter-project" v-model="filters.projectId" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">All projects</option>
         <option v-for="project in projects" :key="project.id" :value="project.id">
           {{ project.name }}
@@ -41,14 +41,14 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
       </select>
     </div>
     <div>
-      <label :class="labelClass">DATE</label>
-      <select :class="selectClass">
+      <label for="scan-filter-date" :class="labelClass">DATE</label>
+      <select id="scan-filter-date" :class="selectClass">
         <option>All time</option>
       </select>
     </div>
     <div>
-      <label :class="labelClass">STATUS</label>
-      <select v-model="filters.status" :class="selectClass" @change="$emit('apply')">
+      <label for="scan-filter-status" :class="labelClass">STATUS</label>
+      <select id="scan-filter-status" v-model="filters.status" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">Any status</option>
         <option v-for="option in statusOptions" :key="option.value" :value="option.value">
           {{ option.label }}
@@ -56,8 +56,8 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
       </select>
     </div>
     <div>
-      <label :class="labelClass">SEVERITY</label>
-      <select v-model="filters.severity" :class="selectClass" @change="$emit('apply')">
+      <label for="scan-filter-severity" :class="labelClass">SEVERITY</label>
+      <select id="scan-filter-severity" v-model="filters.severity" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">Any severity</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
