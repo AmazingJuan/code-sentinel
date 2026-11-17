@@ -72,7 +72,10 @@ describe('Project Resolver (RF-038)', () => {
 
     expect(result.id).toBe('auto-proj-999');
     expect(result.isNew).toBe(true);
-    expect(postBody).not.toBeNull();
+    expect(postBody).toEqual({
+      name: expect.any(String),
+      repo: expect.any(String),
+    });
   });
 });
 
