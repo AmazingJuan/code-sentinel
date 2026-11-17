@@ -124,12 +124,32 @@ export class SemgrepAdapter implements ToolAdapter {
 
   private toParsedFinding(semgrepResult: SemgrepResult): ParsedFinding {
     const recommendation = semgrepResult.extra.metadata?.recommendation;
+
+    // Extract or infer CWE
+    const cweRaw = semgrepResult.extra.metadata?.cwe;
+    let cwe: string | null = null;
+    if (typeof cweRaw === 'string') {
+      const match = cweRaw.match(/CWE-\d+/i);
+      if (match) cwe = match[0].toUpperCase();
+    } else if (Array.isArray(cweRaw) && typeof cweRaw[0] === 'string') {
+      const match = cweRaw[0].match(/CWE-\d+/i);
+      if (match) cwe = match[0].toUpperCase();
+    }
+    if (!cwe) {
+      const check = (semgrepResult.check_id || '').toLowerCase();
+      if (check.includes('eval')) cwe = 'CWE-95';
+      else if (check.includes('html') || check.includes('xss')) cwe = 'CWE-79';
+      else if (check.includes('sql')) cwe = 'CWE-89';
+      else if (check.includes('secret') || check.includes('key')) cwe = 'CWE-798';
+    }
+
     return {
       // check_id llega como "rules.no-eval": el prefijo es la carpeta de reglas, no aporta.
       type: semgrepResult.check_id.split('.').at(-1) ?? semgrepResult.check_id,
       severity: mapSemgrepSeverity(semgrepResult.extra.severity),
       filePath: toProjectRelativePath(semgrepResult.path),
       line: semgrepResult.start.line,
+      cwe,
       description: semgrepResult.extra.message ?? null,
       recommendation: typeof recommendation === 'string' ? recommendation : null,
     };
