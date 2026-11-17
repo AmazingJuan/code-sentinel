@@ -6,11 +6,10 @@ on:
       - main
     paths:
       - 'apps/cli/**'
+      - '!apps/cli/README.md'
+      - '!apps/cli/test/**'
+      - '!**.md'
       - '.github/workflows/publish-cli.yml'
-    paths-ignore:
-      - 'apps/cli/README.md'
-      - 'apps/cli/test/**'
-      - '**.md'
   workflow_dispatch:
 
 concurrency:

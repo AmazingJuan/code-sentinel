@@ -6,10 +6,9 @@ on:
       - main
     paths:
       - 'apps/backend/**'
+      - '!apps/backend/README.md'
+      - '!**.md'
       - '.github/workflows/deploy-backend.yml'
-    paths-ignore:
-      - 'apps/backend/README.md'
-      - '**.md'
   workflow_dispatch:
 
 concurrency:
