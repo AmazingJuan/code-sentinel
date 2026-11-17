@@ -1,5 +1,7 @@
 // apps/backend/src/database/seed.ts
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
@@ -8,6 +10,13 @@ import { ProjectAssignment } from '../projects/project-assignment.entity';
 import { Scan } from '../scans/scan.entity';
 import { Finding } from '../findings/finding.entity';
 import { DEFAULT_USERS } from '../users/users.service';
+
+// Look for .env in current directory and monorepo root
+const rootEnv = resolve(__dirname, '../../../../.env');
+if (existsSync(rootEnv)) {
+  dotenv.config({ path: rootEnv });
+}
+dotenv.config();
 
 /**
  * Production-ready seeder.
