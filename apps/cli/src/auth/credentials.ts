@@ -15,7 +15,7 @@ export interface StoredSession {
 }
 
 export function getConfigDirectory(): string {
-  return join(homedir(), '.code-sentinel');
+  return process.env.CODE_SENTINEL_CONFIG_DIR || join(homedir(), '.code-sentinel');
 }
 
 export function getCredentialsFilePath(): string {

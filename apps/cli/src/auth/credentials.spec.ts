@@ -1,9 +1,10 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   clearSession,
-  getCredentialsFilePath,
   getStoredSession,
   resolveEffectiveToken,
   saveSession,
@@ -11,19 +12,19 @@ import {
 } from './credentials.js';
 
 describe('Credentials Manager', () => {
-  const filePath = getCredentialsFilePath();
+  let tempDir: string;
 
   beforeEach(() => {
     delete process.env.CODE_SENTINEL_TOKEN;
-    if (existsSync(filePath)) {
-      rmSync(filePath, { force: true });
-    }
+    tempDir = mkdtempSync(join(tmpdir(), 'cs-creds-test-'));
+    process.env.CODE_SENTINEL_CONFIG_DIR = tempDir;
   });
 
   afterEach(() => {
     delete process.env.CODE_SENTINEL_TOKEN;
-    if (existsSync(filePath)) {
-      rmSync(filePath, { force: true });
+    delete process.env.CODE_SENTINEL_CONFIG_DIR;
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
