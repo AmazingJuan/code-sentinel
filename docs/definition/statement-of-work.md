@@ -53,7 +53,7 @@ Code Sentinel will centralize security analysis for software projects by integra
 
 The platform will support project management, security scan execution and monitoring, security finding registration and classification, historical scan analysis, security dashboards, report generation and protected report downloads, user and role management, project assignment, and role-based access control.
 
-The initial implementation will support Static Application Security Testing (SAST), Secret Scanning, Port Scanning, and Custom Security Scanners. The architecture will be designed to support the integration of additional security analysis tools and vulnerability types without requiring a complete redesign of the platform.
+The initial implementation will support Static Application Security Testing (SAST), Secret Scanning, and Port Scanning. The architecture will be designed to support the integration of additional security analysis tools and vulnerability types without requiring a complete redesign of the platform.
 
 The implementation will be organized into three development sprints. Sprint 1 will establish the complete frontend experience using static data. Sprint 2 will implement the backend, authentication, authorization, database, scanner engine, integrations, and core security functionality. Sprint 3 will complete dashboards, historical results, protected reports, final authorization validation, and end-to-end testing.
 
@@ -92,7 +92,6 @@ The scope includes:
 * SAST analysis.
 * Secret Scanning.
 * Port Scanning.
-* Custom Security Scanners.
 * Support for multiple analysis types.
 * Processing of different security report formats.
 * Normalization of security findings into a common internal structure.
@@ -219,7 +218,7 @@ The project will be considered successful if it:
 * Meets the applicable non-functional requirements NFR-001 through NFR-007.
 * Provides a fully navigable frontend experience.
 * Provides real backend functionality for authentication, projects, scans, findings, and reporting.
-* Centralizes SAST, Secret Scanning, Port Scanning, and Custom Security Scanner results.
+* Centralizes SAST, Secret Scanning, and Port Scanning results.
 * Normalizes findings from different security tools into a consistent internal structure.
 * Provides scan status management and scan history.
 * Provides centralized finding visualization and filtering.
@@ -408,10 +407,6 @@ The system shall support security analysis for exposed secrets, credentials, API
 #### RF-013: Port Scanning
 
 The system shall support port scanning as a security analysis type.
-
-#### RF-014: Custom Security Scanners
-
-The system shall support the integration and execution of custom security scanners.
 
 #### RF-015: Multiple Analysis Types
 
@@ -618,7 +613,6 @@ Sprint 2 shall include:
 * SAST analysis.
 * Secret Scanning.
 * Port Scanning.
-* Custom Security Scanners.
 * Multiple analysis types.
 * Report format processing.
 * Result normalization.
@@ -682,7 +676,6 @@ The project deliverables shall include:
 * SAST integration.
 * Secret Scanning integration.
 * Port Scanning integration.
-* Custom Security Scanner support.
 * Security result collection engine.
 * Report processing and normalization engine.
 * Common security finding data structure.
@@ -719,7 +712,6 @@ The project will be accepted when:
 * SAST results are successfully collected and processed.
 * Secret Scanning results are successfully collected and processed.
 * Port Scanning results are successfully collected and processed.
-* Custom security scanners can be integrated through the supported architecture.
 * Results from supported tools are normalized into the common internal data structure.
 * Findings retain their source tool, project, scan, classification, location, and severity when available.
 * Authorized users can view centralized findings.

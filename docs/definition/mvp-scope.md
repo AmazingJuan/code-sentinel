@@ -38,7 +38,6 @@
 ## LATER
 
 - Port scanning on a configured target.
-- Development of proprietary/custom security scanners within the platform.
 - Integration with external ticketing systems (Jira, Azure DevOps).
 - Automatic notifications for critical findings.
 - Executive dashboard with metrics and historical trends.
