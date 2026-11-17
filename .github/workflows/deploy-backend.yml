@@ -7,6 +7,9 @@ on:
     paths:
       - 'apps/backend/**'
       - '.github/workflows/deploy-backend.yml'
+    paths-ignore:
+      - 'apps/backend/README.md'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
@@ -17,11 +20,15 @@ jobs:
   deploy:
     name: Trigger Render Deploy Hook
     runs-on: ubuntu-latest
+    env:
+      RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
     steps:
       - name: Trigger Render Deploy Hook
         if: env.RENDER_HOOK != ''
-        env:
-          RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           echo "Disparando despliegue de backend en Render..."
           curl -f -X POST "$RENDER_HOOK"
+      - name: Skip notification if hook not configured
+        if: env.RENDER_HOOK == ''
+        run: |
+          echo "RENDER_DEPLOY_HOOK_URL no esta configurado en los secrets del repositorio. Saltando despliegue."

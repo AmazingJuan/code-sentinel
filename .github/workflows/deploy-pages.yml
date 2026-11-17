@@ -7,6 +7,10 @@ on:
     paths:
       - 'apps/frontend/**'
       - '.github/workflows/deploy-pages.yml'
+    paths-ignore:
+      - 'apps/frontend/code-sentinel-2/**'
+      - 'apps/frontend/README.md'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
