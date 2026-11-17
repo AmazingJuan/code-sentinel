@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 
-// 1. Resolve API URL from unified environment variable during build time
-// Priority: CODE_SENTINEL_API_URL > fallback localhost
+// 1. Resolve API URL from environment variables during build time
+// Priority: CODE_SENTINEL_API_URL > VITE_API_URL > fallback localhost
 const targetUrl =
   process.env.CODE_SENTINEL_API_URL ||
   process.env.VITE_API_URL ||
@@ -37,4 +37,3 @@ try {
 }
 
 console.log('[build] CLI build completed successfully.');
-

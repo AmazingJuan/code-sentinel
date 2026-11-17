@@ -102,7 +102,7 @@ jobs:
 
       - name: Build CLI
         env:
-          CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
         run: pnpm run build
 
   # ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ jobs:
         working-directory: apps/frontend
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-          CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
         run: |
           pnpm run build
           # SPA 404 fallback for GitHub Pages client-side routing
@@ -353,7 +353,7 @@ jobs:
       - name: Build CLI
         working-directory: apps/cli
         env:
-          CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
         run: pnpm run build
 
       - name: Publish to npm
