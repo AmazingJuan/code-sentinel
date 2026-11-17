@@ -35,13 +35,16 @@ function submitAssignment(): void {
       Project access
     </div>
 
-    <p v-if="props.errorMessage" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+    <p v-if="props.errorMessage" role="alert" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
       {{ props.errorMessage }}
     </p>
 
     <form class="mb-4 flex flex-wrap items-center gap-3" @submit.prevent="submitAssignment">
+      <label for="assign-user-select" class="sr-only">Select user to assign</label>
       <select
+        id="assign-user-select"
         v-model="selectedUserId"
+        aria-label="Select a user to assign"
         :disabled="props.isSaving || props.availableUsers.length === 0"
         class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
       >
@@ -60,7 +63,7 @@ function submitAssignment(): void {
       </button>
     </form>
 
-    <p v-if="props.isLoading" class="text-sm text-muted-foreground">Loading assignments…</p>
+    <p v-if="props.isLoading" class="text-sm text-muted-foreground">Loading assignments...</p>
     <p v-else-if="props.assignments.length === 0" class="text-sm text-muted-foreground">No users are assigned to this project yet.</p>
     <ul v-else class="divide-y divide-border/60">
       <li v-for="assignment in props.assignments" :key="assignment.id" class="flex items-center justify-between py-2 text-sm">
@@ -71,6 +74,7 @@ function submitAssignment(): void {
         <button
           type="button"
           :disabled="props.isSaving"
+          :aria-label="'Remove user ' + assignment.user.name + ' from project'"
           class="inline-flex items-center gap-1 text-destructive hover:text-destructive/80 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           @click="emit('unassign', assignment.userId)"
         >

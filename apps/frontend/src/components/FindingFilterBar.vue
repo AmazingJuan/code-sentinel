@@ -13,8 +13,8 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
 <template>
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <div>
-      <label :class="labelClass">SEVERITY</label>
-      <select v-model="filters.severity" :class="selectClass" @change="$emit('apply')">
+      <label for="filter-severity" :class="labelClass">SEVERITY</label>
+      <select id="filter-severity" v-model="filters.severity" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">Any severity</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -23,8 +23,8 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
       </select>
     </div>
     <div>
-      <label :class="labelClass">TOOL</label>
-      <select v-model="filters.sourceTool" :class="selectClass" @change="$emit('apply')">
+      <label for="filter-tool" :class="labelClass">TOOL</label>
+      <select id="filter-tool" v-model="filters.sourceTool" :class="selectClass" @change="$emit('apply')">
         <option :value="undefined">Any tool</option>
         <option value="SAST">SAST</option>
         <option value="Secret Scanner">Secret Scanner</option>
@@ -35,8 +35,9 @@ const labelClass = 'mb-1.5 block font-mono text-[10px] font-medium uppercase tra
       </select>
     </div>
     <div>
-      <label :class="labelClass">TYPE</label>
+      <label for="filter-type" :class="labelClass">TYPE</label>
       <input
+        id="filter-type"
         v-model="filters.type"
         placeholder="e.g. SQL Injection"
         :class="selectClass"

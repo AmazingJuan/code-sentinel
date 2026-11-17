@@ -168,29 +168,30 @@ function historicalDelta(scan: ScanInterface): number | null {
 
     <p
       v-if="errorMessage"
+      role="alert"
       class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive"
     >
       {{ errorMessage }}
     </p>
     <p v-else class="mb-2 font-mono text-xs text-muted-foreground">
-      {{ isLoading ? 'Loading…' : `${scans.length} scan${scans.length === 1 ? '' : 's'}` }}
+      {{ isLoading ? 'Loading...' : `${scans.length} scan${scans.length === 1 ? '' : 's'}` }}
     </p>
 
     <div class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[720px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           <tr>
-            <th class="px-4 py-3 font-medium">Scan</th>
-            <th class="px-4 py-3 font-medium">Project</th>
-            <th class="px-4 py-3 font-medium">Date</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Tools</th>
-            <th class="px-3 py-3 text-right font-medium">Crit</th>
-            <th class="px-3 py-3 text-right font-medium">High</th>
-            <th class="px-3 py-3 text-right font-medium">Med</th>
-            <th class="px-3 py-3 text-right font-medium">Low</th>
-            <th class="px-3 py-3 text-right font-medium">Total</th>
-            <th class="px-2 py-3"></th>
+            <th scope="col" class="px-4 py-3 font-medium">Scan</th>
+            <th scope="col" class="px-4 py-3 font-medium">Project</th>
+            <th scope="col" class="px-4 py-3 font-medium">Date</th>
+            <th scope="col" class="px-4 py-3 font-medium">Status</th>
+            <th scope="col" class="px-4 py-3 font-medium">Tools</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">Crit</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">High</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">Med</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">Low</th>
+            <th scope="col" class="px-3 py-3 text-right font-medium">Total</th>
+            <th scope="col" class="px-2 py-3"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>

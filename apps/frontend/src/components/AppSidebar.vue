@@ -66,7 +66,7 @@ function isActive(routeName: string): boolean {
         </div>
       </div>
 
-      <nav class="flex flex-1 flex-col gap-0.5 p-2">
+      <nav aria-label="Main Navigation" class="flex flex-1 flex-col gap-0.5 p-2">
         <p class="px-3 py-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
           Navigation
         </p>
