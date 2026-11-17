@@ -12,6 +12,9 @@ function buildParsedFinding(overrides: Partial<ParsedFinding> = {}): ParsedFindi
     severity: 'high',
     filePath: 'src/unsafe.ts',
     line: 2,
+    cwe: 'CWE-95',
+    commitSha: null,
+    codeSnippet: null,
     description: 'Use of eval allows arbitrary code execution',
     recommendation: null,
     ...overrides,
@@ -26,7 +29,7 @@ describe('normalizeFinding', (): void => {
     expect(result.toolCategory).toBe('SAST');
   });
 
-  it('keeps only the 8 contract fields even if extra properties are provided (NFR-001)', (): void => {
+  it('keeps only the normalized contract fields even if extra properties are provided (NFR-001)', (): void => {
     const findingWithSecrets = {
       ...buildParsedFinding(),
       Secret: 'ghp_fake',
@@ -36,6 +39,9 @@ describe('normalizeFinding', (): void => {
     const result = normalizeFinding(findingWithSecrets, semgrepTool);
 
     expect(Object.keys(result).sort()).toEqual([
+      'codeSnippet',
+      'commitSha',
+      'cwe',
       'description',
       'filePath',
       'line',
@@ -45,6 +51,32 @@ describe('normalizeFinding', (): void => {
       'toolCategory',
       'type',
     ]);
+    expect((result as Record<string, unknown>).Secret).toBeUndefined();
+    expect((result as Record<string, unknown>).Match).toBeUndefined();
+    expect(result.cwe).toBe('CWE-95');
+  });
+
+  it('normalizes and retains cwe, commitSha, and codeSnippet correctly', (): void => {
+    const findingWithCwe = buildParsedFinding({
+      cwe: '  CWE-798  ',
+      commitSha: '  abc1234  ',
+      codeSnippet: 'const key = "secret";',
+    });
+
+    const result = normalizeFinding(findingWithCwe, semgrepTool);
+    expect(result.cwe).toBe('CWE-798');
+    expect(result.commitSha).toBe('abc1234');
+    expect(result.codeSnippet).toBe('const key = "secret";');
+
+    const findingEmptyCwe = buildParsedFinding({
+      cwe: '   ',
+      commitSha: '   ',
+      codeSnippet: '   ',
+    });
+    const resultEmpty = normalizeFinding(findingEmptyCwe, semgrepTool);
+    expect(resultEmpty.cwe).toBeNull();
+    expect(resultEmpty.commitSha).toBeNull();
+    expect(resultEmpty.codeSnippet).toBeNull();
   });
 
   it('sets severity to null if it is not one of the 4 valid values (RF-022)', (): void => {

@@ -4,5 +4,6 @@ rules:
     severity: ERROR
     message: Use of eval() with external data allows arbitrary code execution.
     metadata:
+      cwe: CWE-95
       recommendation: Replace eval() with JSON.parse() or an explicit function that does not execute text as code.
     pattern: eval($X)

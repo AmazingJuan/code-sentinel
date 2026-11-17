@@ -4,6 +4,7 @@ rules:
     severity: WARNING
     message: v-html renders unescaped HTML and can lead to XSS vulnerabilities.
     metadata:
+      cwe: CWE-79
       recommendation: Use {{ }} interpolation or sanitize the HTML with DOMPurify before rendering.
     pattern: v-html="..."
     paths:
