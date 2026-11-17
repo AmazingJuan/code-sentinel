@@ -215,7 +215,7 @@ Performance will be assessed through:
 
 The project will be considered successful if it:
 
-* Implements the defined functional requirements RF-001 through RF-036.
+* Implements the defined functional requirements RF-001 through RF-035.
 * Meets the applicable non-functional requirements NFR-001 through NFR-007.
 * Provides a fully navigable frontend experience.
 * Provides real backend functionality for authentication, projects, scans, findings, and reporting.
@@ -497,10 +497,6 @@ The system shall prevent unauthorized users from downloading protected reports a
 
 The system shall allow authorized administrators to assign projects to users and shall enforce those assignments when users access projects, scans, findings, and reports.
 
-#### RF-036: CLI npm Distribution and Embedded Backend Endpoint Resolution
-
-The system shall package and distribute the Code Sentinel CLI through the npm registry, embedding the canonical backend API endpoint into the build distribution and providing automated, path-conditional CI/CD workflows for independent deployment of frontend, backend, and CLI services.
-
 ## Non-Functional Requirements
 
 ### NFR-001: Confidentiality
@@ -707,7 +703,6 @@ The project will be accepted when:
 * Scan status is correctly represented as pending, running, completed, or failed.
 * Previous scans can be consulted through scan history.
 * Supported security tools execute through the orchestration layer.
-* The CLI is distributed through npm with embedded backend endpoint resolution, and deployment workflows are path-conditional.
 * SAST results are successfully collected and processed.
 * Secret Scanning results are successfully collected and processed.
 * Port Scanning results are successfully collected and processed.
