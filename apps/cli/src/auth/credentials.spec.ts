@@ -61,3 +61,4 @@ describe('Credentials Manager', () => {
     expect(resolveEffectiveToken()).toBe('stored-token');
   });
 });
+

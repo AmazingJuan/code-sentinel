@@ -4,7 +4,6 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
-import type { CreateProjectDto } from '@/services/ProjectService'
 import ProjectsView from '@/views/ProjectsView.vue'
 
 const project: ProjectInterface = {
@@ -23,12 +22,10 @@ const project: ProjectInterface = {
 }
 
 const getProjects = vi.fn<() => Promise<ProjectInterface[]>>()
-const createProject = vi.fn<(payload: CreateProjectDto) => Promise<ProjectInterface>>()
 
 vi.mock('@/services/ProjectService', () => ({
   ProjectService: {
     getProjects: () => getProjects(),
-    createProject: (payload: CreateProjectDto) => createProject(payload),
   },
 }))
 
@@ -62,33 +59,24 @@ describe('ProjectsView', () => {
     expect(wrapper.text()).toContain('1 project')
   })
 
-  it('shows an empty state when no projects are registered', async () => {
+  it('shows an empty state with CLI discovery instructions when no projects are registered', async () => {
     getProjects.mockResolvedValueOnce([])
 
     const wrapper = await mountProjectsView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No projects have been registered yet')
+    expect(wrapper.text()).toContain('No projects detected yet')
+    expect(wrapper.text()).toContain('code-sentinel-cli scan')
   })
 
-  it('registers a project and prepends it to the list', async () => {
-    getProjects.mockResolvedValueOnce([])
-    createProject.mockResolvedValueOnce(project)
+  it('displays the zero-touch project discovery banner', async () => {
+    getProjects.mockResolvedValueOnce([project])
 
     const wrapper = await mountProjectsView()
     await flushPromises()
 
-    await wrapper.find('#project-name').setValue('payments-service')
-    await wrapper.find('#project-repo').setValue('git@github.com:org/payments-service.git')
-    await wrapper.find('form').trigger('submit.prevent')
-    await flushPromises()
-
-    expect(createProject).toHaveBeenCalledWith({
-      name: 'payments-service',
-      repo: 'git@github.com:org/payments-service.git',
-    })
-    expect(wrapper.text()).toContain('registered successfully')
-    expect(wrapper.text()).toContain('payments-service')
+    expect(wrapper.text()).toContain('Zero-Touch Project Discovery')
+    expect(wrapper.text()).toContain('npx @amazingwalin/code-sentinel-cli scan')
   })
 
   it('shows an error message when loading projects fails', async () => {

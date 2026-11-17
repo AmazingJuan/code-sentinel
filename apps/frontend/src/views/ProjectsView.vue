@@ -1,7 +1,6 @@
 <!-- apps/frontend/src/views/ProjectsView.vue -->
 <script setup lang="ts">
-import axios from 'axios'
-import { ChevronRight, FolderPlus } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -11,11 +10,7 @@ import { ProjectService } from '@/services/ProjectService'
 
 const projects = ref<ProjectInterface[]>([])
 const isLoading = ref<boolean>(false)
-const isSubmitting = ref<boolean>(false)
 const errorMessage = ref<string | null>(null)
-const formErrorMessage = ref<string | null>(null)
-const successMessage = ref<string | null>(null)
-const form = ref<{ name: string; repo: string }>({ name: '', repo: '' })
 
 const hasProjects = computed<boolean>(() => projects.value.length > 0)
 
@@ -28,31 +23,6 @@ async function loadProjects(): Promise<void> {
     errorMessage.value = 'We could not load the registered projects. Please try again in a few seconds.'
   } finally {
     isLoading.value = false
-  }
-}
-
-function extractErrorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError<{ message?: string | string[] }>(error)) {
-    const message = error.response?.data?.message
-    if (Array.isArray(message)) return message.join(' ')
-    if (message) return message
-  }
-  return fallback
-}
-
-async function registerProject(): Promise<void> {
-  formErrorMessage.value = null
-  successMessage.value = null
-  isSubmitting.value = true
-  try {
-    const project = await ProjectService.createProject({ name: form.value.name, repo: form.value.repo })
-    projects.value = [project, ...projects.value]
-    form.value = { name: '', repo: '' }
-    successMessage.value = `Project "${project.name}" was registered successfully and is ready for configuration and scanning.`
-  } catch (error) {
-    formErrorMessage.value = extractErrorMessage(error, 'We could not register this project.')
-  } finally {
-    isSubmitting.value = false
   }
 }
 
@@ -86,52 +56,22 @@ onMounted(loadProjects)
       description="Configured software repositories and security profiles."
     />
 
-    <div class="mb-6 rounded-lg border border-border bg-card p-5">
-      <div class="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-        <FolderPlus class="size-4 text-primary" />
-        Register a new project
+    <div class="mb-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <div class="flex size-8 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 font-mono text-xs font-bold text-primary">
+          &gt;_
+        </div>
+        <div>
+          <div class="text-sm font-medium text-foreground">Zero-Touch Project Discovery</div>
+          <div class="text-xs text-muted-foreground">
+            Projects are automatically identified and registered in your console as soon as you run a security scan.
+          </div>
+        </div>
       </div>
-
-      <p v-if="formErrorMessage" role="alert" class="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
-        {{ formErrorMessage }}
-      </p>
-      <p v-if="successMessage" role="status" class="mb-3 rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm text-primary">
-        {{ successMessage }}
-      </p>
-
-      <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="registerProject">
-        <div>
-          <label for="project-name" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">PROJECT NAME</label>
-          <input
-            id="project-name"
-            v-model="form.name"
-            required
-            maxlength="120"
-            placeholder="payments-service"
-            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label for="project-repo" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">SOURCE CODE LOCATION</label>
-          <input
-            id="project-repo"
-            v-model="form.repo"
-            required
-            maxlength="500"
-            placeholder="git@github.com:org/payments-service.git"
-            class="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-        </div>
-        <div class="sm:col-span-2">
-          <button
-            type="submit"
-            :disabled="isSubmitting"
-            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {{ isSubmitting ? 'Registering...' : 'Register project' }}
-          </button>
-        </div>
-      </form>
+      <div class="flex items-center gap-2 rounded border border-border bg-muted/50 px-3 py-1.5 font-mono text-xs text-muted-foreground">
+        <span class="font-semibold text-primary">$</span>
+        <code>npx @amazingwalin/code-sentinel-cli scan</code>
+      </div>
     </div>
 
     <p v-if="errorMessage" role="alert" class="mt-5 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive">
@@ -179,9 +119,10 @@ onMounted(loadProjects)
           </RouterLink>
         </tbody>
       </table>
-      <p v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-muted-foreground">
-        No projects have been registered yet. Use the form above to register your first project.
-      </p>
+      <div v-if="!isLoading && !hasProjects" class="px-4 py-12 text-center text-sm text-muted-foreground">
+        <p class="font-medium text-foreground">No projects detected yet</p>
+        <p class="mt-1 text-xs">Run <code class="rounded bg-muted px-1.5 py-0.5 text-primary">npx @amazingwalin/code-sentinel-cli scan</code> inside any repository to automatically register and analyze it.</p>
+      </div>
     </div>
   </div>
 </template>
