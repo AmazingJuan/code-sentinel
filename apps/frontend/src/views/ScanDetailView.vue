@@ -1,7 +1,7 @@
 <!-- apps/frontend/src/views/ScanDetailView.vue -->
 <script setup lang="ts">
 import axios from 'axios'
-import { Calendar, ChevronLeft, ChevronRight, FolderKanban, GitBranch, GitCommit, Hash } from 'lucide-vue-next'
+import { Calendar, ChevronLeft, ChevronRight, FolderKanban, GitBranch, GitCommit, Hash, Lock } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -14,6 +14,7 @@ import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
 import { buildCommitUrl } from '@/services/GitHelper'
 import { FindingService } from '@/services/FindingService'
+import { ReportService } from '@/services/ReportService'
 import { ScanService } from '@/services/ScanService'
 
 const route = useRoute()
@@ -22,6 +23,31 @@ const scan = ref<ScanInterface | null>(null)
 const findings = ref<FindingInterface[]>([])
 const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
+
+const isExportModalOpen = ref(false)
+const reportPassword = ref('')
+const reportFormat = ref<'html' | 'json'>('html')
+const isDownloading = ref(false)
+const exportError = ref<string | null>(null)
+
+async function handleDownloadReport(): Promise<void> {
+  if (!scan.value?.id) return
+  if (!reportPassword.value || reportPassword.value.length < 4) {
+    exportError.value = 'Password must be at least 4 characters long.'
+    return
+  }
+  isDownloading.value = true
+  exportError.value = null
+  try {
+    await ReportService.downloadProtectedReport(scan.value.id, reportPassword.value, reportFormat.value)
+    isExportModalOpen.value = false
+    reportPassword.value = ''
+  } catch {
+    exportError.value = 'Failed to generate protected report. Please verify your permissions.'
+  } finally {
+    isDownloading.value = false
+  }
+}
 
 function extractErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error) && error.response?.status === 403) {
@@ -121,7 +147,18 @@ const summaryItems = computed(() => [
         :breadcrumb="`~/ scan-reports / #${scan.scanNumber}`"
       >
         <template #actions>
-          <StatusBadge :status="scan.status" />
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              @click="isExportModalOpen = true"
+              class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-sm"
+              title="Download password-protected report (RF-033 / RF-034)"
+            >
+              <Lock class="size-3.5 text-primary" />
+              <span>Export Report</span>
+            </button>
+            <StatusBadge :status="scan.status" />
+          </div>
         </template>
       </PageHeader>
 
@@ -286,5 +323,72 @@ const summaryItems = computed(() => [
         </div>
       </div>
     </template>
+
+    <!-- Export Protected Report Modal (RF-033, RF-034) -->
+    <div
+      v-if="isExportModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
+      <div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
+        <div class="flex items-center gap-2 text-primary">
+          <Lock class="size-5" />
+          <h3 class="text-base font-semibold text-foreground">Export Protected Report</h3>
+        </div>
+        <p class="mt-2 text-xs text-muted-foreground">
+          Code Sentinel security reports are encrypted with password protection (RF-033 &amp; RF-034). Set a password to encrypt and protect the security results.
+        </p>
+
+        <form @submit.prevent="handleDownloadReport" class="mt-4 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+              Report Password
+            </label>
+            <input
+              v-model="reportPassword"
+              type="password"
+              placeholder="Enter password (min 4 characters)..."
+              required
+              class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+              Format
+            </label>
+            <select
+              v-model="reportFormat"
+              class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="html">Protected Interactive HTML (Offline Encrypted)</option>
+              <option value="json">Encrypted Security JSON</option>
+            </select>
+          </div>
+
+          <p v-if="exportError" role="alert" class="text-xs text-destructive">
+            {{ exportError }}
+          </p>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              @click="isExportModalOpen = false"
+              :disabled="isDownloading"
+              class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="isDownloading"
+              class="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+            >
+              <Lock v-if="!isDownloading" class="size-3.5" />
+              <span>{{ isDownloading ? 'Generating...' : 'Download Report' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
