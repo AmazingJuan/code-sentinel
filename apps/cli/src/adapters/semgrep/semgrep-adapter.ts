@@ -59,8 +59,6 @@ export class SemgrepAdapter implements ToolAdapter {
     return [
       'run',
       '--rm',
-      '--network',
-      'none',
       '-v',
       `${target.rootPath}:${CONTAINER_SOURCE_DIR}:ro`,
       '-v',
@@ -70,6 +68,9 @@ export class SemgrepAdapter implements ToolAdapter {
       SEMGREP_IMAGE,
       'semgrep',
       'scan',
+      '--quiet',
+      '--config',
+      'p/default',
       '--config',
       CONTAINER_RULES_DIR,
       '--json',
@@ -98,7 +99,14 @@ export class SemgrepAdapter implements ToolAdapter {
   parse(rawReport: string): ParsedFinding[] {
     let report: unknown;
     try {
-      report = JSON.parse(rawReport);
+      const trimmed = rawReport.trim();
+      const firstBrace = trimmed.indexOf('{');
+      const lastBrace = trimmed.lastIndexOf('}');
+      const jsonStr =
+        firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace
+          ? trimmed.slice(firstBrace, lastBrace + 1)
+          : trimmed;
+      report = JSON.parse(jsonStr);
     } catch {
       throw new ReportParseError(this.sourceTool, 'output is not valid JSON');
     }
