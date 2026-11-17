@@ -1,0 +1,26 @@
+[
+  {
+    "RuleID": "github-pat",
+    "Description": "Uncovered a GitHub Personal Access Token, potentially leading to unauthorized repository access.",
+    "StartLine": 12,
+    "EndLine": 12,
+    "StartColumn": 15,
+    "EndColumn": 55,
+    "Match": "REDACTED",
+    "Secret": "REDACTED",
+    "File": "/path/src/auth/config.ts",
+    "Fingerprint": "/path/src/auth/config.ts:github-pat:12"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "Description": "Uncovered a generic API key.",
+    "StartLine": 45,
+    "EndLine": 45,
+    "StartColumn": 10,
+    "EndColumn": 42,
+    "Match": "REDACTED",
+    "Secret": "REDACTED",
+    "File": "/path/src/services/api.ts",
+    "Fingerprint": "/path/src/services/api.ts:generic-api-key:45"
+  }
+]

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
+import { GitleaksAdapter } from './adapters/gitleaks/gitleaks-adapter.js';
 import { PortScannerAdapter } from './adapters/port-scanner/port-scanner-adapter.js';
 import { SemgrepAdapter } from './adapters/semgrep/semgrep-adapter.js';
 import {
@@ -103,7 +104,7 @@ Options:
   -d, --target <path>   Target directory or file to scan (default: current directory)
   -u, --api-url <url>   Backend API URL (default: ${DEFAULT_API_URL})
   -t, --token <jwt>     Authentication token (default: saved session or env)
-      --tools <list>    Comma-separated tools to run: semgrep, port-scanner (default: all)
+      --tools <list>    Comma-separated tools to run: semgrep, gitleaks, port-scanner (default: all)
       --dry-run         Run scan locally without syncing results to backend
   -h, --help            Show this help message
   -v, --version         Show CLI version
@@ -121,6 +122,7 @@ Examples:
 export function buildRegistry(): AdapterRegistry {
   const registry = new AdapterRegistry();
   registry.register(new SemgrepAdapter());
+  registry.register(new GitleaksAdapter());
   registry.register(new PortScannerAdapter());
   return registry;
 }
