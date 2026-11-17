@@ -1,0 +1,55 @@
+name: Publish CLI to npm
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/cli/**'
+      - '.github/workflows/publish-cli.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: publish-cli-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Build & Publish to npm Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install CLI dependencies
+        working-directory: apps/cli
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI
+        working-directory: apps/cli
+        env:
+          CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
+        run: pnpm run build
+
+      - name: Publish to npm
+        working-directory: apps/cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing Code Sentinel CLI to npm..."
+          pnpm publish --access public --no-git-checks --provenance
