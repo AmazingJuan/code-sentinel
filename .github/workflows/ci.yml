@@ -331,6 +331,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ci-status, changes]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.changes.outputs.cli == 'true'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -358,7 +361,6 @@ jobs:
 
       - name: Publish to npm
         working-directory: apps/cli
-        if: env.NODE_AUTH_TOKEN != ''
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
