@@ -10,6 +10,10 @@ async function bootstrap(): Promise<void> {
   // Security: disable x-powered-by header to avoid framework disclosure
   app.disable('x-powered-by');
 
+  // Allow larger payload sizes for scan reports with large finding volumes
+  app.useBodyParser('json', { limit: '50mb' });
+  app.useBodyParser('urlencoded', { limit: '50mb', extended: true });
+
   // Graceful shutdown handling for container restarts
   app.enableShutdownHooks();
 
