@@ -11,6 +11,9 @@ export interface ParsedFinding {
   severity: Severity | null;
   filePath: string | null;
   line: number | null;
+  cwe?: string | null;
+  commitSha?: string | null;
+  codeSnippet?: string | null;
   description: string | null;
   recommendation: string | null;
 }

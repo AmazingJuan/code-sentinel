@@ -6,7 +6,7 @@ export interface SemgrepResult {
   extra: {
     message?: string;
     severity?: string;
-    metadata?: { recommendation?: unknown };
+    metadata?: { recommendation?: unknown; cwe?: unknown };
   };
 }
 

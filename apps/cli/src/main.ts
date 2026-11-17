@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,6 +119,67 @@ export function buildRegistry(): AdapterRegistry {
   return registry;
 }
 
+export function detectGitMetadata(targetPath: string): { commitSha: string | null; branch: string | null } {
+  try {
+    const commitSha =
+      execSync('git rev-parse HEAD', {
+        cwd: targetPath,
+        stdio: ['pipe', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim() || null;
+
+    const rawBranch =
+      execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd: targetPath,
+        stdio: ['pipe', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim() || null;
+
+    const branch = rawBranch && rawBranch !== 'HEAD' ? rawBranch : null;
+    return { commitSha, branch };
+  } catch {
+    return { commitSha: null, branch: null };
+  }
+}
+
+export function enrichFindingsWithLocalCode(
+  findings: NormalizedFinding[],
+  targetPath: string,
+  commitSha: string | null,
+): NormalizedFinding[] {
+  return findings.map((f) => {
+    let snippet: string | null = null;
+    if (f.filePath && f.line) {
+      try {
+        const fullPath = resolve(targetPath, f.filePath);
+        if (existsSync(fullPath)) {
+          const content = readFileSync(fullPath, 'utf8');
+          const lines = content.split('\n');
+          const targetLine = f.line;
+          const startLine = Math.max(1, targetLine - 2);
+          const endLine = Math.min(lines.length, targetLine + 2);
+          const rows: Array<{ line: number; text: string; highlight: boolean }> = [];
+          for (let i = startLine; i <= endLine; i++) {
+            rows.push({
+              line: i,
+              text: lines[i - 1] ?? '',
+              highlight: i === targetLine,
+            });
+          }
+          snippet = JSON.stringify(rows);
+        }
+      } catch {
+        // ignore snippet reading errors
+      }
+    }
+    return {
+      ...f,
+      commitSha: f.commitSha ?? commitSha,
+      codeSnippet: f.codeSnippet ?? snippet,
+    };
+  });
+}
+
 export async function submitScanToBackend(
   apiUrl: string,
   token: string,
@@ -125,6 +187,7 @@ export async function submitScanToBackend(
   tools: string[],
   findings: NormalizedFinding[],
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  metadata?: { commitSha?: string | null; branch?: string | null },
 ): Promise<{ scanId: string; totalCount: number }> {
   const headers = {
     'Content-Type': 'application/json',
@@ -137,7 +200,12 @@ export async function submitScanToBackend(
     {
       method: 'POST',
       headers,
-      body: JSON.stringify({ projectId, tools }),
+      body: JSON.stringify({
+        projectId,
+        tools,
+        commitSha: metadata?.commitSha ?? undefined,
+        branch: metadata?.branch ?? undefined,
+      }),
     },
     timeoutMs,
   );
@@ -173,6 +241,8 @@ export async function submitScanToBackend(
       headers,
       body: JSON.stringify({
         status: 'completed',
+        commitSha: metadata?.commitSha ?? undefined,
+        branch: metadata?.branch ?? undefined,
         findings,
       }),
     },
@@ -413,12 +483,16 @@ export async function runCli(argv: string[]): Promise<number> {
   try {
     console.log(' Syncing scan results to Code Sentinel...');
     const scanTools = Array.from(new Set(activeAdapters.map((a) => a.toolCategory)));
+    const gitMeta = detectGitMetadata(targetPath);
+    const enrichedFindings = enrichFindingsWithLocalCode(findings, targetPath, gitMeta.commitSha);
     const { scanId } = await submitScanToBackend(
       effectiveApiUrl,
       token as string,
       (resolvedProject as ProjectInfo).id,
       scanTools,
-      findings,
+      enrichedFindings,
+      DEFAULT_TIMEOUT_MS,
+      gitMeta,
     );
 
     console.log(` Successfully synchronized scan #${scanId}!`);
