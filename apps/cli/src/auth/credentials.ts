@@ -77,3 +77,31 @@ export function resolveEffectiveToken(explicitTokenFlag?: string): string | null
   return null;
 }
 
+export async function validateTokenWithBackend(
+  apiUrl: string,
+  token: string,
+): Promise<{ valid: boolean; user?: StoredSession['user']; unreachable?: boolean }> {
+  try {
+    const res = await fetch(`${apiUrl}/auth/me`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (res.ok) {
+      const user = (await res.json()) as StoredSession['user'];
+      return { valid: true, user };
+    }
+
+    if (res.status === 401) {
+      return { valid: false };
+    }
+
+    return { valid: true };
+  } catch {
+    // Network error (backend might be offline or restarting)
+    return { valid: true, unreachable: true };
+  }
+}
+

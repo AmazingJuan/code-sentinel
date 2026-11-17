@@ -7,7 +7,13 @@ import { parseArgs } from 'node:util';
 
 import { PortScannerAdapter } from './adapters/port-scanner/port-scanner-adapter.js';
 import { SemgrepAdapter } from './adapters/semgrep/semgrep-adapter.js';
-import { clearSession, getStoredSession, resolveEffectiveToken } from './auth/credentials.js';
+import {
+  clearSession,
+  getStoredSession,
+  resolveEffectiveToken,
+  saveSession,
+  validateTokenWithBackend,
+} from './auth/credentials.js';
 import { openBrowser, startLoginServer } from './auth/login-server.js';
 import { DEFAULT_API_URL } from './config/endpoint.js';
 import type { NormalizedFinding } from './domain/finding.js';
@@ -303,21 +309,29 @@ export function handleLogoutCommand(): number {
   return 0;
 }
 
-export function handleWhoamiCommand(): number {
+export async function handleWhoamiCommand(apiUrl?: string): Promise<number> {
   const session = getStoredSession();
   if (!session || !session.token) {
     console.log(' Not logged in. Run "code-sentinel login" to authenticate.');
     return 1;
   }
+  const effectiveUrl = apiUrl || session.apiUrl || DEFAULT_API_URL;
+  const check = await validateTokenWithBackend(effectiveUrl, session.token);
   console.log('----------------------------------------------------');
   console.log(' Code Sentinel - Current Session');
   console.log('----------------------------------------------------');
-  console.log(` User     : ${session.user?.name || 'N/A'}`);
-  console.log(` Email    : ${session.user?.email || 'N/A'}`);
-  console.log(` Role     : ${session.user?.role || 'N/A'}`);
-  console.log(` API URL  : ${session.apiUrl || DEFAULT_API_URL}`);
+  const statusStr = check.valid
+    ? check.unreachable
+      ? 'Active (backend unreachable)'
+      : 'Active (verified)'
+    : 'Expired or Invalid';
+  console.log(` Status   : ${statusStr}`);
+  console.log(` User     : ${check.user?.name || session.user?.name || 'N/A'}`);
+  console.log(` Email    : ${check.user?.email || session.user?.email || 'N/A'}`);
+  console.log(` Role     : ${check.user?.role || session.user?.role || 'N/A'}`);
+  console.log(` API URL  : ${effectiveUrl}`);
   console.log(` Saved At : ${session.savedAt}`);
-  return 0;
+  return check.valid ? 0 : 1;
 }
 
 export async function runCli(argv: string[]): Promise<number> {
@@ -363,7 +377,7 @@ export async function runCli(argv: string[]): Promise<number> {
   }
 
   if (command === 'whoami') {
-    return handleWhoamiCommand();
+    return await handleWhoamiCommand(effectiveApiUrl);
   }
 
   if (command !== 'scan') {
@@ -384,6 +398,21 @@ export async function runCli(argv: string[]): Promise<number> {
 
   let token = resolveEffectiveToken(values.token);
   const isDryRun = Boolean(values['dry-run']);
+
+  // Validate stored token against backend early so expired sessions prompt for re-auth
+  if (token && !values.token && !process.env.CODE_SENTINEL_TOKEN && !isDryRun) {
+    const check = await validateTokenWithBackend(effectiveApiUrl, token);
+    if (!check.valid) {
+      console.log(' Stored session has expired or is invalid.');
+      clearSession();
+      token = null;
+    } else if (check.user) {
+      const stored = getStoredSession();
+      if (stored) {
+        saveSession({ ...stored, user: check.user });
+      }
+    }
+  }
 
   // If no token is provided and dry-run is not active, attempt interactive web login if TTY
   if (!token && !isDryRun) {
