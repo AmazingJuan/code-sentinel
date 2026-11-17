@@ -1,0 +1,70 @@
+name: Deploy Frontend (GitHub Pages)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/frontend/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pages-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build & Deploy Frontend to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: apps/frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: apps/frontend
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend for GitHub Pages
+        working-directory: apps/frontend
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
+        run: |
+          pnpm run build
+          # SPA 404 fallback for GitHub Pages client-side routing
+          cp dist/index.html dist/404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/frontend/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
