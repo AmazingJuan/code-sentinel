@@ -1,8 +1,13 @@
 {
   "name": "@amazingwalin/code-sentinel-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official CLI for Code Sentinel AppSec and vulnerability management platform",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AmazingJuan/code-sentinel.git",
+    "directory": "apps/cli"
+  },
   "bin": {
     "code-sentinel": "./dist/main.js"
   },
