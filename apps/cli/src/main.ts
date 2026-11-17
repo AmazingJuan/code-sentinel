@@ -342,11 +342,13 @@ export async function runCli(argv: string[]): Promise<number> {
   if (token && !isDryRun) {
     try {
       console.log(' Identifying project for Code Sentinel...');
+      const storedSession = getStoredSession();
       resolvedProject = await resolveOrCreateProject(
         effectiveApiUrl,
         token,
         targetPath,
         values.project,
+        storedSession?.user?.email,
       );
       if (resolvedProject.isNew) {
         console.log(` Auto-registered project: "${resolvedProject.name}" (ID: ${resolvedProject.id})`);
