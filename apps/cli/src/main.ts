@@ -410,11 +410,12 @@ export async function runCli(argv: string[]): Promise<number> {
 
   try {
     console.log(' Syncing scan results to Code Sentinel...');
+    const scanTools = Array.from(new Set(activeAdapters.map((a) => a.toolCategory)));
     const { scanId } = await submitScanToBackend(
       effectiveApiUrl,
       token as string,
       (resolvedProject as ProjectInfo).id,
-      activeAdapters.map((a) => a.sourceTool),
+      scanTools,
       findings,
     );
 
