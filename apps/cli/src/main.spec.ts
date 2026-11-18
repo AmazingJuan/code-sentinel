@@ -88,11 +88,20 @@ describe('Code Sentinel CLI main', () => {
     errSpy.mockRestore();
   });
 
+  it('rejects an unknown --engine value', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const exitCode = await runCli(['scan', '--engine', 'podman', '--dry-run']);
+    expect(exitCode).toBe(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid --engine "podman"'));
+    errSpy.mockRestore();
+  });
+
   it('runs scan in dry-run mode on valid directory', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const runAdaptersSpy = vi.spyOn(runAdaptersModule, 'runAdapters').mockResolvedValue({
       findings: [],
       errors: [],
+      timings: [],
     });
 
     const exitCode = await runCli(['scan', '--target', '.', '--dry-run']);
@@ -116,6 +125,7 @@ describe('Code Sentinel CLI main', () => {
     vi.spyOn(runAdaptersModule, 'runAdapters').mockResolvedValue({
       findings: [],
       errors: [],
+      timings: [],
     });
 
     const originalFetch = globalThis.fetch;

@@ -90,4 +90,35 @@ describe('runAdapters', (): void => {
 
     expect(result.findings[0]).toMatchObject({ sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' });
   });
+
+  it('runs tools in parallel and reports per-tool timings', async (): Promise<void> => {
+    class SlowAdapter extends FakeAdapter {
+      override run(): Promise<string> {
+        return new Promise((resolve): void => {
+          setTimeout((): void => resolve('[]'), 150);
+        });
+      }
+    }
+
+    const startedAt = performance.now();
+    const result = await runAdapters(
+      [new SlowAdapter('Semgrep', 'SAST', '[]'), new SlowAdapter('Gitleaks', 'Secret Scanner', '[]')],
+      target,
+    );
+    const elapsed = performance.now() - startedAt;
+
+    // Sequential execution would take at least 300ms.
+    expect(elapsed).toBeLessThan(280);
+    expect(result.timings.map((timing) => timing.sourceTool)).toEqual(['Semgrep', 'Gitleaks']);
+    expect(result.timings.every((timing) => timing.ok && timing.durationMs >= 100)).toBe(true);
+  });
+
+  it('marks failed tools in timings', async (): Promise<void> => {
+    const result = await runAdapters(
+      [new FakeAdapter('Semgrep', 'SAST', new ToolExecutionError('Semgrep', 'boom'))],
+      target,
+    );
+
+    expect(result.timings[0]).toMatchObject({ sourceTool: 'Semgrep', ok: false });
+  });
 });

@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import { GitleaksAdapter } from './adapters/gitleaks/gitleaks-adapter.js';
-import { SemgrepAdapter } from './adapters/semgrep/semgrep-adapter.js';
+import { GITLEAKS_TOOL, GitleaksAdapter } from './adapters/gitleaks/gitleaks-adapter.js';
+import {
+  isRegistryRulesDisabled,
+  REGISTRY_RULESET,
+  resolveRegistryRules,
+} from './adapters/semgrep/registry-rules.js';
+import { SEMGREP_TOOL, SemgrepAdapter } from './adapters/semgrep/semgrep-adapter.js';
 import {
   clearSession,
   getStoredSession,
@@ -18,8 +23,17 @@ import { openBrowser, startLoginServer } from './auth/login-server.js';
 import { DEFAULT_API_URL } from './config/endpoint.js';
 import type { NormalizedFinding } from './domain/finding.js';
 import type { ToolAdapter } from './domain/tool-adapter.js';
+import {
+  ENGINE_MODES,
+  engineSettingsFromEnv,
+  ExecutionEngine,
+  isEngineMode,
+  type ToolDefinition,
+} from './infra/execution-engine.js';
+import { findManagedAsset, installManagedTool, MANAGED_TOOLS } from './infra/managed-tools.js';
+import { createScanWorkspace, type ScanWorkspace } from './infra/scan-workspace.js';
 import { AdapterRegistry } from './pipeline/adapter-registry.js';
-import { runAdapters } from './pipeline/run-adapters.js';
+import { runAdapters, type ToolTiming } from './pipeline/run-adapters.js';
 import { type ProjectInfo, resolveOrCreateProject } from './project/project-resolver.js';
 
 export { DEFAULT_API_URL };
@@ -33,6 +47,8 @@ export interface CliOptions {
   token?: string;
   dryRun?: boolean;
   tools?: string;
+  engine?: string;
+  refreshRules?: boolean;
   help?: boolean;
   version?: boolean;
 }
@@ -94,6 +110,7 @@ Usage:
 
 Commands:
   scan                  Run security analysis on target directory (default)
+  setup                 Install native scanners and cache rules (no Docker needed afterwards)
   login                 Authenticate via web browser interface
   logout                Clear saved session credentials
   whoami                Show information about the active session
@@ -104,25 +121,102 @@ Options:
   -u, --api-url <url>   Backend API URL (default: ${DEFAULT_API_URL})
   -t, --token <jwt>     Authentication token (default: saved session or env)
       --tools <list>    Comma-separated tools to run: semgrep, gitleaks (default: project tools or all)
+      --engine <mode>   Scanner engine: auto, native, docker (default: auto or CODE_SENTINEL_ENGINE)
+      --refresh-rules   Re-download the cached Semgrep ${REGISTRY_RULESET} ruleset before scanning
       --dry-run         Run scan locally without syncing results to backend
   -h, --help            Show this help message
   -v, --version         Show CLI version
 
+Engines:
+  auto     Use native scanners if installed, otherwise Docker, otherwise download native ones
+  native   Never use Docker (downloads verified gitleaks/opengrep binaries if missing)
+  docker   Always run scanners in containers
+
 Examples:
+  code-sentinel setup
   code-sentinel login
   code-sentinel scan
   code-sentinel scan --target ./src
   code-sentinel scan --dry-run
+  code-sentinel scan --engine native
   code-sentinel whoami
   code-sentinel logout
 `);
 }
 
-export function buildRegistry(): AdapterRegistry {
+export interface RegistryOptions {
+  /** Motor compartido: la detección de Docker y las descargas se hacen una sola vez. */
+  engine?: ExecutionEngine;
+  refreshRules?: boolean;
+}
+
+export function buildRegistry(options: RegistryOptions = {}): AdapterRegistry {
+  const engine = options.engine ?? new ExecutionEngine(engineSettingsFromEnv());
   const registry = new AdapterRegistry();
-  registry.register(new SemgrepAdapter());
-  registry.register(new GitleaksAdapter());
+  registry.register(
+    new SemgrepAdapter({
+      engine,
+      registryRules: (): Promise<string | null> =>
+        isRegistryRulesDisabled()
+          ? Promise.resolve(null)
+          : resolveRegistryRules({ refresh: options.refreshRules, log: engine.settings.log }),
+    }),
+  );
+  registry.register(new GitleaksAdapter({ engine }));
   return registry;
+}
+
+export function formatTimings(timings: readonly ToolTiming[]): string {
+  return timings
+    .map((timing: ToolTiming): string =>
+      `${timing.sourceTool} ${(timing.durationMs / 1000).toFixed(1)}s${timing.ok ? '' : ' (failed)'}`,
+    )
+    .join(' | ');
+}
+
+/** `code-sentinel setup`: deja listos los escáneres nativos y la caché de reglas. */
+export async function handleSetupCommand(engine: ExecutionEngine): Promise<number> {
+  console.log('----------------------------------------------------');
+  console.log(' Code Sentinel - Native Scanner Setup');
+  console.log('----------------------------------------------------');
+  let failures = 0;
+
+  const tools: ToolDefinition[] = [SEMGREP_TOOL, GITLEAKS_TOOL];
+  for (const tool of tools) {
+    try {
+      const existing = engine.findLocalBinary(tool);
+      if (existing) {
+        console.log(` ${tool.sourceTool}: using ${existing}`);
+        continue;
+      }
+      if (!findManagedAsset(tool.managedTool)) {
+        console.log(` ${tool.sourceTool}: no prebuilt binary for this platform; Docker will be used.`);
+        continue;
+      }
+      const installed = await installManagedTool(tool.managedTool, engine.settings.runner, engine.settings.log);
+      console.log(
+        ` ${tool.sourceTool}: installed ${tool.managedTool} v${MANAGED_TOOLS[tool.managedTool].version} (${installed})`,
+      );
+    } catch (error: unknown) {
+      failures++;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(` ${tool.sourceTool}: setup failed (${message})`);
+    }
+  }
+
+  if (isRegistryRulesDisabled()) {
+    console.log(` Semgrep ${REGISTRY_RULESET} ruleset disabled by CODE_SENTINEL_SEMGREP_REGISTRY=off.`);
+  } else {
+    const rulesPath = await resolveRegistryRules({ refresh: true, log: engine.settings.log });
+    if (rulesPath) {
+      console.log(` Semgrep ${REGISTRY_RULESET} ruleset cached at ${rulesPath}`);
+    } else {
+      failures++;
+    }
+  }
+
+  console.log(failures === 0 ? ' Setup complete. Scans will run natively.' : ' Setup finished with errors.');
+  return failures === 0 ? 0 : 1;
 }
 
 export function isAdapterSelected(adapter: ToolAdapter, toolPatterns: string[]): boolean {
@@ -176,14 +270,24 @@ export function enrichFindingsWithLocalCode(
   targetPath: string,
   commitSha: string | null,
 ): NormalizedFinding[] {
+  // Varios findings suelen caer en el mismo archivo: se lee y divide una sola vez.
+  const linesByFile = new Map<string, string[] | null>();
+  const readLines = (fullPath: string): string[] | null => {
+    if (!linesByFile.has(fullPath)) {
+      linesByFile.set(fullPath, existsSync(fullPath) ? readFileSync(fullPath, 'utf8').split('\n') : null);
+    }
+    return linesByFile.get(fullPath) ?? null;
+  };
+
   return findings.map((f) => {
     let snippet: string | null = null;
     if (f.filePath && f.line) {
       try {
         const fullPath = resolve(targetPath, f.filePath);
-        if (existsSync(fullPath)) {
-          const content = readFileSync(fullPath, 'utf8');
-          const lines = content.split('\n');
+        // Nunca leer fuera del proyecto aunque un reporte traiga rutas con "..".
+        const relativePath = relative(targetPath, fullPath);
+        const lines = relativePath.startsWith('..') || isAbsolute(relativePath) ? null : readLines(fullPath);
+        if (lines) {
           const targetLine = f.line;
           const startLine = Math.max(1, targetLine - 2);
           const endLine = Math.min(lines.length, targetLine + 2);
@@ -367,6 +471,8 @@ export async function runCli(argv: string[]): Promise<number> {
       token: { type: 'string', short: 't' },
       'dry-run': { type: 'boolean', default: false },
       tools: { type: 'string' },
+      engine: { type: 'string' },
+      'refresh-rules': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
       version: { type: 'boolean', short: 'v', default: false },
     },
@@ -390,6 +496,19 @@ export async function runCli(argv: string[]): Promise<number> {
       : session?.apiUrl || (values['api-url'] as string) || DEFAULT_API_URL;
 
   const command = positionals[0] || 'scan';
+
+  const engineValue = (values.engine ?? '').trim().toLowerCase();
+  if (engineValue && !isEngineMode(engineValue)) {
+    console.error(`Invalid --engine "${values.engine}". Use one of: ${ENGINE_MODES.join(', ')}.`);
+    return 1;
+  }
+  const engine = new ExecutionEngine(
+    engineSettingsFromEnv(engineValue && isEngineMode(engineValue) ? { mode: engineValue } : {}),
+  );
+
+  if (command === 'setup') {
+    return await handleSetupCommand(engine);
+  }
 
   if (command === 'login') {
     return await handleLoginCommand(effectiveApiUrl);
@@ -483,7 +602,7 @@ export async function runCli(argv: string[]): Promise<number> {
     }
   }
 
-  const registry = buildRegistry();
+  const registry = buildRegistry({ engine, refreshRules: Boolean(values['refresh-rules']) });
   const allAdapters = registry.list();
 
   let requestedTools: string[];
@@ -510,9 +629,37 @@ export async function runCli(argv: string[]): Promise<number> {
 
   const toolsOriginLabel = toolsSource === 'project' ? ' (from project config)' : '';
   console.log(` Active tools${toolsOriginLabel}: ${activeAdapters.map((a: ToolAdapter) => `${a.sourceTool} (${a.toolCategory})`).join(', ') || 'None'}`);
+  console.log(` Engine      : ${engine.settings.mode}`);
+
+  // Solo se copian a un workspace temporal los archivos relevantes (respeta .gitignore y
+  // omite dependencias/builds): es lo que hacía lento el análisis sobre Docker Desktop.
+  let workspace: ScanWorkspace;
+  try {
+    workspace = await createScanWorkspace(targetPath);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(` Error preparing files to scan: ${msg}`);
+    return 1;
+  }
+  const strategyLabel = workspace.strategy === 'git' ? ' (respecting .gitignore)' : '';
+  const skippedLabel =
+    workspace.skippedLargeFiles > 0 ? `, ${workspace.skippedLargeFiles} files over 5 MB skipped` : '';
+  console.log(` Files       : ${workspace.files.length}${strategyLabel}${skippedLabel}`);
   console.log(' Running security analysis...');
 
-  const { findings, errors } = await runAdapters(activeAdapters, { rootPath: targetPath });
+  let pipeline: Awaited<ReturnType<typeof runAdapters>>;
+  try {
+    pipeline =
+      workspace.files.length > 0
+        ? await runAdapters(activeAdapters, { rootPath: workspace.workspaceDir })
+        : { findings: [], errors: [], timings: [] };
+  } finally {
+    workspace.cleanup();
+  }
+  const { findings, errors, timings } = pipeline;
+  if (timings && timings.length > 0) {
+    console.log(` Tool timings: ${formatTimings(timings)}`);
+  }
 
   if (errors.length > 0) {
     console.warn(` Warnings encountered (${errors.length}):`);
@@ -547,7 +694,7 @@ export async function runCli(argv: string[]): Promise<number> {
     console.log(' Syncing scan results to Code Sentinel...');
     const scanTools = Array.from(new Set(activeAdapters.map((a) => a.toolCategory)));
     const gitMeta = detectGitMetadata(targetPath);
-    const enrichedFindings = enrichFindingsWithLocalCode(findings, targetPath, gitMeta.commitSha);
+    const enrichedFindings = enrichFindingsWithLocalCode(findings, workspace.sourceRoot, gitMeta.commitSha);
     const { scanId } = await submitScanToBackend(
       effectiveApiUrl,
       token as string,

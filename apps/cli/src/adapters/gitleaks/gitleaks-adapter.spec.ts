@@ -4,27 +4,22 @@ import { describe, expect, it } from 'vitest';
 
 import { ReportParseError, ToolExecutionError } from '../../domain/errors.js';
 import type { ScanTarget } from '../../domain/tool-adapter.js';
-import type { CommandResult, CommandRunner } from '../../infra/command-runner.js';
-import { GITLEAKS_IMAGE, GitleaksAdapter } from './gitleaks-adapter.js';
+import type { CommandResult } from '../../infra/command-runner.js';
+import type { ToolExecutor, ToolRunRequest } from '../../infra/tool-executor.js';
+import { GitleaksAdapter } from './gitleaks-adapter.js';
 
-class StubRunner implements CommandRunner {
-  receivedCommand = '';
-  receivedArgs: string[] = [];
+class StubExecutor implements ToolExecutor {
+  readonly kind = 'native';
+  readonly description = 'stub';
+  readonly binaryName = 'gitleaks';
+  lastRequest: ToolRunRequest | null = null;
 
-  constructor(private readonly result: CommandResult) {}
+  constructor(private readonly resultOrError: CommandResult | Error) {}
 
-  async run(command: string, args: string[]): Promise<CommandResult> {
-    this.receivedCommand = command;
-    this.receivedArgs = args;
-    return this.result;
-  }
-}
-
-class ThrowingRunner implements CommandRunner {
-  constructor(private readonly error: Error) {}
-
-  async run(): Promise<CommandResult> {
-    throw this.error;
+  async execute(request: ToolRunRequest): Promise<CommandResult> {
+    this.lastRequest = request;
+    if (this.resultOrError instanceof Error) throw this.resultOrError;
+    return this.resultOrError;
   }
 }
 
@@ -33,36 +28,44 @@ const fixtureReport = readFileSync(
   'utf8',
 );
 
-const target: ScanTarget = { rootPath: '/projects/my-app' };
+const target: ScanTarget = { rootPath: '/tmp/code-sentinel-ws-1' };
 
-function buildAdapter(result: CommandResult): {
+function buildAdapter(resultOrError: CommandResult | Error): {
   adapter: GitleaksAdapter;
-  runner: StubRunner;
+  executor: StubExecutor;
 } {
-  const runner = new StubRunner(result);
-  const adapter = new GitleaksAdapter({ runner });
-  return { adapter, runner };
+  const executor = new StubExecutor(resultOrError);
+  const adapter = new GitleaksAdapter({ executor: (): Promise<ToolExecutor> => Promise.resolve(executor) });
+  return { adapter, executor };
 }
 
-describe('GitleaksAdapter.buildDockerArgs', (): void => {
-  it('mounts rootPath to /path in read-only and runs with network none and redact', (): void => {
+describe('GitleaksAdapter.buildArgs', (): void => {
+  it('scans the current directory without git history, redacting secrets into the report path', (): void => {
     const adapter = new GitleaksAdapter();
-    const args = adapter.buildDockerArgs(target);
+    const args = adapter.buildArgs({ inputs: {}, reportPath: '/tmp/report.json' });
 
-    expect(args).toContain('run');
-    expect(args).toContain('--network');
-    expect(args).toContain('none');
-    expect(args).toContain('/projects/my-app:/path:ro');
-    expect(args).toContain(GITLEAKS_IMAGE);
-    expect(args).toContain('detect');
-    expect(args).toContain('--source');
-    expect(args).toContain('/path');
-    expect(args).toContain('--redact');
-    expect(args).toContain('--no-banner');
+    expect(args).toEqual([
+      'detect',
+      '--source',
+      '.',
+      '--report-format',
+      'json',
+      '--report-path',
+      '/tmp/report.json',
+      '--redact',
+      '--no-git',
+      '--no-banner',
+    ]);
   });
 });
 
 describe('GitleaksAdapter.run', (): void => {
+  it('runs the executor on the scan workspace', async (): Promise<void> => {
+    const { adapter, executor } = buildAdapter({ exitCode: 0, stdout: '[]', stderr: '' });
+    await adapter.run(target);
+    expect(executor.lastRequest?.workspace).toBe(target.rootPath);
+  });
+
   it('returns stdout when exit code is 0 (no leaks)', async (): Promise<void> => {
     const { adapter } = buildAdapter({ exitCode: 0, stdout: '[]', stderr: '' });
     const output = await adapter.run(target);
@@ -98,12 +101,10 @@ describe('GitleaksAdapter.run', (): void => {
   });
 
   it('wraps execution failure into ToolExecutionError', async (): Promise<void> => {
-    const adapter = new GitleaksAdapter({
-      runner: new ThrowingRunner(new Error('docker daemon not running')),
-    });
+    const { adapter } = buildAdapter(new Error('docker daemon not running'));
 
     await expect(adapter.run(target)).rejects.toThrow(ToolExecutionError);
-    await expect(adapter.run(target)).rejects.toThrow('could not start Docker');
+    await expect(adapter.run(target)).rejects.toThrow('could not start stub');
   });
 });
 
@@ -134,6 +135,15 @@ describe('GitleaksAdapter.parse', (): void => {
     expect(findings[1].severity).toBe('high');
     expect(findings[1].filePath).toBe('src/services/api.ts');
     expect(findings[1].line).toBe(45);
+  });
+
+  it('normalizes native Windows, relative and /workspace paths to project-relative paths', (): void => {
+    const report = (file: string): string =>
+      JSON.stringify([{ RuleID: 'generic-api-key', Description: '', StartLine: 1, File: file }]);
+
+    expect(adapter.parse(report('src\\config\\keys.ts'))[0].filePath).toBe('src/config/keys.ts');
+    expect(adapter.parse(report('./src/keys.ts'))[0].filePath).toBe('src/keys.ts');
+    expect(adapter.parse(report('/workspace/src/keys.ts'))[0].filePath).toBe('src/keys.ts');
   });
 
   it('throws ReportParseError on invalid JSON', (): void => {
