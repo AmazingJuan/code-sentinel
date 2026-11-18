@@ -1,52 +1,63 @@
 import { ReportParseError, ToolExecutionError } from '../../domain/errors.js';
 import type { ParsedFinding, ToolCategory } from '../../domain/finding.js';
 import type { ScanTarget, ToolAdapter } from '../../domain/tool-adapter.js';
+import type { CommandResult } from '../../infra/command-runner.js';
 import {
-  type CommandResult,
-  type CommandRunner,
-  NodeCommandRunner,
-} from '../../infra/command-runner.js';
+  engineSettingsFromEnv,
+  ExecutionEngine,
+  type ToolDefinition,
+} from '../../infra/execution-engine.js';
+import type { ResolvedToolPaths, ToolExecutor } from '../../infra/tool-executor.js';
 import { type GitleaksResult, isGitleaksReport } from './gitleaks-report.js';
 import { mapGitleaksSeverity } from './gitleaks-severity.js';
 
 export const GITLEAKS_IMAGE = 'ghcr.io/gitleaks/gitleaks:v8.18.2';
-const CONTAINER_TARGET_DIR = '/path';
+
+/** Cómo se ejecuta Gitleaks en cada motor. El ENTRYPOINT de la imagen ya es `gitleaks`. */
+export const GITLEAKS_TOOL: ToolDefinition = {
+  sourceTool: 'Gitleaks',
+  binaryEnvVar: 'CODE_SENTINEL_GITLEAKS_PATH',
+  pathCandidates: ['gitleaks'],
+  managedTool: 'gitleaks',
+  image: GITLEAKS_IMAGE,
+  containerCommand: [],
+  containerBinaryName: 'gitleaks',
+};
 
 export interface GitleaksAdapterOptions {
-  runner?: CommandRunner;
+  /** Provee el ejecutor (nativo o contenedor). Por defecto lo resuelve el motor según el entorno. */
+  executor?: () => Promise<ToolExecutor>;
+  engine?: ExecutionEngine;
 }
 
 /**
- * RF-012: Escaneo de secretos expuestos mediante Gitleaks en Docker (NFR-007).
- * Identifica tokens, credenciales y secretos sin transmitir el código ni almacenar
- * secretos en texto plano.
+ * RF-012: Escaneo de secretos expuestos mediante Gitleaks, nativo o en contenedor sin red
+ * (NFR-007). Identifica tokens, credenciales y secretos sin transmitir el código ni
+ * almacenar secretos en texto plano (`--redact`).
  */
 export class GitleaksAdapter implements ToolAdapter {
   readonly sourceTool = 'Gitleaks';
   readonly toolCategory: ToolCategory = 'Secret Scanner';
 
-  private readonly runner: CommandRunner;
+  private readonly executorProvider: () => Promise<ToolExecutor>;
 
   constructor(options: GitleaksAdapterOptions = {}) {
-    this.runner = options.runner ?? new NodeCommandRunner();
+    this.executorProvider =
+      options.executor ??
+      ((): Promise<ToolExecutor> =>
+        (options.engine ?? new ExecutionEngine(engineSettingsFromEnv())).executorFor(GITLEAKS_TOOL));
   }
 
-  buildDockerArgs(target: ScanTarget): string[] {
+  /** Argumentos de la herramienta; se ejecuta con cwd en el workspace y analiza ".". */
+  buildArgs(paths: ResolvedToolPaths): string[] {
     return [
-      'run',
-      '--rm',
-      '--network',
-      'none',
-      '-v',
-      `${target.rootPath}:${CONTAINER_TARGET_DIR}:ro`,
-      GITLEAKS_IMAGE,
       'detect',
       '--source',
-      CONTAINER_TARGET_DIR,
+      '.',
       '--report-format',
       'json',
       '--report-path',
-      '/dev/stdout',
+      paths.reportPath,
       '--redact',
       '--no-git',
       '--no-banner',
@@ -54,7 +65,18 @@ export class GitleaksAdapter implements ToolAdapter {
   }
 
   async run(target: ScanTarget): Promise<string> {
-    const result = await this.execute(this.buildDockerArgs(target));
+    const executor = await this.prepareExecutor();
+
+    let result: CommandResult;
+    try {
+      result = await executor.execute({
+        workspace: target.rootPath,
+        buildArgs: (paths: ResolvedToolPaths): string[] => this.buildArgs(paths),
+      });
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ToolExecutionError(this.sourceTool, `could not start ${executor.description} (${detail})`);
+    }
 
     // Gitleaks: exit code 0 = no leaks found; exit code 1 = leaks found.
     // However, Gitleaks also exits with code 1 on command/syntax errors.
@@ -107,12 +129,12 @@ export class GitleaksAdapter implements ToolAdapter {
     return report.map((item: GitleaksResult): ParsedFinding => this.toParsedFinding(item));
   }
 
-  private async execute(args: string[]): Promise<CommandResult> {
+  private async prepareExecutor(): Promise<ToolExecutor> {
     try {
-      return await this.runner.run('docker', args);
+      return await this.executorProvider();
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      throw new ToolExecutionError(this.sourceTool, `could not start Docker (${detail})`);
+      throw new ToolExecutionError(this.sourceTool, detail);
     }
   }
 
@@ -130,10 +152,14 @@ export class GitleaksAdapter implements ToolAdapter {
   }
 }
 
-/** Quita "/path/" del inicio de las rutas de Gitleaks para hacerlas relativas al proyecto. */
+/**
+ * Normaliza a "/" y quita "./" o el directorio del contenedor ("/workspace/" actual,
+ * "/path/" de reportes anteriores) para dejar rutas relativas al proyecto.
+ */
 function toProjectRelativePath(filePath: string): string {
   return filePath
     .replaceAll('\\', '/')
-    .replace(new RegExp(`^${CONTAINER_TARGET_DIR}/`), '')
+    .replace(/^\.\//, '')
+    .replace(/^\/(?:workspace|path)\//, '')
     .replace(/^\//, '');
 }

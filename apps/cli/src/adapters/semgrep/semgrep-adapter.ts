@@ -4,16 +4,30 @@ import { fileURLToPath } from 'node:url';
 import { ReportParseError, ToolExecutionError } from '../../domain/errors.js';
 import type { ParsedFinding, ToolCategory } from '../../domain/finding.js';
 import type { ScanTarget, ToolAdapter } from '../../domain/tool-adapter.js';
+import type { CommandResult } from '../../infra/command-runner.js';
 import {
-  type CommandResult,
-  type CommandRunner,
-  NodeCommandRunner,
-} from '../../infra/command-runner.js';
+  engineSettingsFromEnv,
+  ExecutionEngine,
+  type ToolDefinition,
+} from '../../infra/execution-engine.js';
+import type { ResolvedToolPaths, ToolExecutor } from '../../infra/tool-executor.js';
+import { isRegistryRulesDisabled, resolveRegistryRules } from './registry-rules.js';
 import { isSemgrepReport, type SemgrepResult } from './semgrep-report.js';
 import { mapSemgrepSeverity } from './semgrep-severity.js';
 
 /** Versión fija de la imagen: el mismo código siempre da el mismo resultado. */
 export const SEMGREP_IMAGE = 'semgrep/semgrep:1.181.1';
+
+/** Cómo se ejecuta Semgrep en cada motor. Opengrep (fork LGPL) es el binario nativo gestionado. */
+export const SEMGREP_TOOL: ToolDefinition = {
+  sourceTool: 'Semgrep',
+  binaryEnvVar: 'CODE_SENTINEL_SEMGREP_PATH',
+  pathCandidates: ['semgrep', 'opengrep'],
+  managedTool: 'opengrep',
+  image: SEMGREP_IMAGE,
+  containerCommand: ['semgrep'],
+  containerBinaryName: 'semgrep',
+};
 
 /** Resuelve la ruta al directorio de reglas tanto en desarrollo como en distribución npm. */
 export function resolveRulesDir(): string {
@@ -32,58 +46,72 @@ export function resolveRulesDir(): string {
   return pkgRules;
 }
 
-const CONTAINER_SOURCE_DIR = '/src';
-const CONTAINER_RULES_DIR = '/rules';
-const EXCLUDED_DIRS = ['node_modules', 'dist', 'coverage'] as const;
-
 export interface SemgrepAdapterOptions {
-  runner?: CommandRunner;
+  /** Provee el ejecutor (nativo o contenedor). Por defecto lo resuelve el motor según el entorno. */
+  executor?: () => Promise<ToolExecutor>;
+  engine?: ExecutionEngine;
   rulesDir?: string;
+  /** Ruta local del ruleset del registry, o null para usar solo las reglas propias. */
+  registryRules?: () => Promise<string | null>;
 }
 
-/** RF-011: análisis estático con Semgrep CE, corriendo en Docker sin red (NFR-007). */
+/** RF-011: análisis estático con Semgrep CE u Opengrep, siempre sin red (NFR-007). */
 export class SemgrepAdapter implements ToolAdapter {
   readonly sourceTool = 'Semgrep';
   readonly toolCategory: ToolCategory = 'SAST';
 
-  private readonly runner: CommandRunner;
+  private readonly executorProvider: () => Promise<ToolExecutor>;
+  private readonly registryRules: () => Promise<string | null>;
   private readonly rulesDir: string;
 
   constructor(options: SemgrepAdapterOptions = {}) {
-    this.runner = options.runner ?? new NodeCommandRunner();
+    this.executorProvider =
+      options.executor ??
+      ((): Promise<ToolExecutor> =>
+        (options.engine ?? new ExecutionEngine(engineSettingsFromEnv())).executorFor(SEMGREP_TOOL));
+    this.registryRules =
+      options.registryRules ??
+      ((): Promise<string | null> =>
+        isRegistryRulesDisabled()
+          ? Promise.resolve(null)
+          : resolveRegistryRules({ log: (message: string): void => console.log(` ${message}`) }));
     this.rulesDir = options.rulesDir ?? resolveRulesDir();
   }
 
-  buildDockerArgs(target: ScanTarget): string[] {
-    const excludeArgs = EXCLUDED_DIRS.flatMap((dir: string): string[] => ['--exclude', dir]);
+  /** Argumentos de la herramienta; se ejecuta con cwd en el workspace y analiza ".". */
+  buildArgs(binaryName: string, paths: ResolvedToolPaths): string[] {
+    const configArgs = ['registry', 'rules']
+      .filter((name: string): boolean => name in paths.inputs)
+      .flatMap((name: string): string[] => ['--config', paths.inputs[name]]);
     return [
-      'run',
-      '--rm',
-      '-v',
-      `${target.rootPath}:${CONTAINER_SOURCE_DIR}:ro`,
-      '-v',
-      `${this.rulesDir}:${CONTAINER_RULES_DIR}:ro`,
-      '-w',
-      CONTAINER_SOURCE_DIR,
-      SEMGREP_IMAGE,
-      'semgrep',
       'scan',
       '--quiet',
-      '--config',
-      'p/default',
-      '--config',
-      CONTAINER_RULES_DIR,
       '--json',
-      '--metrics=off',
+      // Opengrep no tiene telemetría ni acepta el flag.
+      ...(binaryName === 'opengrep' ? [] : ['--metrics=off']),
       '--disable-version-check',
-      '--no-git-ignore',
-      ...excludeArgs,
+      ...configArgs,
       '.',
     ];
   }
 
   async run(target: ScanTarget): Promise<string> {
-    const result = await this.execute(this.buildDockerArgs(target));
+    const executor = await this.prepareExecutor();
+    const registryRulesPath = await this.registryRules();
+    const inputs: Record<string, string> = { rules: this.rulesDir };
+    if (registryRulesPath) inputs.registry = registryRulesPath;
+
+    let result: CommandResult;
+    try {
+      result = await executor.execute({
+        workspace: target.rootPath,
+        inputs,
+        buildArgs: (paths: ResolvedToolPaths): string[] => this.buildArgs(executor.binaryName, paths),
+      });
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ToolExecutionError(this.sourceTool, `could not start ${executor.description} (${detail})`);
+    }
 
     // Semgrep exits with 0 regardless of findings; any non-zero exit is a real failure.
     if (result.exitCode !== 0) {
@@ -94,6 +122,15 @@ export class SemgrepAdapter implements ToolAdapter {
       );
     }
     return result.stdout;
+  }
+
+  private async prepareExecutor(): Promise<ToolExecutor> {
+    try {
+      return await this.executorProvider();
+    } catch (error: unknown) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new ToolExecutionError(this.sourceTool, detail);
+    }
   }
 
   parse(rawReport: string): ParsedFinding[] {
@@ -119,15 +156,6 @@ export class SemgrepAdapter implements ToolAdapter {
     return report.results.map((semgrepResult: SemgrepResult): ParsedFinding =>
       this.toParsedFinding(semgrepResult),
     );
-  }
-
-  private async execute(args: string[]): Promise<CommandResult> {
-    try {
-      return await this.runner.run('docker', args);
-    } catch (error: unknown) {
-      const detail = error instanceof Error ? error.message : String(error);
-      throw new ToolExecutionError(this.sourceTool, `could not start Docker (${detail})`);
-    }
   }
 
   private toParsedFinding(semgrepResult: SemgrepResult): ParsedFinding {
@@ -164,7 +192,10 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 }
 
-/** Quita "./" o "/src/" del inicio: el backend espera rutas relativas a la raíz del proyecto. */
+/** Normaliza a "/" y quita "./" o el directorio del contenedor: el backend espera rutas relativas. */
 function toProjectRelativePath(semgrepPath: string): string {
-  return semgrepPath.replace(/^\.\//, '').replace(new RegExp(`^${CONTAINER_SOURCE_DIR}/`), '');
+  return semgrepPath
+    .replaceAll('\\', '/')
+    .replace(/^\.\//, '')
+    .replace(/^\/(?:workspace|src)\//, '');
 }
