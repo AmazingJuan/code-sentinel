@@ -24,6 +24,8 @@ jobs:
   publish:
     name: Build & Publish to npm Registry
     runs-on: ubuntu-latest
+    env:
+      CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

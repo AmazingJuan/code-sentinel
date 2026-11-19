@@ -9,7 +9,9 @@ const distDir = resolve(rootDir, 'dist');
 
 // The backend URL is baked in at build time; CODE_SENTINEL_API_URL still overrides it at runtime.
 const targetUrl =
-  process.env.CODE_SENTINEL_API_URL || process.env.VITE_API_URL || 'http://localhost:8000';
+  process.env.CODE_SENTINEL_API_URL ||
+  process.env.VITE_API_URL ||
+  'https://code-sentinel-api.onrender.com';
 try {
   const { protocol } = new URL(targetUrl);
   if (protocol !== 'http:' && protocol !== 'https:') throw new Error(protocol);
