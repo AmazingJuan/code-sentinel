@@ -1,11 +1,11 @@
-// Valores que acepta el backend (ver docs/contracts/scan-contract.md).
-export const TOOL_CATEGORIES = ['SAST', 'Secret Scanner'] as const;
+// Values accepted by the backend (see docs/contracts/scan-contract.md).
+const TOOL_CATEGORIES = ['SAST', 'Secret Scanner'] as const;
 export type ToolCategory = (typeof TOOL_CATEGORIES)[number];
 
-export const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
+const SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
-/** Lo que un adaptador extrae del reporte de su herramienta, sin identidad de herramienta. */
+/** What an adapter extracts from its tool report, without the tool identity. */
 export interface ParsedFinding {
   type: string;
   severity: Severity | null;
@@ -18,7 +18,7 @@ export interface ParsedFinding {
   recommendation: string | null;
 }
 
-/** Formato común que viaja al backend en POST /scans/:id/results (RF-017). */
+/** Common format sent to the backend in POST /scans/:id/results (RF-017). */
 export interface NormalizedFinding extends ParsedFinding {
   toolCategory: ToolCategory;
   sourceTool: string;

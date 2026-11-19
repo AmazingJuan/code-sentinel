@@ -1,5 +1,4 @@
-// apps/frontend/src/interfaces/ProjectInterface.ts
-import type { ScanTool } from './ScanInterface'
+import type { ScanTool } from '@/interfaces/ScanInterface'
 
 export type ProjectStatus = 'pending' | 'completed' | 'failed'
 

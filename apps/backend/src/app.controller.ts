@@ -1,7 +1,5 @@
-// apps/backend/src/app.controller.ts
 import { Controller, Get } from '@nestjs/common';
-import type { HealthCheckResponse } from './app.service';
-import { AppService } from './app.service';
+import { AppService, type HealthCheckResponse } from './app.service';
 
 @Controller()
 export class AppController {

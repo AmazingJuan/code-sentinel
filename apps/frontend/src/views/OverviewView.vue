@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/views/OverviewView.vue -->
 <script setup lang="ts">
 import { Activity, ArrowRight, Bug, ScrollText, ShieldAlert } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
@@ -10,14 +9,19 @@ import SeverityBar from '@/components/SeverityBar.vue'
 import StatCard from '@/components/StatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
-import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
-import type { FindingInterface } from '@/interfaces/FindingInterface'
+import LoadingState from '@/components/LoadingState.vue'
+import type { FindingInterface, FindingSeverity } from '@/interfaces/FindingInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
-import { FindingService } from '@/services/FindingService'
-import { ScanService } from '@/services/ScanService'
+import type { SeverityCounts } from '@/interfaces/SeverityCountsInterface'
+import type { TerminalLine } from '@/interfaces/TerminalInterface'
 import { extractErrorMessage } from '@/services/ErrorHelper'
+import { FindingService } from '@/services/FindingService'
+import { formatDate, severityCountClass as severityClass } from '@/services/FormatHelper'
+import { ScanService } from '@/services/ScanService'
+
+const SEVERITIES: FindingSeverity[] = ['critical', 'high', 'medium', 'low']
 
 const scans = ref<ScanInterface[]>([])
 const findings = ref<FindingInterface[]>([])
@@ -53,7 +57,7 @@ const recentFindings = computed<FindingInterface[]>(() =>
 )
 
 // RF-029: calculate aggregate counters from the project summaries (derived from scans).
-const aggregate = computed<{ critical: number; high: number; medium: number; low: number }>(() => {
+const aggregate = computed<SeverityCounts>(() => {
   const summaries = selectedProjectId.value
     ? projectSummaries.value.filter(
         (project) => project.projectId === selectedProjectId.value,
@@ -101,25 +105,72 @@ async function loadOverview(): Promise<void> {
   }
 }
 
-function severityClass(value: number, tone: 'critical' | 'high' | 'medium' | 'low'): string {
-  if (value === 0) return 'text-muted-foreground/40'
-  const map = {
-    critical: 'text-critical',
-    high: 'text-high',
-    medium: 'text-medium',
-    low: 'text-low',
-  }
-  return map[tone]
-}
+const latestProjectName = computed<string>(
+  () => latestDisplayScan.value?.project?.name ?? 'code-sentinel',
+)
 
-function formatDate(value: string | null): string {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
+const terminalLines = computed<TerminalLine[]>(() => {
+  const scan = latestDisplayScan.value
+  return [
+    [
+      { text: '$ ', tone: 'prompt' },
+      { text: `codesentinel scan ./${latestProjectName.value}`, tone: 'default' },
+    ],
+    [],
+    [{ text: 'Code Sentinel v1.0.0', tone: 'bold' }],
+    [{ text: 'Security Analysis Engine', tone: 'dim' }],
+    [],
+    [{ text: `Project: ./${latestProjectName.value}`, tone: 'dim' }],
+    [],
+    [
+      { text: '[1/4] Running SAST analysis............... ', tone: 'default' },
+      { text: 'OK', tone: 'green' },
+    ],
+    [
+      { text: '[2/4] Scanning for hardcoded secrets...... ', tone: 'default' },
+      { text: 'OK', tone: 'green' },
+    ],
+    [
+      { text: '[3/4] Scanning open ports................. ', tone: 'default' },
+      { text: 'OK', tone: 'green' },
+    ],
+    [
+      { text: '[4/4] Normalizing findings................ ', tone: 'default' },
+      { text: 'OK', tone: 'green' },
+    ],
+    [],
+    [{ text: 'Processing results...', tone: 'dim' }],
+    [
+      { text: 'Storing scan results............... ', tone: 'default' },
+      { text: 'OK', tone: 'green' },
+    ],
+    [],
+    [{ text: '--------------------------------------------', tone: 'rule' }],
+    [{ text: ' SCAN COMPLETED', tone: 'bold' }],
+    [{ text: '--------------------------------------------', tone: 'rule' }],
+    [],
+    [
+      { text: 'CRITICAL    ', tone: 'default' },
+      { text: String(scan?.criticalCount ?? 0), tone: 'critical' },
+    ],
+    [
+      { text: 'HIGH        ', tone: 'default' },
+      { text: String(scan?.highCount ?? 0), tone: 'high' },
+    ],
+    [
+      { text: 'MEDIUM      ', tone: 'default' },
+      { text: String(scan?.mediumCount ?? 0), tone: 'medium' },
+    ],
+    [
+      { text: 'LOW         ', tone: 'default' },
+      { text: String(scan?.lowCount ?? 0), tone: 'low' },
+    ],
+    [],
+    [{ text: `Total findings: ${scan?.totalCount ?? 0}`, tone: 'default' }],
+    [{ text: 'Report generated successfully.', tone: 'green' }],
+    [{ text: `Scan ID: #${scan?.scanNumber ?? '-'}`, tone: 'cyan' }],
+  ]
+})
 
 onMounted(loadOverview)
 </script>
@@ -139,8 +190,7 @@ onMounted(loadOverview)
           <select
             id="project-scope-select"
             v-model="selectedProjectId"
-            aria-label="Filter overview by project scope"
-            class="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                class="h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
           >
             <option :value="undefined">All projects</option>
             <option
@@ -199,80 +249,14 @@ onMounted(loadOverview)
         <h2 class="text-sm font-medium text-muted-foreground">Latest scan execution</h2>
         <span class="font-mono text-xs text-muted-foreground">
           scan #{{ latestDisplayScan?.scanNumber ?? '-' }} ·
-          {{ latestDisplayScan?.project?.name ?? 'code-sentinel' }}
+          {{ latestProjectName }}
         </span>
       </div>
       <div class="grid gap-4 lg:grid-cols-5">
         <TerminalWindow
           class="lg:col-span-3"
           title="zsh - ~/projects/code-sentinel"
-          :lines="[
-            [
-              { text: '$ ', tone: 'prompt' },
-              {
-                text: `codesentinel scan ./${latestDisplayScan?.project?.name ?? 'code-sentinel'}`,
-                tone: 'default',
-              },
-            ],
-            [],
-            [{ text: 'Code Sentinel v1.0.0', tone: 'bold' }],
-            [{ text: 'Security Analysis Engine', tone: 'dim' }],
-            [],
-            [
-              {
-                text: `Project: ./${latestDisplayScan?.project?.name ?? 'code-sentinel'}`,
-                tone: 'dim',
-              },
-            ],
-            [],
-            [
-              { text: '[1/4] Running SAST analysis............... ', tone: 'default' },
-              { text: 'OK', tone: 'green' },
-            ],
-            [
-              { text: '[2/4] Scanning for hardcoded secrets...... ', tone: 'default' },
-              { text: 'OK', tone: 'green' },
-            ],
-            [
-              { text: '[3/4] Scanning open ports................. ', tone: 'default' },
-              { text: 'OK', tone: 'green' },
-            ],
-            [
-              { text: '[4/4] Normalizing findings................ ', tone: 'default' },
-              { text: 'OK', tone: 'green' },
-            ],
-            [],
-            [{ text: 'Processing results...', tone: 'dim' }],
-            [
-              { text: 'Storing scan results............... ', tone: 'default' },
-              { text: 'OK', tone: 'green' },
-            ],
-            [],
-            [{ text: '--------------------------------------------', tone: 'rule' }],
-            [{ text: ' SCAN COMPLETED', tone: 'bold' }],
-            [{ text: '--------------------------------------------', tone: 'rule' }],
-            [],
-            [
-              { text: 'CRITICAL    ', tone: 'default' },
-              { text: String(latestDisplayScan?.criticalCount ?? 0), tone: 'critical' },
-            ],
-            [
-              { text: 'HIGH        ', tone: 'default' },
-              { text: String(latestDisplayScan?.highCount ?? 0), tone: 'high' },
-            ],
-            [
-              { text: 'MEDIUM      ', tone: 'default' },
-              { text: String(latestDisplayScan?.mediumCount ?? 0), tone: 'medium' },
-            ],
-            [
-              { text: 'LOW         ', tone: 'default' },
-              { text: String(latestDisplayScan?.lowCount ?? 0), tone: 'low' },
-            ],
-            [],
-            [{ text: `Total findings: ${latestDisplayScan?.totalCount ?? 0}`, tone: 'default' }],
-            [{ text: 'Report generated successfully.', tone: 'green' }],
-            [{ text: `Scan ID: #${latestDisplayScan?.scanNumber ?? '-'}`, tone: 'cyan' }],
-          ]"
+          :lines="terminalLines"
         />
 
         <div class="rounded-lg border border-border bg-card p-4 lg:col-span-2">
@@ -283,7 +267,7 @@ onMounted(loadOverview)
           </div>
           <div class="mt-4 grid grid-cols-2 gap-2">
             <div
-              v-for="severity in ['critical', 'high', 'medium', 'low'] as const"
+              v-for="severity in SEVERITIES"
               :key="severity"
               class="rounded-md border border-border bg-background/50 p-2.5"
             >

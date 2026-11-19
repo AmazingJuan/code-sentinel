@@ -1,7 +1,8 @@
-<!-- apps/frontend/src/components/StatCard.vue -->
 <script setup lang="ts">
-import type { Component } from 'vue'
 import { computed } from 'vue'
+import type { Component } from 'vue'
+
+type Tone = 'default' | 'critical' | 'high' | 'primary'
 
 const props = withDefaults(
   defineProps<{
@@ -9,7 +10,7 @@ const props = withDefaults(
     value: string | number
     icon: Component
     hint?: string
-    tone?: 'default' | 'critical' | 'high' | 'primary'
+    tone?: Tone
   }>(),
   {
     hint: undefined,
@@ -17,25 +18,22 @@ const props = withDefaults(
   },
 )
 
-const toneRing = computed(() => {
-  const map: Record<string, string> = {
-    default: 'text-muted-foreground bg-muted',
-    primary: 'text-primary bg-primary/10',
-    critical: 'text-critical bg-critical/10',
-    high: 'text-high bg-high/10',
-  }
-  return map[props.tone] ?? map.default
-})
+const TONE_RING: Record<Tone, string> = {
+  default: 'text-muted-foreground bg-muted',
+  primary: 'text-primary bg-primary/10',
+  critical: 'text-critical bg-critical/10',
+  high: 'text-high bg-high/10',
+}
 
-const valueTone = computed(() => {
-  const map: Record<string, string> = {
-    default: 'text-foreground',
-    primary: 'text-foreground',
-    critical: 'text-critical',
-    high: 'text-high',
-  }
-  return map[props.tone] ?? map.default
-})
+const VALUE_TONE: Record<Tone, string> = {
+  default: 'text-foreground',
+  primary: 'text-foreground',
+  critical: 'text-critical',
+  high: 'text-high',
+}
+
+const toneRing = computed<string>(() => TONE_RING[props.tone])
+const valueTone = computed<string>(() => VALUE_TONE[props.tone])
 </script>
 
 <template>

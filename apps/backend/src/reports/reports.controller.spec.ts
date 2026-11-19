@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { Request, Response } from 'express';
-import { User, UserRole } from '../users/entities/user.entity';
+import type { Response } from 'express';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { PublicUser, UserRole } from '../users/entities/user.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { DownloadReportDto } from './dto/download-report.dto';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
-
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
 
 describe('ReportsController', (): void => {
   let controller: ReportsController;
@@ -16,14 +15,12 @@ describe('ReportsController', (): void => {
     exportScanReport: jest.Mock;
   };
 
-  const analyst: Omit<User, 'passwordHash'> = {
+  const analyst: PublicUser = {
     id: 'u-1',
     email: 'analyst@sentinel.local',
     name: 'Analyst',
     role: UserRole.ANALYST,
-    isActive: true,
     createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   const mockRequest = { user: analyst } as AuthenticatedRequest;

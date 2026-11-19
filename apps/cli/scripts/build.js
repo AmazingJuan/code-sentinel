@@ -1,53 +1,58 @@
-import { execSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(__dirname, '..');
+const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const distDir = resolve(rootDir, 'dist');
 
-// 1. Resolve API URL from unified environment variable during build time
-// Priority: CODE_SENTINEL_API_URL > fallback localhost
+// The backend URL is baked in at build time; CODE_SENTINEL_API_URL still overrides it at runtime.
 const targetUrl =
-  process.env.CODE_SENTINEL_API_URL ||
-  process.env.VITE_API_URL ||
-  'http://localhost:8000';
-
+  process.env.CODE_SENTINEL_API_URL || process.env.VITE_API_URL || 'http://localhost:8000';
+try {
+  const { protocol } = new URL(targetUrl);
+  if (protocol !== 'http:' && protocol !== 'https:') throw new Error(protocol);
+} catch {
+  console.error(`[build] Invalid backend API URL: ${targetUrl}`);
+  process.exit(1);
+}
 console.log(`[build] Injecting backend API URL during build: ${targetUrl}`);
 
-// 2. Generate src/config/endpoint.ts
 const endpointConfigPath = resolve(rootDir, 'src/config/endpoint.ts');
 mkdirSync(dirname(endpointConfigPath), { recursive: true });
+writeFileSync(
+  endpointConfigPath,
+  `// Auto-generated during build. Do not edit directly.
+export const DEFAULT_API_URL: string = process.env.CODE_SENTINEL_API_URL || '${targetUrl.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}';
+`,
+  'utf8',
+);
 
-const content = `// Auto-generated during build. Do not edit directly.
-export const DEFAULT_API_URL: string =
-  process.env.CODE_SENTINEL_API_URL || '${targetUrl}';
-`;
+// Start from an empty dist/ so renamed or deleted modules are never published.
+rmSync(distDir, { recursive: true, force: true });
 
-writeFileSync(endpointConfigPath, content, 'utf8');
+const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+execFileSync(process.execPath, [tsc, '-p', 'tsconfig.build.json'], {
+  cwd: rootDir,
+  stdio: 'inherit',
+});
 
-// 3. Run TypeScript compilation
-execSync('tsc -p tsconfig.build.json', { cwd: rootDir, stdio: 'inherit' });
-
-// 4. Copy static assets (rules and auth HTML pages) to dist
-const rulesSrc = resolve(rootDir, 'rules');
-const rulesDest = resolve(rootDir, 'dist/rules');
-if (existsSync(rulesSrc)) {
-  cpSync(rulesSrc, rulesDest, { recursive: true });
+const assets = [
+  ['rules', 'dist/rules'],
+  ['src/auth/pages', 'dist/auth/pages'],
+];
+for (const [source, destination] of assets) {
+  const sourcePath = resolve(rootDir, source);
+  if (existsSync(sourcePath)) {
+    cpSync(sourcePath, resolve(rootDir, destination), { recursive: true });
+  }
 }
 
-const pagesSrc = resolve(rootDir, 'src/auth/pages');
-const pagesDest = resolve(rootDir, 'dist/auth/pages');
-if (existsSync(pagesSrc)) {
-  cpSync(pagesSrc, pagesDest, { recursive: true });
-}
-
-// 5. Ensure executable permissions
 try {
-  execSync('chmod +x dist/main.js', { cwd: rootDir, stdio: 'inherit' });
+  chmodSync(resolve(distDir, 'main.js'), 0o755);
 } catch {
-  // Ignore on platforms without chmod
+  // Platforms without POSIX permissions (Windows) do not need the executable bit.
 }
 
 console.log('[build] CLI build completed successfully.');
-

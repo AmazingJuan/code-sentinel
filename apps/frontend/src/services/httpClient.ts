@@ -1,4 +1,3 @@
-// apps/frontend/src/services/httpClient.ts
 import axios from 'axios'
 
 import { useAuthStore } from '@/stores/authStore'
@@ -22,11 +21,11 @@ httpClient.interceptors.request.use((config) => {
 
 httpClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Only clear session on an explicit 401 from an authenticated endpoint
-    // Never clear on network failures or 5xx server reboots
+  (error: unknown) => {
+    // Only an explicit 401 from an authenticated endpoint ends the session; network
+    // failures and 5xx responses must not log the user out. A failed login is a 401 too.
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      const url = error.config?.url || ''
+      const url = error.config?.url ?? ''
       if (!url.includes('/auth/login')) {
         useAuthStore().logout()
       }

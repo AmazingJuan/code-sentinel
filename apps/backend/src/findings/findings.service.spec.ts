@@ -1,5 +1,8 @@
-// apps/backend/src/findings/findings.service.spec.ts
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { In, ObjectLiteral, Repository } from 'typeorm';
 
@@ -95,7 +98,17 @@ describe('FindingsService', () => {
   });
 
   describe('findAll', (): void => {
-    it('debe retornar los findings de los scans accesibles cuando no hay filtros', async (): Promise<void> => {
+    it('rejects an unknown severity or toolCategory with BadRequestException', async (): Promise<void> => {
+      await expect(
+        service.findAll({ severity: 'urgent' }, analyst),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.findAll({ toolCategory: 'DAST' }, analyst),
+      ).rejects.toThrow(BadRequestException);
+      expect(repository.find).not.toHaveBeenCalled();
+    });
+
+    it('returns the findings of accessible scans when no filters are given', async (): Promise<void> => {
       repository.find!.mockResolvedValue(mockFindings);
       const result = await service.findAll({}, analyst);
       expect(repository.find).toHaveBeenCalledWith({
@@ -105,7 +118,7 @@ describe('FindingsService', () => {
       expect(result).toHaveLength(2);
     });
 
-    it('debe filtrar por severity cuando se provee', async (): Promise<void> => {
+    it('filters by severity when provided', async (): Promise<void> => {
       repository.find!.mockResolvedValue([mockFindings[0]]);
       await service.findAll({ severity: 'critical' }, analyst);
       expect(repository.find).toHaveBeenCalledWith(
@@ -115,20 +128,20 @@ describe('FindingsService', () => {
       );
     });
 
-    it('sin filtros debe retornar el set completo de findings (RF-026)', async (): Promise<void> => {
+    it('returns the full finding set without filters (RF-026)', async (): Promise<void> => {
       repository.find!.mockResolvedValue(mockFindings);
       const result = await service.findAll({}, analyst);
       expect(result).toHaveLength(mockFindings.length);
     });
 
-    it('debe retornar [] si el scanId pedido es de un proyecto no asignado', async (): Promise<void> => {
+    it('returns [] when the requested scanId belongs to an unassigned project', async (): Promise<void> => {
       scansService.findProjectIdForScan.mockResolvedValue('p9');
       const result = await service.findAll({ scanId: 's9' }, analyst);
       expect(result).toEqual([]);
       expect(repository.find).not.toHaveBeenCalled();
     });
 
-    it('debe filtrar por scanId asignado, type, toolCategory y sourceTool (incluyendo categoría legada)', async (): Promise<void> => {
+    it('filters by assigned scanId, type, toolCategory and sourceTool (including the legacy category)', async (): Promise<void> => {
       repository.find!.mockResolvedValue([mockFindings[0]]);
 
       await service.findAll(
@@ -160,7 +173,7 @@ describe('FindingsService', () => {
       );
     });
 
-    it('debe retornar [] cuando el usuario no tiene proyectos asignados o esos proyectos no tienen scans', async (): Promise<void> => {
+    it('returns [] when the user has no assigned projects or those projects have no scans', async (): Promise<void> => {
       projectsService.getAccessibleProjectIds.mockResolvedValueOnce([]);
       expect(await service.findAll({}, analyst)).toEqual([]);
 
@@ -168,7 +181,7 @@ describe('FindingsService', () => {
       expect(await service.findAll({}, analyst)).toEqual([]);
     });
 
-    it('isFindingSeverity debe validar severidades válidas e inválidas', (): void => {
+    it('isFindingSeverity accepts valid severities and rejects invalid ones', (): void => {
       expect(isFindingSeverity('critical')).toBe(true);
       expect(isFindingSeverity('high')).toBe(true);
       expect(isFindingSeverity('medium')).toBe(true);
@@ -178,14 +191,14 @@ describe('FindingsService', () => {
   });
 
   describe('findOne', (): void => {
-    it('debe lanzar NotFoundException cuando el finding no existe', async (): Promise<void> => {
+    it('throws NotFoundException when the finding does not exist', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(null);
       await expect(service.findOne('no-existe', analyst)).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it('debe lanzar ForbiddenException si el finding es de un proyecto no asignado', async (): Promise<void> => {
+    it('throws ForbiddenException when the finding belongs to an unassigned project', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(mockFindings[0]);
       scansService.findProjectIdForScan.mockResolvedValue('p9');
       await expect(service.findOne('f1', analyst)).rejects.toThrow(
@@ -193,7 +206,7 @@ describe('FindingsService', () => {
       );
     });
 
-    it('debe retornar el finding aunque no tenga severity provista (RF-022)', async (): Promise<void> => {
+    it('returns the finding even without a severity (RF-022)', async (): Promise<void> => {
       const findingWithoutSeverity = {
         id: 'f3',
         scanId: 's1',
@@ -207,7 +220,7 @@ describe('FindingsService', () => {
       expect(result.severity).toBeNull();
     });
 
-    it('debe retornar el finding sin filePath/line cuando no aplican (RF-021)', async (): Promise<void> => {
+    it('returns the finding without filePath/line when they do not apply (RF-021)', async (): Promise<void> => {
       const globalFinding = {
         id: 'f4',
         scanId: 's1',
@@ -225,7 +238,7 @@ describe('FindingsService', () => {
       expect(result.line).toBeNull();
     });
 
-    it('debe retornar filePath y line cuando el finding sí tiene ubicación en código (RF-021)', async (): Promise<void> => {
+    it('returns filePath and line when the finding has a code location (RF-021)', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(mockFindings[0]);
 
       const result = await service.findOne('f1', analyst);

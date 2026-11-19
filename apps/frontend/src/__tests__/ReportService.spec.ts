@@ -1,4 +1,3 @@
-// apps/frontend/src/__tests__/ReportService.spec.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { httpClient } from '@/services/httpClient'

@@ -1,4 +1,3 @@
-// apps/frontend/src/services/FindingService.ts
 import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import { httpClient } from '@/services/httpClient'

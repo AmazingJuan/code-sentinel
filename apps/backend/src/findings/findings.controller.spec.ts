@@ -1,11 +1,9 @@
-// apps/backend/src/findings/findings.controller.spec.ts
-import { Request } from 'express';
-import { User, UserRole } from '../users/entities/user.entity';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { UserRole } from '../users/entities/user.entity';
+import { FindingFiltersDto } from './dto/finding-filters.dto';
 import { Finding } from './finding.entity';
 import { FindingsController } from './findings.controller';
 import { FindingsService } from './findings.service';
-
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
 
 describe('FindingsController', (): void => {
   let controller: FindingsController;
@@ -43,29 +41,20 @@ describe('FindingsController', (): void => {
     );
   });
 
-  it('debe delegar findAll con todos los filtros a FindingsService', async (): Promise<void> => {
-    const result = await controller.findAll(
-      request,
-      'SQL Injection',
-      'high',
-      's1',
-      'Semgrep',
-      'SAST',
-    );
+  it('delegates findAll with every filter to FindingsService', async (): Promise<void> => {
+    const filters: FindingFiltersDto = {
+      type: 'SQL Injection',
+      severity: 'high',
+      scanId: 's1',
+      sourceTool: 'Semgrep',
+      toolCategory: 'SAST',
+    };
+    const result = await controller.findAll(request, filters);
     expect(result).toEqual([mockFinding]);
-    expect(findingsService.findAll).toHaveBeenCalledWith(
-      {
-        type: 'SQL Injection',
-        severity: 'high',
-        scanId: 's1',
-        sourceTool: 'Semgrep',
-        toolCategory: 'SAST',
-      },
-      request.user,
-    );
+    expect(findingsService.findAll).toHaveBeenCalledWith(filters, request.user);
   });
 
-  it('debe delegar findOne a FindingsService', async (): Promise<void> => {
+  it('delegates findOne to FindingsService', async (): Promise<void> => {
     const result = await controller.findOne('f1', request);
     expect(result).toEqual(mockFinding);
     expect(findingsService.findOne).toHaveBeenCalledWith('f1', request.user);

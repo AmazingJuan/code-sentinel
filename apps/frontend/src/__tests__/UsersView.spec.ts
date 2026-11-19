@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flushPromises, mount } from '@vue/test-utils';
 
+import ConfirmModal from '@/components/ConfirmModal.vue';
 import type { ManagedUser } from '@/interfaces/UserInterface';
 import { UserService } from '@/services/UserService';
 import UsersView from '@/views/UsersView.vue';
@@ -89,8 +90,7 @@ describe('UsersView.vue', () => {
     expect(wrapper.text()).toContain('User created successfully.');
   });
 
-  it('deletes an existing user', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('deletes an existing user after confirming in the dialog', async () => {
     vi.mocked(UserService.findAll).mockResolvedValueOnce(sampleUsers).mockResolvedValueOnce([sampleUsers[1]!]);
     vi.mocked(UserService.remove).mockResolvedValueOnce(undefined);
 
@@ -100,6 +100,12 @@ describe('UsersView.vue', () => {
     const deleteButtons = wrapper.findAll('button').filter((buttonElement) => buttonElement.text().includes('Delete'));
     expect(deleteButtons.length).toBeGreaterThan(0);
     await deleteButtons[0]!.trigger('click');
+    expect(UserService.remove).not.toHaveBeenCalled();
+
+    const dialog = wrapper.findComponent(ConfirmModal);
+    expect(dialog.props('isOpen')).toBe(true);
+    const confirmButton = dialog.findAll('button').find((buttonElement) => buttonElement.text() === 'Delete');
+    await confirmButton!.trigger('click');
     await flushPromises();
 
     expect(UserService.remove).toHaveBeenCalledWith('u1');

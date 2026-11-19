@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/views/ProjectsView.vue -->
 <script setup lang="ts">
 import { ChevronRight, ExternalLink, FolderKanban, Search, Terminal } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
@@ -6,15 +5,25 @@ import { RouterLink } from 'vue-router'
 
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import LoadingState from '@/components/LoadingState.vue'
-import ErrorState from '@/components/ErrorState.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
-import { ProjectService } from '@/services/ProjectService'
 import { extractErrorMessage } from '@/services/ErrorHelper'
+import { formatDate } from '@/services/FormatHelper'
+import { ProjectService } from '@/services/ProjectService'
+
+interface ProjectStats {
+  total: number
+  critical: number
+  scanned: number
+  pending: number
+}
+
+const CLI_SCAN_COMMAND = 'npx @amazingwalin/code-sentinel-cli scan'
 
 const projects = ref<ProjectInterface[]>([])
-const searchQuery = ref('')
+const searchQuery = ref<string>('')
 const isLoading = ref<boolean>(false)
 const errorMessage = ref<string | null>(null)
 
@@ -30,28 +39,25 @@ async function loadProjects(): Promise<void> {
   }
 }
 
-const filteredProjects = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return projects.value
+const filteredProjects = computed<ProjectInterface[]>(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return projects.value
   return projects.value.filter(
-    (p) => p.name.toLowerCase().includes(q) || p.repo.toLowerCase().includes(q),
+    (project) =>
+      project.name.toLowerCase().includes(query) ||
+      project.repo.toLowerCase().includes(query),
   )
 })
 
-const stats = computed(() => {
+const stats = computed<ProjectStats>(() => {
   const all = projects.value
   return {
     total: all.length,
-    critical: all.filter((p) => p.criticalCount > 0).length,
-    scanned: all.filter((p) => p.status === 'completed').length,
-    pending: all.filter((p) => p.status === 'pending').length,
+    critical: all.filter((project) => project.criticalCount > 0).length,
+    scanned: all.filter((project) => project.status === 'completed').length,
+    pending: all.filter((project) => project.status === 'pending').length,
   }
 })
-
-function formatDate(value: string | null): string {
-  if (!value) return 'Never scanned'
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 onMounted(loadProjects)
 </script>
@@ -64,7 +70,6 @@ onMounted(loadProjects)
       description="Manage registered codebases, security postures, and scan configurations."
     />
 
-    <!-- Quick Stats Cards -->
     <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
       <div class="rounded-lg border border-border bg-card p-4">
         <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Total Projects</p>
@@ -84,7 +89,6 @@ onMounted(loadProjects)
       </div>
     </div>
 
-    <!-- Zero-Touch CLI Discovery Banner -->
     <div class="mb-6 flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
         <div class="flex size-9 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 font-mono text-xs font-bold text-primary">
@@ -99,17 +103,17 @@ onMounted(loadProjects)
       </div>
       <div class="flex items-center gap-2 rounded border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs text-foreground">
         <span class="font-bold text-primary">$</span>
-        <code>npx @amazingwalin/code-sentinel-cli scan</code>
+        <code>{{ CLI_SCAN_COMMAND }}</code>
       </div>
     </div>
 
-    <!-- Search Toolbar -->
     <div class="mb-4">
       <div class="relative">
-        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden="true" />
         <input
           v-model="searchQuery"
-          type="text"
+          type="search"
+          aria-label="Filter projects"
           placeholder="Filter projects by repository or name..."
           class="w-full rounded-md border border-border bg-card py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
@@ -127,7 +131,6 @@ onMounted(loadProjects)
       {{ isLoading ? 'Loading...' : `${projects.length} project${projects.length === 1 ? '' : 's'}` }}
     </p>
 
-    <!-- Table -->
     <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <div v-if="isLoading" class="p-10">
         <LoadingState
@@ -172,7 +175,7 @@ onMounted(loadProjects)
             </td>
 
             <td class="px-5 py-4">
-              <StatusBadge :status="project.status === 'pending' ? 'pending' : project.status === 'completed' ? 'completed' : 'failed'" />
+              <StatusBadge :status="project.status" />
             </td>
 
             <td class="px-5 py-4">
@@ -215,7 +218,7 @@ onMounted(loadProjects)
             </td>
 
             <td class="px-5 py-4 font-mono text-xs text-muted-foreground">
-              {{ formatDate(project.lastScan) }}
+              {{ formatDate(project.lastScan, 'Never scanned') }}
             </td>
 
             <td class="px-3 py-4 text-right">
@@ -231,8 +234,7 @@ onMounted(loadProjects)
         </tbody>
       </table>
 
-      <!-- Empty state when search yields no matches -->
-      <div v-else-if="!isLoading && projects.length > 0 && filteredProjects.length === 0" class="p-8">
+      <div v-else-if="projects.length > 0" class="p-8">
         <EmptyState
           title="No matching projects found"
           :description="`No repositories match '${searchQuery}'. Try searching with a different term.`"
@@ -241,8 +243,7 @@ onMounted(loadProjects)
         />
       </div>
 
-      <!-- Empty state when no projects are registered -->
-      <div v-else-if="!isLoading && projects.length === 0" class="p-8">
+      <div v-else class="p-8">
         <EmptyState
           title="No projects detected yet"
           description="Projects are registered automatically when you run a scan with Code Sentinel CLI."
@@ -250,7 +251,7 @@ onMounted(loadProjects)
           <template #extra>
             <div class="mt-4 flex items-center gap-2 rounded border border-border bg-muted/60 px-3 py-1.5 font-mono text-xs text-foreground">
               <span class="font-bold text-primary">$</span>
-              <code>npx @amazingwalin/code-sentinel-cli scan</code>
+              <code>{{ CLI_SCAN_COMMAND }}</code>
             </div>
           </template>
         </EmptyState>

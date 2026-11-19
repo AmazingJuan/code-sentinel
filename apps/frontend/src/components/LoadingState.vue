@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/LoadingState.vue -->
 <script setup lang="ts">
 import { Loader2 } from 'lucide-vue-next'
 
@@ -22,7 +21,6 @@ withDefaults(
     :class="compact ? 'p-6' : 'min-h-[220px] p-10'"
   >
     <div class="relative flex items-center justify-center">
-      <!-- Glow ring -->
       <div class="absolute size-9 rounded-full bg-primary/20 blur-sm animate-pulse" />
       <Loader2 class="size-7 text-primary animate-spin" />
     </div>

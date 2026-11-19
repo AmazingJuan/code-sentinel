@@ -51,8 +51,8 @@ describe('normalizeFinding', (): void => {
       'toolCategory',
       'type',
     ]);
-    expect((result as Record<string, unknown>).Secret).toBeUndefined();
-    expect((result as Record<string, unknown>).Match).toBeUndefined();
+    expect(result).not.toHaveProperty('Secret');
+    expect(result).not.toHaveProperty('Match');
     expect(result.cwe).toBe('CWE-95');
   });
 

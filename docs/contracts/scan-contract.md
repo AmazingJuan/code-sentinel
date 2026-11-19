@@ -11,7 +11,9 @@ El backend rechaza con 400 cualquier campo que no esté en este contrato (whitel
 3. El CLI valida la ruta del proyecto.
    - Válida → `PATCH /scans/:id/status` `{ status: "running" }`.
    - Inválida → `PATCH /scans/:id/status` `{ status: "failed", errorMessage }` y termina.
-4. Ejecuta las herramientas en local (NFR-007).
+4. Ejecuta las herramientas en local (NFR-007), nativas o en contenedor y siempre sin red.
+   - Si fallan todas las herramientas, cierra el scan con `status: "failed"` y `errorMessage`.
+   - Si falla `PATCH /status` o `POST /results` después de crear el scan, el CLI intenta marcarlo como `failed` para que no quede en `pending`/`running`.
 5. `POST /scans/:id/results` `{ status, errorMessage?, findings[] }` → 200 con conteos.
 
 ## Transiciones (si no, 409)
@@ -40,3 +42,6 @@ El backend rechaza con 400 cualquier campo que no esté en este contrato (whitel
 - `status: "failed"` exige `errorMessage` no vacío y `findings: []`.
 - Los conteos (`criticalCount`, …, `totalCount`) los calcula el backend; el CLI no los envía.
 - Nunca se envían `Secret` ni `Match` de Gitleaks: el backend responde 400.
+- Los findings de Secret Scanner nunca incluyen `codeSnippet`, para no enviar la línea con el secreto.
+- Un segundo `POST /scans/:id/results` sobre el mismo scan responde 409 (la transición se aplica una sola vez, en una transacción).
+- Los ids de ruta que no son UUID y los filtros inválidos responden 400.

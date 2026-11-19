@@ -27,3 +27,7 @@ export class InvalidFindingError extends Error {
     this.name = 'InvalidFindingError';
   }
 }
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

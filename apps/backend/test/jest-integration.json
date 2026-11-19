@@ -1,4 +1,3 @@
-// apps/backend/test/jest-integration.json
 {
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",

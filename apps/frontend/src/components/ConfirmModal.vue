@@ -1,8 +1,8 @@
-<!-- apps/frontend/src/components/ConfirmModal.vue -->
 <script setup lang="ts">
 import { AlertTriangle, X } from 'lucide-vue-next'
+import { onBeforeUnmount, useId, watch } from 'vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     isOpen: boolean
     title: string
@@ -24,6 +24,24 @@ const emit = defineEmits<{
   confirm: []
   cancel: []
 }>()
+
+const titleId = useId()
+const messageId = useId()
+
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && !props.isLoading) emit('cancel')
+}
+
+watch(
+  () => props.isOpen,
+  (isOpen: boolean): void => {
+    if (isOpen) document.addEventListener('keydown', onKeydown)
+    else document.removeEventListener('keydown', onKeydown)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount((): void => document.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
@@ -32,6 +50,8 @@ const emit = defineEmits<{
     class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm transition-opacity"
     role="dialog"
     aria-modal="true"
+    :aria-labelledby="titleId"
+    :aria-describedby="messageId"
   >
     <div
       class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl transition-all"
@@ -44,12 +64,13 @@ const emit = defineEmits<{
           >
             <AlertTriangle class="size-4" />
           </div>
-          <h3 class="font-mono text-base font-semibold text-foreground">
+          <h3 :id="titleId" class="font-mono text-base font-semibold text-foreground">
             {{ title }}
           </h3>
         </div>
         <button
           type="button"
+          :disabled="isLoading"
           @click="emit('cancel')"
           class="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label="Close dialog"
@@ -58,7 +79,7 @@ const emit = defineEmits<{
         </button>
       </div>
 
-      <p class="mt-3 text-sm text-muted-foreground leading-relaxed">
+      <p :id="messageId" class="mt-3 text-sm text-muted-foreground leading-relaxed">
         {{ message }}
       </p>
 

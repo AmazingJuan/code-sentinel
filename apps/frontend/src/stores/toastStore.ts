@@ -1,4 +1,3 @@
-// apps/frontend/src/stores/toastStore.ts
 import { defineStore, getActivePinia } from 'pinia'
 import { ref } from 'vue'
 
@@ -67,21 +66,22 @@ export const useToastStore = defineStore('toast', () => {
   }
 })
 
-/**
- * Safe accessor that returns the toast store if Pinia is active,
- * or a dummy fallback in test environments without an active Pinia.
- */
-export function getToastStore() {
+type ToastStore = Pick<
+  ReturnType<typeof useToastStore>,
+  'show' | 'success' | 'error' | 'warning' | 'info' | 'remove' | 'clear'
+>
+
+/** Returns a no-op store when no Pinia instance is active (e.g. isolated component tests). */
+export function getToastStore(): ToastStore {
   try {
     if (getActivePinia()) {
       return useToastStore()
     }
   } catch {
-    // Pinia not initialized
+    // Fall through to the no-op store.
   }
 
   return {
-    toasts: [] as ToastItem[],
     show: () => '',
     success: () => '',
     error: () => '',

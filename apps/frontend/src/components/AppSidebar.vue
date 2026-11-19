@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/AppSidebar.vue -->
 <script setup lang="ts">
 import {
   FileText,

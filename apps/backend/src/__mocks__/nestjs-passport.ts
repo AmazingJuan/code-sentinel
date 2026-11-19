@@ -1,13 +1,11 @@
-// apps/backend/src/__mocks__/nestjs-passport.ts
-// Mock manual para Jest: @nestjs/passport@12 se publica como ESM puro y el
-// runtime de Jest (CommonJS) no puede parsear su sintaxis "export". Este mock
-// reemplaza el paquete SOLO durante los tests. Los tests de integración
-// sustituyen el JwtAuthGuard con overrideGuard, así que aquí basta con que las
-// clases existan.
+// Jest stub: @nestjs/passport@12 ships as pure ESM, which the CommonJS Jest
+// runtime cannot parse. Integration tests replace JwtAuthGuard through
+// overrideGuard, so these classes only need to exist.
 import { CanActivate, DynamicModule } from '@nestjs/common';
 
-// TypeScript exige `any[]` en el constructor para poder extender una clase
-// recibida como parámetro (patrón mixin).
+// TypeScript requires an `any[]` constructor signature for a class received as
+// a parameter to be extendable (mixin pattern).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Constructor = new (...args: any[]) => object;
 
 export function AuthGuard(): new () => CanActivate {

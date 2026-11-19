@@ -19,12 +19,18 @@ describe('Project Resolver (RF-038)', () => {
 
   describe('extractCanonicalSlug', () => {
     it('extracts owner/repo from HTTPS git URLs', () => {
-      expect(extractCanonicalSlug('https://github.com/EAFIT-Works/juice-shop.git')).toBe('EAFIT-Works/juice-shop');
-      expect(extractCanonicalSlug('https://github.com/bkimminich/juice-shop')).toBe('bkimminich/juice-shop');
+      expect(extractCanonicalSlug('https://github.com/EAFIT-Works/juice-shop.git')).toBe(
+        'EAFIT-Works/juice-shop',
+      );
+      expect(extractCanonicalSlug('https://github.com/bkimminich/juice-shop')).toBe(
+        'bkimminich/juice-shop',
+      );
     });
 
     it('extracts owner/repo from SSH/SCP git URLs', () => {
-      expect(extractCanonicalSlug('git@github.com:juice-shop/juice-shop.git')).toBe('juice-shop/juice-shop');
+      expect(extractCanonicalSlug('git@github.com:juice-shop/juice-shop.git')).toBe(
+        'juice-shop/juice-shop',
+      );
       expect(extractCanonicalSlug('git@gitlab.com:org/suborg/repo.git')).toBe('suborg/repo');
     });
 
@@ -60,7 +66,12 @@ describe('Project Resolver (RF-038)', () => {
       return Promise.reject(new Error(`Unhandled URL: ${url}`));
     });
 
-    const result = await resolveOrCreateProject('http://localhost:8000', 'jwt-token', '.', 'payments-service');
+    const result = await resolveOrCreateProject(
+      'http://localhost:8000',
+      'jwt-token',
+      '.',
+      'payments-service',
+    );
 
     expect(result.id).toBe('proj-123');
     expect(result.name).toBe('payments-service');
@@ -125,7 +136,8 @@ describe('Project Resolver (RF-038)', () => {
             return Promise.resolve({
               ok: false,
               status: 409,
-              text: () => Promise.resolve('{"message":"A project with this name is already registered"}'),
+              text: () =>
+                Promise.resolve('{"message":"A project with this name is already registered"}'),
             });
           }
 
@@ -153,7 +165,13 @@ describe('Project Resolver (RF-038)', () => {
       return Promise.reject(new Error(`Unhandled URL: ${url}`));
     });
 
-    const result = await resolveOrCreateProject('http://localhost:8000', 'jwt-token', '.', undefined, 'analyst@code-sentinel.local');
+    const result = await resolveOrCreateProject(
+      'http://localhost:8000',
+      'jwt-token',
+      '.',
+      undefined,
+      'analyst@code-sentinel.local',
+    );
 
     expect(result.id).toBe('proj-user-scoped');
     expect(result.isNew).toBe(true);
@@ -161,4 +179,3 @@ describe('Project Resolver (RF-038)', () => {
     expect(postAttempts[1]).toContain('(analyst)');
   });
 });
-

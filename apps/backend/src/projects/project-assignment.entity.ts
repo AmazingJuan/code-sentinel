@@ -1,4 +1,3 @@
-// apps/backend/src/projects/project-assignment.entity.ts
 import {
   Column,
   CreateDateColumn,

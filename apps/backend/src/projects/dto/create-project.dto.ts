@@ -1,4 +1,3 @@
-// apps/backend/src/projects/dto/create-project.dto.ts
 import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
 
 export class CreateProjectDto {

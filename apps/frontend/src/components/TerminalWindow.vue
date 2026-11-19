@@ -1,29 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type Tone =
-  | 'default'
-  | 'dim'
-  | 'green'
-  | 'cyan'
-  | 'prompt'
-  | 'critical'
-  | 'high'
-  | 'medium'
-  | 'low'
-  | 'bold'
-  | 'rule'
-
-type TermSegment = {
-  text: string
-  tone?: Tone
-}
-
-type TermLine = string | TermSegment[]
+import type { TerminalLine, TerminalTone } from '@/interfaces/TerminalInterface'
 
 interface Props {
   title?: string
-  lines: TermLine[]
+  lines: TerminalLine[]
   class?: string
   animate?: boolean
   showCursor?: boolean
@@ -35,7 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
   showCursor: true,
 })
 
-const toneClass: Record<Tone, string> = {
+const toneClass: Record<TerminalTone, string> = {
   default: 'text-foreground/90',
   dim: 'text-term-dim',
   green: 'text-term-green',
@@ -49,33 +31,30 @@ const toneClass: Record<Tone, string> = {
   rule: 'text-term-dim',
 }
 
-const terminalClass = computed(() => [
+const terminalClass = computed<(string | undefined)[]>(() => [
   'min-w-0 max-w-full overflow-hidden rounded-lg border border-border',
   'bg-[oklch(0.13_0.01_260)]',
   'shadow-xl shadow-black/40',
   props.class,
 ])
 
-function getToneClass(tone?: Tone) {
+function getToneClass(tone?: TerminalTone): string {
   return toneClass[tone ?? 'default']
 }
 </script>
 
 <template>
   <div :class="terminalClass">
-    <!-- Terminal header -->
     <div
       class="flex items-center gap-2 border-b border-border/70
              bg-[oklch(0.16_0.01_260)] px-3 py-2"
     >
-      <!-- Traffic lights -->
       <div class="flex gap-1.5" aria-hidden="true">
         <span class="size-3 rounded-full bg-[#ff5f57]" />
         <span class="size-3 rounded-full bg-[#febc2e]" />
         <span class="size-3 rounded-full bg-[#28c840]" />
       </div>
 
-      <!-- Title -->
       <span
         class="ml-2 font-mono text-xs text-muted-foreground"
       >
@@ -83,7 +62,6 @@ function getToneClass(tone?: Tone) {
       </span>
     </div>
 
-    <!-- Terminal content -->
     <div class="min-w-0 max-w-full overflow-x-auto p-4">
       <pre class="m-0 font-mono text-[13px] leading-relaxed"><code><span
         v-for="(line, i) in props.lines"

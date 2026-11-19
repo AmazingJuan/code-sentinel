@@ -1,4 +1,3 @@
-// apps/backend/src/findings/findings.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Finding } from './finding.entity';

@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, sep } from 'node:path';
 
 /**
- * Directorios generados o de dependencias que nunca se escanean. Se aplican tanto a la
- * lista de Git como al recorrido manual, para que una carpeta versionada por error
- * (p. ej. `dist/`) no dispare el tiempo de análisis.
+ * Generated or dependency directories that are never scanned. Applied to both the Git
+ * listing and the manual walk, so a folder committed by mistake (e.g. `dist/`) does not
+ * blow up scan time.
  */
-export const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
+const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
   '.git',
   'node_modules',
   'bower_components',
@@ -29,26 +29,26 @@ export const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
   '.terraform',
 ]);
 
-/** Reporte local que genera el propio CLI: contiene snippets y no debe re-escanearse. */
+/** Local fallback report written by the CLI: it contains snippets and must not be re-scanned. */
 export const OWN_REPORT_FILE = 'code-sentinel-findings.json';
 
-/** Archivos más grandes que esto suelen ser binarios, bundles o datos; Semgrep los salta igual. */
+/** Larger files are usually binaries, bundles or data; Semgrep skips them anyway. */
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 const COPY_CONCURRENCY = 32;
 
 export interface CollectedFiles {
-  /** Directorio desde el que se resuelven las rutas relativas. */
+  /** Directory the relative paths are resolved from. */
   sourceRoot: string;
-  /** Rutas relativas a `sourceRoot`, con `/` como separador. */
+  /** Paths relative to `sourceRoot`, using `/` as separator. */
   files: string[];
-  /** `git` si se usó `git ls-files` (respeta .gitignore), `walk` si se recorrió el disco. */
+  /** `git` when `git ls-files` was used (respects .gitignore), `walk` for a disk walk. */
   strategy: 'git' | 'walk' | 'single-file';
   skippedLargeFiles: number;
 }
 
 export interface ScanWorkspace extends CollectedFiles {
-  /** Directorio temporal con solo los archivos a escanear. */
+  /** Temporary directory holding only the files to scan. */
   workspaceDir: string;
   cleanup(): void;
 }
@@ -95,7 +95,7 @@ function walkFiles(root: string): string[] {
   return files;
 }
 
-/** Decide qué archivos de `targetPath` se analizan, sin copiarlos todavía. */
+/** Decides which files under `targetPath` are scanned, without copying them yet. */
 export function collectScanFiles(targetPath: string): CollectedFiles {
   if (statSync(targetPath).isFile()) {
     return {
@@ -115,7 +115,7 @@ export function collectScanFiles(targetPath: string): CollectedFiles {
     const relativePath = candidate.split(sep).join('/');
     if (isExcludedPath(relativePath)) continue;
     try {
-      // lstat: los symlinks no se siguen para no escanear fuera del proyecto.
+      // lstat: symlinks are not followed so nothing outside the project is scanned.
       const stats = lstatSync(join(targetPath, relativePath));
       if (!stats.isFile()) continue;
       if (stats.size > MAX_FILE_BYTES) {
@@ -124,7 +124,7 @@ export function collectScanFiles(targetPath: string): CollectedFiles {
       }
       files.push(relativePath);
     } catch {
-      // Archivo versionado pero borrado del disco: no hay nada que escanear.
+      // Tracked by Git but deleted from disk: nothing to scan.
     }
   }
 
@@ -136,8 +136,8 @@ async function copyAll(
   destinationRoot: string,
   files: readonly string[],
 ): Promise<void> {
-  // Se guarda la promesa (no un flag): otro worker puede necesitar la misma carpeta
-  // mientras el mkdir todavía está en curso.
+  // Store the promise, not a flag: another worker may need the same folder while the
+  // mkdir is still in flight.
   const createdDirs = new Map<string, Promise<unknown>>();
   let index = 0;
   const worker = async (): Promise<void> => {
@@ -158,9 +158,9 @@ async function copyAll(
 }
 
 /**
- * Copia los archivos a escanear a un directorio temporal privado. Las herramientas
- * leen ahí (montado o copiado al contenedor, o directo en modo nativo), así el costo
- * del sistema de archivos de Docker Desktop solo se paga por los archivos relevantes.
+ * Copies the files to scan into a private temporary directory. Tools read from there
+ * (mounted or copied into the container, or directly in native mode), so the Docker
+ * Desktop file sharing cost is only paid for relevant files.
  */
 export async function createScanWorkspace(targetPath: string): Promise<ScanWorkspace> {
   const collected = collectScanFiles(targetPath);

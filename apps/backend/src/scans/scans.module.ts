@@ -1,4 +1,3 @@
-// apps/backend/src/scans/scans.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Scan } from './scan.entity';

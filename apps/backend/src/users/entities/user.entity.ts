@@ -30,3 +30,5 @@ export class User {
   @CreateDateColumn()
   createdAt: Date;
 }
+
+export type PublicUser = Omit<User, 'passwordHash'>;

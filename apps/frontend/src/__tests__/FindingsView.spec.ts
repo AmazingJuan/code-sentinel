@@ -1,4 +1,3 @@
-// apps/frontend/src/__tests__/FindingsView.spec.ts
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { flushPromises, mount } from '@vue/test-utils'

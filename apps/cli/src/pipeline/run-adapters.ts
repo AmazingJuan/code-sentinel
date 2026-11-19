@@ -44,9 +44,9 @@ async function runOne(adapter: ToolAdapter, target: ScanTarget): Promise<Adapter
 }
 
 /**
- * run → parse → normalize para cada herramienta, todas en paralelo: el tiempo total es el
- * de la más lenta y no la suma. Si una herramienta falla, se anota el error y las demás
- * siguen (RF-030). Los resultados conservan el orden de registro de los adaptadores.
+ * run -> parse -> normalize for every tool in parallel, so total time is that of the
+ * slowest tool. A failing tool records an error while the others continue (RF-030).
+ * Results keep the adapter registration order.
  */
 export async function runAdapters(
   adapters: readonly ToolAdapter[],

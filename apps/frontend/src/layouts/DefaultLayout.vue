@@ -1,18 +1,31 @@
-<!-- apps/frontend/src/layouts/DefaultLayout.vue -->
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
 import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import { useAuthStore } from '@/stores/authStore'
 
 const route = useRoute()
-const mobileOpen = ref(false)
+const router = useRouter()
+const authStore = useAuthStore()
+const mobileOpen = ref<boolean>(false)
 
-watch(() => route.fullPath, () => {
-  mobileOpen.value = false
-})
+watch(
+  () => route.fullPath,
+  (): void => {
+    mobileOpen.value = false
+  },
+)
+
+// The HTTP client clears the session on a 401; leave protected pages as soon as that happens.
+watch(
+  () => authStore.token,
+  async (token: string | null): Promise<void> => {
+    if (!token) await router.replace({ name: 'login' })
+  },
+)
 </script>
 
 <template>
@@ -23,12 +36,14 @@ watch(() => route.fullPath, () => {
 
     <div v-if="mobileOpen" class="fixed inset-0 z-50 lg:hidden">
       <button
+        type="button"
         class="absolute inset-0 cursor-default bg-black/60"
         aria-label="Close navigation"
         @click="mobileOpen = false"
       />
       <aside class="relative h-full w-64 border-r border-sidebar-border bg-sidebar">
         <button
+          type="button"
           class="absolute right-2 top-3 rounded p-1 text-muted-foreground hover:text-foreground"
           aria-label="Close navigation"
           @click="mobileOpen = false"

@@ -7,15 +7,14 @@ export interface CommandResult {
 }
 
 export interface RunOptions {
-  /** Directorio de trabajo del proceso hijo. */
   cwd?: string;
-  /** Mata el proceso si supera este tiempo (ms). */
+  /** Kills the process after this many milliseconds. */
   timeoutMs?: number;
-  /** Reenvía la salida al stderr del usuario (p. ej. progreso de `docker pull`). */
+  /** Mirrors output to the user's stderr (e.g. `docker pull` progress). */
   streamOutput?: boolean;
 }
 
-/** Ejecuta un programa externo. Se inyecta en los adaptadores para poder probarlos sin Docker. */
+/** Runs an external program. Injected into adapters so they can be tested without Docker. */
 export interface CommandRunner {
   run(command: string, args: readonly string[], options?: RunOptions): Promise<CommandResult>;
 }

@@ -1,4 +1,3 @@
-// apps/backend/test/integration/users-auth.integration-spec.ts
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -11,11 +10,13 @@ import { UsersController } from '../../src/users/users.controller';
 import { UsersService } from '../../src/users/users.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
-describe('Users — integración (Controller + Service + Guards + ValidationPipe)', (): void => {
+const USER_ID = '00000000-0000-4000-8000-000000000003';
+
+describe('Users integration (controller + service + guards + ValidationPipe)', (): void => {
   let app: INestApplication<App>;
 
   const sampleUser: User = {
-    id: 'u1',
+    id: USER_ID,
     email: 'analyst@code-sentinel.local',
     name: 'Analyst User',
     passwordHash: '$2b$12$hashed',
@@ -60,12 +61,12 @@ describe('Users — integración (Controller + Service + Guards + ValidationPipe
     jest.clearAllMocks();
   });
 
-  it('GET /users como analyst debe retornar 403', async (): Promise<void> => {
+  it('GET /users as analyst returns 403', async (): Promise<void> => {
     const response = await request(app.getHttpServer()).get('/users');
     expect(response.status).toBe(403);
   });
 
-  it('GET /users como admin debe retornar 200 sin passwordHash', async (): Promise<void> => {
+  it('GET /users as admin returns 200 without passwordHash', async (): Promise<void> => {
     const response = await request(app.getHttpServer())
       .get('/users')
       .set(TEST_ROLE_HEADER, 'admin');
@@ -76,7 +77,7 @@ describe('Users — integración (Controller + Service + Guards + ValidationPipe
     expect(body[0]).not.toHaveProperty('passwordHash');
   });
 
-  it('POST /users como admin debe validar contraseña mínima y crear usuario', async (): Promise<void> => {
+  it('POST /users as admin enforces the minimum password length and creates the user', async (): Promise<void> => {
     const badResponse = await request(app.getHttpServer())
       .post('/users')
       .set(TEST_ROLE_HEADER, 'admin')
@@ -100,16 +101,16 @@ describe('Users — integración (Controller + Service + Guards + ValidationPipe
     expect(goodResponse.body).not.toHaveProperty('passwordHash');
   });
 
-  it('PATCH /users/:id y DELETE /users/:id como admin deben actualizar y eliminar', async (): Promise<void> => {
+  it('PATCH and DELETE /users/:id as admin update and delete the user', async (): Promise<void> => {
     mockUserRepository.findOne.mockResolvedValueOnce({ ...sampleUser });
     const patchResp = await request(app.getHttpServer())
-      .patch('/users/u1')
+      .patch(`/users/${USER_ID}`)
       .set(TEST_ROLE_HEADER, 'admin')
       .send({ name: 'Updated Name' });
     expect(patchResp.status).toBe(200);
 
     const deleteResp = await request(app.getHttpServer())
-      .delete('/users/u1')
+      .delete(`/users/${USER_ID}`)
       .set(TEST_ROLE_HEADER, 'admin');
     expect(deleteResp.status).toBe(200);
   });

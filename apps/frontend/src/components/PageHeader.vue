@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/PageHeader.vue -->
 <script setup lang="ts">
 defineProps<{
   title: string

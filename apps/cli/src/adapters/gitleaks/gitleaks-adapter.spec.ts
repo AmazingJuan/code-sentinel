@@ -35,7 +35,9 @@ function buildAdapter(resultOrError: CommandResult | Error): {
   executor: StubExecutor;
 } {
   const executor = new StubExecutor(resultOrError);
-  const adapter = new GitleaksAdapter({ executor: (): Promise<ToolExecutor> => Promise.resolve(executor) });
+  const adapter = new GitleaksAdapter({
+    executor: (): Promise<ToolExecutor> => Promise.resolve(executor),
+  });
   return { adapter, executor };
 }
 
@@ -86,7 +88,9 @@ describe('GitleaksAdapter.run', (): void => {
     });
 
     await expect(adapter.run(target)).rejects.toThrow(ToolExecutionError);
-    await expect(adapter.run(target)).rejects.toThrow('execution failed: unknown command "dir" for "gitleaks"');
+    await expect(adapter.run(target)).rejects.toThrow(
+      'execution failed: unknown command "dir" for "gitleaks"',
+    );
   });
 
   it('throws ToolExecutionError when exit code is not 0 or 1', async (): Promise<void> => {

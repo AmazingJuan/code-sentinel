@@ -2,6 +2,7 @@
 useDefault = true
 
 [allowlist]
-description = "Falsos positivos conocidos"
-regexTarget = "match" # Hace que compare contra la coincidencia completa, así que solo se ignora ese caso exacto y no cualquier aparición de abc123def456.
+description = "Known false positives"
+# Compare against the full match so only this exact case is ignored, not every occurrence of abc123def456.
+regexTarget = "match"
 regexes = ['''token=abc123def456''']

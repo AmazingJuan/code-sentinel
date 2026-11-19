@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/EmptyState.vue -->
 <script setup lang="ts">
 import { Inbox } from 'lucide-vue-next'
 import type { Component } from 'vue'

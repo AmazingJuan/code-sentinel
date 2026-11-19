@@ -23,27 +23,21 @@ permissions:
   security-events: write
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # 1. Security & Secret Detection (Gitleaks)
-  # ---------------------------------------------------------------------------
   secret-scan:
     name: Security & Secret Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Run Gitleaks secret scanner
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
 
-  # ---------------------------------------------------------------------------
-  # 2. Detect Changed Components
-  # ---------------------------------------------------------------------------
   changes:
     name: Detect Changed Components
     runs-on: ubuntu-latest
@@ -54,10 +48,10 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Detect path changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -81,9 +75,6 @@ jobs:
               - 'apps/frontend/nginx.conf'
               - '.github/workflows/ci.yml'
 
-  # ---------------------------------------------------------------------------
-  # 3. CLI Toolsuite (apps/cli)
-  # ---------------------------------------------------------------------------
   cli:
     name: CLI Checks (Lint, Test, Build)
     runs-on: ubuntu-latest
@@ -98,15 +89,15 @@ jobs:
         working-directory: apps/cli
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: 'pnpm'
@@ -126,9 +117,6 @@ jobs:
           CODE_SENTINEL_API_URL: ${{ secrets.CODE_SENTINEL_API_URL || secrets.VITE_API_URL || 'https://code-sentinel-api.onrender.com' }}
         run: pnpm run build
 
-  # ---------------------------------------------------------------------------
-  # 4. Backend API (apps/backend)
-  # ---------------------------------------------------------------------------
   backend:
     name: Backend Checks (Lint, Unit, Integration, Coverage, Build)
     runs-on: ubuntu-latest
@@ -143,15 +131,15 @@ jobs:
         working-directory: apps/backend
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: 'pnpm'
@@ -173,16 +161,13 @@ jobs:
         run: pnpm run build
 
       - name: Upload backend coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-coverage-report
           path: apps/backend/coverage
           retention-days: 14
 
-  # ---------------------------------------------------------------------------
-  # 5. Frontend Application (apps/frontend)
-  # ---------------------------------------------------------------------------
   frontend:
     name: Frontend Checks (Lint, Types, Unit, Build)
     runs-on: ubuntu-latest
@@ -199,15 +184,15 @@ jobs:
       CYPRESS_INSTALL_BINARY: 0
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.33.0
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: 'pnpm'
@@ -228,9 +213,6 @@ jobs:
       - name: Build Frontend
         run: pnpm run build
 
-  # ---------------------------------------------------------------------------
-  # 6. Docker Compose & Container Integrity
-  # ---------------------------------------------------------------------------
   docker-validation:
     name: Docker & Compose Integrity
     runs-on: ubuntu-latest
@@ -244,20 +226,17 @@ jobs:
       github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate docker compose configuration
         run: docker compose config --quiet
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build Docker images
         run: docker compose build --parallel
 
-  # ---------------------------------------------------------------------------
-  # 7. CI Status Gate (Single Required Status Check for Branch Protection)
-  # ---------------------------------------------------------------------------
   ci-status:
     name: CI Status Gate
     runs-on: ubuntu-latest

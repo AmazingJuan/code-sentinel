@@ -47,7 +47,7 @@
 
 Security tools such as Semgrep and Gitleaks each produce their own report format, live in their own terminal and forget everything once the run ends. Code Sentinel puts them behind one workflow:
 
-1. A **CLI** runs the scanners locally, inside Docker containers, against your project folder.
+1. A **CLI** runs the scanners locally against your project folder, as verified native binaries or inside Docker containers.
 2. It **normalizes** every result into one common finding structure (type, severity, location, source tool).
 3. It **syncs** the findings to a **NestJS backend** backed by PostgreSQL.
 4. A **Vue dashboard** lets analysts browse projects, scans and findings, filter them, follow history and export password-protected reports.
@@ -58,9 +58,9 @@ Your source code is analyzed on your machine. The backend only receives the norm
 
 | Area | What you get |
 | --- | --- |
-| **Scanning** | SAST with Semgrep (`p/default` rules plus custom rules) and secret detection with Gitleaks, both in Docker |
+| **Scanning** | SAST with Semgrep (`p/default` rules plus custom rules) and secret detection with Gitleaks, natively or in Docker, always without network access |
 | **Normalization** | One finding model for every tool: type, severity, CWE, file, line, description, recommendation, source tool |
-| **CLI** | Browser-based login, automatic project detection and registration, dry-run mode, offline fallback file |
+| **CLI** | Browser-based login, automatic project detection and registration, native or Docker engine, dry-run mode, offline fallback file |
 | **Dashboard** | Overview, projects, scan history, scan detail, findings list with filters, finding detail with code viewer and git traceability |
 | **Scan lifecycle** | `pending → running → completed / failed`, enforced by the backend |
 | **Access control** | JWT authentication, `analyst` and `admin` roles, per-project assignments |
@@ -130,12 +130,12 @@ sequenceDiagram
 
 | Tool | Version | Needed for |
 | --- | --- | --- |
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Recent | Running the stack with Compose **and** running the scanners from the CLI |
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Recent | Running the stack with Compose. Optional for the CLI, which can run the scanners natively |
 | [Node.js](https://nodejs.org/) | `^22.18.0` or `>=24.12.0` | CLI and local development |
 | [pnpm](https://pnpm.io/installation) | 10+ | Local development (`npm install -g pnpm`) |
 | Git | Any | Cloning; the CLI also reads git metadata from scanned projects |
 
-> **Windows:** use Git Bash or PowerShell. Docker Desktop must be **open** before you run any `docker` command or a scan.
+> **Windows:** use Git Bash or PowerShell. Docker Desktop must be **open** before you run any `docker` command. To scan without Docker, run `code-sentinel setup` once.
 
 ## Quick start
 
@@ -213,8 +213,9 @@ code-sentinel logout         # deletes the saved session
 
 | Command | Description |
 | --- | --- |
+| `setup` | Installs the native scanners (pinned, SHA-256 verified) and caches the Semgrep ruleset, so scans no longer need Docker |
 | `login` | Starts a local login page in your browser and stores the session in `~/.code-sentinel/credentials.json` |
-| `scan [options]` | Runs the selected scanners on a folder and sends the normalized findings to the backend |
+| `scan [path] [options]` | Runs the selected scanners on a folder or file and sends the normalized findings to the backend |
 | `whoami` | Prints the user and backend of the current session |
 | `logout` | Removes the saved credentials |
 
@@ -224,9 +225,11 @@ code-sentinel logout         # deletes the saved session
 | --- | --- | --- |
 | `-d, --target <path>` | Folder or file to scan | Current folder |
 | `-p, --project <id>` | Project id or name; skips auto-detection | Auto-detected |
-| `-u, --api-url <url>` | Backend URL | Saved session, then embedded endpoint |
-| `-t, --token <jwt>` | Access token | Saved session, then `CODE_SENTINEL_TOKEN` |
-| `--tools <list>` | Comma-separated scanners: `semgrep`, `gitleaks` | Project configuration, then all |
+| `-u, --api-url <url>` | Backend URL (`http`/`https`) | `CODE_SENTINEL_API_URL`, then saved session, then embedded endpoint |
+| `-t, --token <jwt>` | Access token | `CODE_SENTINEL_TOKEN`, then saved session |
+| `--tools <list>` | Comma-separated scanners or categories: `semgrep`, `gitleaks`, `sast`, `secrets` | Project configuration, then all |
+| `--engine <mode>` | `auto`, `native` or `docker` (see [Scanners](#scanners)) | `auto` |
+| `--refresh-rules` | Re-download the cached Semgrep `p/default` ruleset | `false` |
 | `--dry-run` | Scan locally without contacting the backend | `false` |
 | `-v, --version` | Print the CLI version | |
 | `-h, --help` | Print usage | |
@@ -239,6 +242,9 @@ code-sentinel scan --target ./apps/backend
 
 # Only look for secrets
 code-sentinel scan --tools gitleaks
+
+# Never use Docker (downloads verified native scanners on first use)
+code-sentinel scan --engine native
 
 # Try it without a backend or an account
 code-sentinel scan --dry-run
@@ -259,12 +265,18 @@ If the project does not exist yet, the CLI registers it and assigns it to you. I
 
 ### Scanners
 
-| Tool | Category | Image | What it finds |
-| --- | --- | --- | --- |
-| Semgrep CE | `SAST` | `semgrep/semgrep:1.181.1` | Insecure code patterns, using `p/default` plus the custom rules in [`apps/cli/rules/`](apps/cli/rules) |
-| Gitleaks | `Secret Scanner` | `ghcr.io/gitleaks/gitleaks:v8.18.2` | Tokens, keys and credentials committed to files (reported with `--redact`) |
+| Tool | Category | Native binary | Docker image | What it finds |
+| --- | --- | --- | --- | --- |
+| Semgrep CE | `SAST` | `semgrep` on `PATH`, else [Opengrep](https://github.com/opengrep/opengrep) 1.33.1 | `semgrep/semgrep:1.181.1` | Insecure code patterns, using `p/default` plus the custom rules in [`apps/cli/rules/`](apps/cli/rules) |
+| Gitleaks | `Secret Scanner` | `gitleaks` on `PATH`, else Gitleaks 8.18.2 | `ghcr.io/gitleaks/gitleaks:v8.18.2` | Tokens, keys and credentials committed to files (reported with `--redact`) |
 
-Both run in throwaway containers (`--rm`) with the project mounted **read-only**. Gitleaks runs with `--network none`. Semgrep needs network access only to download the `p/default` ruleset, and its metrics are disabled.
+The engine is chosen per tool with `--engine` or `CODE_SENTINEL_ENGINE`:
+
+- `auto` (default): a local binary if one is installed, otherwise Docker/Podman, otherwise a verified download.
+- `native`: never uses containers; downloads the pinned binaries (SHA-256 checked) into `~/.code-sentinel/tools` when missing.
+- `docker`: always uses the pinned images.
+
+Only relevant files are scanned: `.gitignore` is respected and dependency/build folders (`node_modules`, `dist`, `.next`, `.venv`, ...) are skipped. They are copied to a private temporary folder, removed after the scan, and the tools run in parallel without network access. The `p/default` ruleset is downloaded at most once a week and cached in `~/.code-sentinel/cache`. On Windows and macOS, Docker receives the files with `docker cp` instead of a slow bind mount. See the [CLI README](apps/cli/README.md) for every environment variable.
 
 ### When the backend is unreachable
 
@@ -342,10 +354,10 @@ pnpm start:dev        # http://localhost:3000
 | `pnpm db:reset` | Drops the schema and seeds the default users again |
 | `pnpm test` / `pnpm test:cov` | Unit tests / with coverage |
 | `pnpm test:integration` | Controller and service integration tests |
-| `pnpm test:e2e` | End-to-end API tests |
+| `pnpm test:e2e` | Builds the API and runs end-to-end HTTP tests against it (needs PostgreSQL) |
 | `pnpm lint` / `pnpm format` | ESLint with autofix / Prettier |
 
-> The schema is created by TypeORM with `synchronize: true`. That is fine for development but must not be relied on in production.
+> The schema is created by TypeORM schema sync (`DB_SYNCHRONIZE`, on by default outside production). There are no migrations yet, so Compose and Render enable it explicitly.
 
 ### Frontend
 
@@ -387,6 +399,7 @@ node dist/main.js scan --dry-run --target ../backend
 | --- | --- |
 | `pnpm build` | Writes the backend URL into `src/config/endpoint.ts`, compiles to `dist/` and copies rules and pages |
 | `pnpm test` | Vitest unit tests (no Docker needed: scanners are faked) |
+| `pnpm typecheck` | Type-checks sources and tests |
 | `pnpm test:e2e` | End-to-end tests of the CLI commands |
 | `pnpm lint` / `pnpm format` | ESLint / Prettier |
 
@@ -394,11 +407,15 @@ Internal layout:
 
 ```
 apps/cli/src
-├── main.ts                 commands: login, scan, whoami, logout
+├── main.ts                 entrypoint (bin): runs the CLI and sets the exit code
+├── cli/                    argument parsing and validation, help, command dispatch
+├── commands/               scan, setup, login, logout, whoami
+├── scan/                   adapter registry, tool selection, git metadata and snippets
+├── backend/                HTTP helpers and the scan ingestion client
 ├── domain/                 ToolAdapter interface, finding model, errors
 ├── adapters/               one folder per scanner (semgrep, gitleaks)
-├── pipeline/               adapter registry, run → parse → normalize
-├── infra/command-runner.ts spawns docker (injectable for tests)
+├── pipeline/               run → parse → normalize, tools in parallel
+├── infra/                  execution engine (native/container), managed binaries, scan workspace
 ├── auth/                   browser login server and credential storage
 ├── project/                project detection and registration
 └── config/endpoint.ts      backend URL embedded at build time
@@ -417,6 +434,8 @@ Copy [`.env.example`](.env.example) to `.env`. Every value has a default.
 | `POSTGRES_PASSWORD` | `code_sentinel` | Database password |
 | `JWT_SECRET` | `development-only-secret` | Signing key for access tokens |
 | `JWT_EXPIRES_IN` | `7d` | Token lifetime |
+| `DB_SYNCHRONIZE` | `true` | Schema auto-sync for the `back` container (required until migrations exist) |
+| `CORS_ORIGINS` | empty (any origin) | Comma-separated browser origins allowed to call the API |
 
 ### Backend
 
@@ -425,8 +444,10 @@ Copy [`.env.example`](.env.example) to `.env`. Every value has a default.
 | `DATABASE_URL` | No | Full connection string (Neon, Render). Takes precedence over the `DB_*` variables and enables SSL |
 | `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | Without `DATABASE_URL` | Discrete connection settings |
 | `DB_SSL` | No | `true` to force SSL with discrete settings |
-| `JWT_SECRET` | **Yes** | Token signing key. Use a long random value outside development |
+| `JWT_SECRET` | **Yes** | Token signing key. Use a long random value outside development; startup fails without it when `NODE_ENV=production` |
 | `JWT_EXPIRES_IN` | No | Token lifetime, for example `1h` or `7d` |
+| `DB_SYNCHRONIZE` | No | `true`/`false`. Schema auto-sync; defaults to `true` outside production and `false` in production. There are no migrations yet, so deployments set it to `true` |
+| `CORS_ORIGINS` | No | Comma-separated allow-list of browser origins. Unset allows every origin (a warning is logged in production) |
 | `PORT` | No | HTTP port, `3000` by default |
 
 ### Frontend
@@ -442,7 +463,10 @@ Copy [`.env.example`](.env.example) to `.env`. Every value has a default.
 | --- | --- |
 | `CODE_SENTINEL_API_URL` | At build time: URL embedded in the package. At run time: overrides it |
 | `CODE_SENTINEL_TOKEN` | Access token for non-interactive use (CI) |
-| `CODE_SENTINEL_CONFIG_DIR` | Where credentials are stored, `~/.code-sentinel` by default |
+| `CODE_SENTINEL_CONFIG_DIR` | Where credentials, native tools and caches are stored, `~/.code-sentinel` by default |
+| `CODE_SENTINEL_ENGINE` | `auto`, `native` or `docker` |
+
+Engine, container runtime and binary path overrides are listed in the [CLI README](apps/cli/README.md#environment-variables).
 
 ## API reference
 
@@ -471,7 +495,7 @@ Every route except `/`, `/health` and `POST /auth/login` requires `Authorization
 | `GET` / `POST` | `/users` | Admin | List / create users |
 | `PATCH` / `DELETE` | `/users/:id` | Admin | Update / delete a user |
 
-Invalid status transitions return `409`. Unknown fields in a payload return `400`. Projects that are not assigned to you return `403`.
+Invalid status transitions and duplicate submissions return `409`. Unknown fields, malformed ids (non-UUID) and invalid filter values return `400`. Projects that are not assigned to you return `403`.
 
 ## Testing and quality
 
@@ -535,12 +559,11 @@ code-sentinel/
 | Authentication | Stateless JWT; the CLI keeps its session under `~/.code-sentinel/` |
 | Authorization | Roles enforced in backend guards, not only in the UI; admins cannot read security data (RF-032) |
 | Project isolation | Analysts only access assigned projects (RF-035) |
-| Source code | Scanned locally in read-only containers; the backend receives findings, not repositories (NFR-007) |
-| Secrets in findings | Gitleaks runs with `--redact`; the normalizer only forwards whitelisted fields |
+| Source code | Scanned locally (native binaries or containers) on a temporary copy, without network access; the backend receives findings, not repositories (NFR-007) |
+| Secrets in findings | Gitleaks runs with `--redact`, secret findings never carry a code snippet, and the normalizer only forwards whitelisted fields |
+| Scanner binaries | Native scanners are pinned versions verified against SHA-256 hashes embedded in the CLI |
 | Payload validation | Global `ValidationPipe` with a whitelist; unknown fields are rejected |
 | Reports | AES-256-GCM with a password-derived key (RF-033, RF-034) |
-
-> **Known limitation:** before syncing, the CLI attaches a few lines of the source file around each finding (`codeSnippet`) so the dashboard can show context. This currently also happens for secret findings, so the line that contains a detected secret reaches the backend. Treat findings data as sensitive until this is fixed.
 
 Found a vulnerability in Code Sentinel itself? Please contact the maintainers privately instead of opening a public issue.
 
@@ -557,10 +580,10 @@ The scan pipeline does not know any tool by name (RF-030, NFR-005). To add one:
      parse(rawReport: string, target: ScanTarget): ParsedFinding[]; // translate it
    }
    ```
-2. Inject a `CommandRunner` so the adapter can be tested without Docker, and throw `ReportParseError` for malformed reports.
+2. Describe how to run the tool with a `ToolDefinition` (native binary names, Docker image, optional managed download) and execute it through the injected `ToolExecutor`, so the adapter works with every engine and can be tested without Docker. Throw `ReportParseError` for malformed reports.
 3. Document how the tool's severities map to `critical | high | medium | low`. Unknown values become `null`.
-4. Register the adapter where the CLI builds its registry in `main.ts`.
-5. If the tool needs a new category, add it to `TOOL_CATEGORIES` in the CLI **and** to the backend DTO and entity.
+4. Register the adapter in `apps/cli/src/scan/registry.ts`.
+5. If the tool needs a new category, add it to `TOOL_CATEGORIES` in `apps/cli/src/domain/finding.ts` **and** to the backend DTO and entity.
 6. Add tests with a real report saved under `__fixtures__/`.
 
 Normalization, syncing and the dashboard work for the new tool without further changes.
@@ -569,7 +592,7 @@ Normalization, syncing and the dashboard work for the new tool without further c
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `Cannot connect to the Docker daemon` | Docker Desktop is closed | Open Docker Desktop and wait until it says *running* |
+| `Cannot connect to the Docker daemon` | Docker Desktop is closed | Open Docker Desktop, or scan without Docker: `code-sentinel scan --engine native` |
 | `ERR_PNPM_NO_PKG_MANIFEST` | `pnpm` run from the repository root | `cd apps/backend`, `apps/frontend` or `apps/cli` first |
 | Backend crashes with `column ... contains null values` | `synchronize` cannot add a required column to existing rows | `docker compose down -v`, start again, then `pnpm seed` |
 | `ECONNREFUSED 127.0.0.1:5432` | Database not running | `docker compose up -d db` |
@@ -578,7 +601,7 @@ Normalization, syncing and the dashboard work for the new tool without further c
 | Analyst gets `403` on a project | Project not assigned to that analyst | Assign it from **Project access** as admin |
 | Frontend loads but shows no data | Wrong `CODE_SENTINEL_API_URL` | Point it to `:3000` (watch mode) or `:8000` (Compose) and restart Vite |
 | `docker: invalid reference format` or broken paths in Git Bash | MSYS rewrites `/path` arguments | Prefix the command with `MSYS_NO_PATHCONV=1` |
-| Scan stays slow on a large folder | Dependencies are being scanned | Scan the source folder with `--target`, or exclude generated folders |
+| Scan is slow on Windows | Scanners running through Docker Desktop | Run `code-sentinel setup` once; later scans run natively |
 | First request to the hosted backend hangs | Render free instance waking up | Wait about a minute and retry |
 | Findings were not synced | Backend unreachable | Check `code-sentinel-findings.json` in the scanned folder and scan again |
 

@@ -1,4 +1,3 @@
-// apps/backend/src/scans/scan.entity.ts
 import {
   Column,
   CreateDateColumn,

@@ -1,4 +1,3 @@
-// apps/backend/src/scans/scans.controller.ts
 import {
   Body,
   Controller,
@@ -6,27 +5,27 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { UserRole } from '../users/entities/user.entity';
 import { CreateScanDto } from './dto/create-scan.dto';
+import { ScanFiltersDto } from './dto/scan-filters.dto';
 import { SubmitScanResultsDto } from './dto/submit-scan-results.dto';
 import { UpdateScanStatusDto } from './dto/update-scan-status.dto';
 import { Scan } from './scan.entity';
 import { ScansService } from './scans.service';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { User, UserRole } from '../users/entities/user.entity';
 
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
-
-@Controller('scans')
 // RF-032: only analysts may read or create security content; admins get 403.
+@Controller('scans')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ANALYST)
 export class ScansController {
@@ -42,7 +41,7 @@ export class ScansController {
 
   @Patch(':id/status')
   updateStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateScanStatusDto: UpdateScanStatusDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<Scan> {
@@ -56,7 +55,7 @@ export class ScansController {
   @Post(':id/results')
   @HttpCode(HttpStatus.OK)
   submitResults(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() submitScanResultsDto: SubmitScanResultsDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<Scan> {
@@ -70,21 +69,14 @@ export class ScansController {
   @Get()
   findAll(
     @Req() request: AuthenticatedRequest,
-    @Query('projectId') projectId?: string,
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-    @Query('status') status?: string,
-    @Query('severity') severity?: 'critical' | 'high' | 'medium' | 'low',
+    @Query() filters: ScanFiltersDto,
   ): Promise<Scan[]> {
-    return this.scansService.findAll(
-      { projectId, dateFrom, dateTo, status, severity },
-      request.user,
-    );
+    return this.scansService.findAll(filters, request.user);
   }
 
   @Get(':id')
   findOne(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<Scan> {
     return this.scansService.findOne(id, request.user);

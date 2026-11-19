@@ -29,7 +29,13 @@ vi.mock('@/services/FindingService', () => ({
 async function mountFindingDetailView(): Promise<ReturnType<typeof mount>> {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/finding/:id', name: 'finding.show', component: { template: '<div />' } }],
+    routes: [
+      { path: '/overview', name: 'overview', component: { template: '<div />' } },
+      { path: '/projects/:id', name: 'project.show', component: { template: '<div />' } },
+      { path: '/scan/:id', name: 'scan.show', component: { template: '<div />' } },
+      { path: '/finding', name: 'finding.index', component: { template: '<div />' } },
+      { path: '/finding/:id', name: 'finding.show', component: { template: '<div />' } },
+    ],
   })
   await router.push('/finding/finding-1')
   await router.isReady()

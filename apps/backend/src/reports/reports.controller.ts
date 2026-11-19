@@ -2,41 +2,35 @@ import {
   Body,
   Controller,
   Param,
+  ParseUUIDPipe,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
-
+import type { Response } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { User } from '../users/entities/user.entity';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { UserRole } from '../users/entities/user.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { DownloadReportDto } from './dto/download-report.dto';
-import { ReportsService } from './reports.service';
+import { ReportFile, ReportsService, ReportSummary } from './reports.service';
 
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
-
+// RF-032: reports expose security content, so only analysts may use them.
 @Controller()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ANALYST)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
-  /**
-   * RF-033: Generates and persists a password-protected report for a scan.
-   */
   @Post('scans/:scanId/reports')
-  async createReport(
-    @Param('scanId') scanId: string,
+  createReport(
+    @Param('scanId', ParseUUIDPipe) scanId: string,
     @Body() createDto: CreateReportDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{
-    id: string;
-    scanId: string;
-    projectId: string;
-    format: string;
-    createdAt: Date;
-  }> {
+  ): Promise<ReportSummary> {
     return this.reportsService.generateProtectedReport(
       scanId,
       createDto,
@@ -44,12 +38,9 @@ export class ReportsController {
     );
   }
 
-  /**
-   * RF-034: Downloads a previously created protected report verifying the password.
-   */
   @Post('reports/:id/download')
   async downloadReport(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() downloadDto: DownloadReportDto,
     @Req() request: AuthenticatedRequest,
     @Res() res: Response,
@@ -59,20 +50,12 @@ export class ReportsController {
       downloadDto,
       request.user,
     );
-    res.setHeader('Content-Type', file.contentType);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${file.filename}"`,
-    );
-    res.send(file.content);
+    this.sendFile(res, file);
   }
 
-  /**
-   * RF-033 / RF-034: Exports and downloads a protected report for a scan in a single step.
-   */
   @Post('scans/:scanId/report/download')
   async exportScanReport(
-    @Param('scanId') scanId: string,
+    @Param('scanId', ParseUUIDPipe) scanId: string,
     @Body() createDto: CreateReportDto,
     @Req() request: AuthenticatedRequest,
     @Res() res: Response,
@@ -82,11 +65,16 @@ export class ReportsController {
       createDto,
       request.user,
     );
+    this.sendFile(res, file);
+  }
+
+  private sendFile(res: Response, file: ReportFile): void {
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${file.filename}"`,
     );
+    res.setHeader('Cache-Control', 'no-store');
     res.send(file.content);
   }
 }

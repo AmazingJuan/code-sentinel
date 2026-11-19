@@ -1,31 +1,45 @@
-<!-- apps/frontend/src/views/ScansView.vue -->
 <script setup lang="ts">
 import { ChevronRight, ListFilter } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 
+import EmptyState from '@/components/EmptyState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ScanFilterBar from '@/components/ScanFilterBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import LoadingState from '@/components/LoadingState.vue'
-import ErrorState from '@/components/ErrorState.vue'
-import EmptyState from '@/components/EmptyState.vue'
 import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
 import { computeProjectSummariesFromScans } from '@/interfaces/ScanInterface'
 import type { ProjectScanSummaryInterface, ScanInterface } from '@/interfaces/ScanInterface'
-import { ScanService } from '@/services/ScanService'
 import { extractErrorMessage } from '@/services/ErrorHelper'
+import { formatDate, severityCountClass as severityClass } from '@/services/FormatHelper'
+import { ScanService } from '@/services/ScanService'
+
+interface ProjectOption {
+  id: string
+  name: string
+}
+
+function projectIdFromQuery(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined
+}
 
 const route = useRoute()
 const scans = ref<ScanInterface[]>([])
+// Unfiltered scan history: feeds the project options, project summary and historical deltas.
 const allKnownScans = ref<ScanInterface[]>([])
 const filters = ref<ScanFiltersInterface>({
-  projectId: typeof route.query.projectId === 'string' ? route.query.projectId : undefined,
+  projectId: projectIdFromQuery(route.query.projectId),
 })
 const isLoading = ref<boolean>(false)
 const errorMessage = ref<string | null>(null)
 
-const projectOptions = computed<{ id: string; name: string }[]>(() => {
+const historySource = computed<ScanInterface[]>(() =>
+  allKnownScans.value.length > 0 ? allKnownScans.value : scans.value,
+)
+
+const projectOptions = computed<ProjectOption[]>(() => {
   const map = new Map<string, string>()
   for (const scan of [...allKnownScans.value, ...scans.value]) {
     if (scan.projectId && scan.project?.name) {
@@ -33,72 +47,102 @@ const projectOptions = computed<{ id: string; name: string }[]>(() => {
     }
   }
   return Array.from(map.entries())
-    .map(([id, name]): { id: string; name: string } => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(([id, name]): ProjectOption => ({ id, name }))
+    .sort((first, second) => first.name.localeCompare(second.name))
 })
 
 const selectedProjectSummary = computed<ProjectScanSummaryInterface | null>(() => {
   if (!filters.value.projectId) return null
-  const summaries = computeProjectSummariesFromScans(
-    allKnownScans.value.length > 0 ? allKnownScans.value : scans.value,
-  )
   return (
-    summaries.find(
+    computeProjectSummariesFromScans(historySource.value).find(
       (summary) => summary.projectId === filters.value.projectId,
     ) ?? null
   )
 })
 
+/**
+ * RF-028: change in total findings of each completed scan against the immediately
+ * preceding completed scan of the same project. Scans without a predecessor are absent.
+ */
+const historicalDeltas = computed<Map<string, number>>(() => {
+  const completedByProject = new Map<string, ScanInterface[]>()
+  for (const scan of historySource.value) {
+    if (scan.status !== 'completed') continue
+    const group = completedByProject.get(scan.projectId) ?? []
+    group.push(scan)
+    completedByProject.set(scan.projectId, group)
+  }
+
+  const deltas = new Map<string, number>()
+  for (const group of completedByProject.values()) {
+    group.sort((first, second) => first.scanNumber - second.scanNumber)
+    group.forEach((scan, index) => {
+      const previous = index > 0 ? group[index - 1] : undefined
+      if (previous) deltas.set(scan.id, scan.totalCount - previous.totalCount)
+    })
+  }
+  return deltas
+})
+
+function historicalDelta(scan: ScanInterface): number | null {
+  if (scan.status !== 'completed') return null
+  return historicalDeltas.value.get(scan.id) ?? null
+}
+
+function deltaClass(delta: number): string {
+  if (delta > 0) return 'text-critical'
+  if (delta < 0) return 'text-primary'
+  return 'text-muted-foreground'
+}
+
+function deltaLabel(delta: number): string {
+  if (delta > 0) return `+${delta}`
+  return delta === 0 ? '=' : String(delta)
+}
+
+function hasActiveFilters(current: ScanFiltersInterface): boolean {
+  return Boolean(
+    current.projectId || current.status || current.severity || current.dateFrom || current.dateTo,
+  )
+}
+
+let loadSequence = 0
+
 async function loadScans(): Promise<void> {
+  const sequence = ++loadSequence
   isLoading.value = true
   errorMessage.value = null
   try {
     const loaded = await ScanService.getScans(filters.value)
+    // Drop responses that were superseded by a newer filter change.
+    if (sequence !== loadSequence) return
     scans.value = loaded
-    if (!filters.value.projectId && !filters.value.status && !filters.value.severity) {
-      allKnownScans.value = loaded
-    } else if (allKnownScans.value.length === 0) {
+    if (!hasActiveFilters(filters.value) || allKnownScans.value.length === 0) {
       allKnownScans.value = loaded
     }
   } catch (error) {
+    if (sequence !== loadSequence) return
     errorMessage.value = extractErrorMessage(error, 'We could not load the scans. Please try again.')
   } finally {
-    isLoading.value = false
+    if (sequence === loadSequence) isLoading.value = false
   }
 }
+
+function resetFilters(): void {
+  filters.value = {}
+  void loadScans()
+}
+
+// Overview links reuse this view with a different ?projectId.
+watch(
+  () => route.query.projectId,
+  (projectId: unknown): void => {
+    filters.value = { ...filters.value, projectId: projectIdFromQuery(projectId) }
+    void loadScans()
+  },
+)
 
 onMounted(loadScans)
-
-function severityClass(value: number, tone: 'critical' | 'high' | 'medium' | 'low'): string {
-  if (value === 0) return 'text-muted-foreground/40'
-  const map = {
-    critical: 'text-critical',
-    high: 'text-high',
-    medium: 'text-medium',
-    low: 'text-low',
-  }
-  return map[tone]
-}
-
-/**
- * RF-028: compares a completed scan's total findings against the immediately
- * preceding completed scan of the same project.
- */
-function historicalDelta(scan: ScanInterface): number | null {
-  if (scan.status !== 'completed') return null
-  const source = allKnownScans.value.length > 0 ? allKnownScans.value : scans.value
-  const previousCompleted = source
-    .filter(
-      (candidate) =>
-        candidate.projectId === scan.projectId &&
-        candidate.status === 'completed' &&
-        candidate.scanNumber < scan.scanNumber,
-    )
-    .sort((a, b) => b.scanNumber - a.scanNumber)[0]
-
-  if (!previousCompleted) return null
-  return scan.totalCount - previousCompleted.totalCount
-}
 </script>
 
 <template>
@@ -211,17 +255,17 @@ function historicalDelta(scan: ScanInterface): number | null {
               @click="navigate"
             >
               <td class="px-4 py-3">
-                <span class="font-mono text-primary hover:underline">#{{ scan.scanNumber }}</span>
+                <RouterLink
+                  :to="{ name: 'scan.show', params: { id: scan.id } }"
+                  class="font-mono text-primary hover:underline"
+                  @click.stop
+                >
+                  #{{ scan.scanNumber }}
+                </RouterLink>
               </td>
               <td class="px-4 py-3 font-mono text-foreground">{{ scan.project.name }}</td>
               <td class="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                {{
-                  new Date(scan.date).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })
-                }}
+                {{ formatDate(scan.date) }}
               </td>
               <td class="px-4 py-3"><StatusBadge :status="scan.status" /></td>
               <td class="px-4 py-3">
@@ -266,26 +310,15 @@ function historicalDelta(scan: ScanInterface): number | null {
                 <span
                   v-if="historicalDelta(scan) !== null"
                   class="ml-1 text-[10px]"
-                  :class="
-                    (historicalDelta(scan) ?? 0) > 0
-                      ? 'text-critical'
-                      : (historicalDelta(scan) ?? 0) < 0
-                        ? 'text-primary'
-                        : 'text-muted-foreground'
-                  "
+                  :class="deltaClass(historicalDelta(scan) ?? 0)"
                 >
-                  {{
-                    (historicalDelta(scan) ?? 0) > 0
-                      ? `+${historicalDelta(scan)}`
-                      : historicalDelta(scan) === 0
-                        ? '='
-                        : historicalDelta(scan)
-                  }}
+                  {{ deltaLabel(historicalDelta(scan) ?? 0) }}
                 </span>
               </td>
               <td class="px-2 py-3 text-muted-foreground">
                 <ChevronRight
                   class="size-4 opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-hidden="true"
                 />
               </td>
             </tr>
@@ -303,7 +336,7 @@ function historicalDelta(scan: ScanInterface): number | null {
           title="No security scans found"
           description="No scans match the selected project, status, or date range filters."
           action-label="Reset filters"
-          @action="filters = {}; loadScans()"
+          @action="resetFilters"
         />
       </div>
     </div>

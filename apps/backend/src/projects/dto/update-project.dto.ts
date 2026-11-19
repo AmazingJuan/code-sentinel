@@ -1,4 +1,3 @@
-// apps/backend/src/projects/dto/update-project.dto.ts
 import {
   ArrayNotEmpty,
   IsArray,

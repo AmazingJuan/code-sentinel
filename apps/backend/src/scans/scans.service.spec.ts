@@ -1,4 +1,3 @@
-// apps/backend/src/scans/scans.service.spec.ts
 import {
   BadRequestException,
   ConflictException,
@@ -45,7 +44,27 @@ function createMockRepository<T extends ObjectLiteral>(): MockRepository<T> {
     save: jest.fn((entity: Partial<T>): Promise<Partial<T>> =>
       Promise.resolve(entity),
     ),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
   };
+}
+
+/** Runs transaction callbacks against the same mocked repositories. */
+function attachTransactionManager(
+  repository: MockRepository<Scan>,
+  findingRepository: MockRepository<Finding>,
+): void {
+  const manager = {
+    getRepository: (entity: unknown): MockRepository<ObjectLiteral> =>
+      entity === Finding ? findingRepository : repository,
+  };
+  Object.assign(repository, {
+    manager: {
+      transaction: jest.fn(
+        (work: (txManager: typeof manager) => Promise<unknown>) =>
+          work(manager),
+      ),
+    },
+  });
 }
 
 describe('ScansService', () => {
@@ -114,6 +133,7 @@ describe('ScansService', () => {
     repository = module.get(SCAN_REPOSITORY_TOKEN);
     findingRepository = module.get(FINDING_REPOSITORY_TOKEN);
     projectRepository = module.get(PROJECT_REPOSITORY_TOKEN);
+    attachTransactionManager(repository, findingRepository);
   });
 
   afterEach((): void => {
@@ -121,7 +141,26 @@ describe('ScansService', () => {
   });
 
   describe('create (POST /scans — RF-005, RF-006)', (): void => {
-    it('debe crear un scan en estado pending con el siguiente scanNumber', async (): Promise<void> => {
+    it('retries with a fresh scanNumber when a concurrent create took the same one', async (): Promise<void> => {
+      repository
+        .find!.mockResolvedValueOnce([{ scanNumber: 1044 }])
+        .mockResolvedValueOnce([{ scanNumber: 1045 }]);
+      repository
+        .save!.mockRejectedValueOnce({ code: '23505' })
+        .mockImplementationOnce((scan: Partial<Scan>) =>
+          Promise.resolve({ id: 'scan-new', ...scan }),
+        );
+
+      const result = await service.create(
+        { projectId: 'p1', tools: ['SAST'] },
+        analyst,
+      );
+
+      expect(result.scanNumber).toBe(1046);
+      expect(repository.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('creates a pending scan with the next scanNumber', async (): Promise<void> => {
       repository.find!.mockResolvedValue([{ scanNumber: 1044 }]);
       repository.save!.mockImplementation((scan: Partial<Scan>) =>
         Promise.resolve({ id: 'scan-new', ...scan }),
@@ -139,14 +178,14 @@ describe('ScansService', () => {
       expect(result.totalCount).toBe(0);
     });
 
-    it('debe rechazar con ForbiddenException (403) si el analista no está asignado al proyecto (RF-035)', async (): Promise<void> => {
+    it('rejects with ForbiddenException (403) when the analyst is not assigned to the project (RF-035)', async (): Promise<void> => {
       await expect(
         service.create({ projectId: 'p9', tools: ['SAST'] }, analyst),
       ).rejects.toThrow(ForbiddenException);
       expect(repository.save).not.toHaveBeenCalled();
     });
 
-    it('debe rechazar con BadRequestException (400) si tools está vacío o tiene una herramienta inválida', async (): Promise<void> => {
+    it('rejects with BadRequestException (400) when tools is empty or contains an invalid tool', async (): Promise<void> => {
       await expect(
         service.create({ projectId: 'p1', tools: [] }, analyst),
       ).rejects.toThrow(BadRequestException);
@@ -160,7 +199,7 @@ describe('ScansService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('debe iniciar scanNumber en 1001 cuando no existen scans previos', async (): Promise<void> => {
+    it('starts scanNumber at 1001 when there are no previous scans', async (): Promise<void> => {
       repository.find!.mockResolvedValue([]);
       const result = await service.create(
         { projectId: 'p1', tools: ['SAST'] },
@@ -171,7 +210,24 @@ describe('ScansService', () => {
   });
 
   describe('updateStatus (PATCH /scans/:id/status — RF-006)', (): void => {
-    it('debe permitir la transición pending → running', async (): Promise<void> => {
+    it('returns 409 when the scan changed concurrently', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue({
+        id: 'scan-1',
+        projectId: 'p1',
+        status: 'running',
+      });
+      repository.update!.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.updateStatus(
+          'scan-1',
+          { status: 'failed', errorMessage: 'Scanner timeout' },
+          analyst,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('allows the pending → running transition', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -185,10 +241,13 @@ describe('ScansService', () => {
       );
 
       expect(result.status).toBe('running');
-      expect(repository.save).toHaveBeenCalled();
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: 'scan-1', status: 'pending' },
+        expect.objectContaining({ status: 'running' }),
+      );
     });
 
-    it('debe permitir pasar a failed con errorMessage y rechazar si falta errorMessage o status inválido', async (): Promise<void> => {
+    it('moves to failed with an errorMessage and rejects a missing errorMessage or invalid status', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -216,7 +275,7 @@ describe('ScansService', () => {
       expect(result.errorMessage).toBe('Scanner timeout');
     });
 
-    it('debe lanzar NotFoundException si el scan no existe al actualizar estado', async (): Promise<void> => {
+    it('throws NotFoundException when updating the status of a missing scan', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(null);
       await expect(
         service.updateStatus('missing', { status: 'running' }, analyst),
@@ -229,7 +288,7 @@ describe('ScansService', () => {
       ['running', 'pending'],
       ['pending', 'completed'],
     ])(
-      'debe rechazar la transición inválida %s → %s con ConflictException (409)',
+      'rejects the invalid transition %s → %s with ConflictException (409)',
       async (fromStatus: ScanStatus, toStatus: ScanStatus): Promise<void> => {
         repository.findOne!.mockResolvedValue({
           id: 'scan-1',
@@ -240,11 +299,11 @@ describe('ScansService', () => {
         await expect(
           service.updateStatus('scan-1', { status: toStatus }, analyst),
         ).rejects.toThrow(ConflictException);
-        expect(repository.save).not.toHaveBeenCalled();
+        expect(repository.update).not.toHaveBeenCalled();
       },
     );
 
-    it('debe rechazar con ForbiddenException (403) si el analista no está asignado al proyecto', async (): Promise<void> => {
+    it('rejects with ForbiddenException (403) when the analyst is not assigned to the project', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p9',
@@ -296,7 +355,22 @@ describe('ScansService', () => {
       ],
     };
 
-    it('debe guardar los findings normalizados y calcular los conteos del scan al cerrar como completed', async (): Promise<void> => {
+    it('rejects a concurrent submission with 409 before storing findings', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValue({
+        id: 'scan-1',
+        projectId: 'p1',
+        status: 'running',
+      });
+      repository.update!.mockResolvedValueOnce({ affected: 0 });
+
+      await expect(
+        service.submitResults('scan-1', sampleResults, analyst),
+      ).rejects.toThrow(ConflictException);
+      expect(findingRepository.save).not.toHaveBeenCalled();
+      expect(projectRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('stores normalized findings and computes scan counters when closing as completed', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -342,7 +416,7 @@ describe('ScansService', () => {
       expect(result.totalCount).toBe(3);
     });
 
-    it('debe permitir cerrar en failed desde pending o running guardando errorMessage', async (): Promise<void> => {
+    it('allows closing as failed from pending or running and stores the errorMessage', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -365,7 +439,7 @@ describe('ScansService', () => {
       expect(findingRepository.save).not.toHaveBeenCalled();
     });
 
-    it('debe exigir errorMessage y findings vacío cuando status es failed', async (): Promise<void> => {
+    it('requires an errorMessage and no findings when status is failed', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -393,7 +467,7 @@ describe('ScansService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('debe rechazar con ConflictException (409) si se intenta enviar resultados a un scan ya cerrado', async (): Promise<void> => {
+    it('rejects with ConflictException (409) when submitting results to a closed scan', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -405,7 +479,7 @@ describe('ScansService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('debe rechazar por seguridad cualquier finding que incluya Secret o Match en texto plano', async (): Promise<void> => {
+    it('rejects any finding that carries a plaintext Secret or Match value', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         projectId: 'p1',
@@ -429,7 +503,7 @@ describe('ScansService', () => {
       expect(findingRepository.save).not.toHaveBeenCalled();
     });
 
-    it('debe validar campos de findings (status inválido, type, severity, toolCategory, sourceTool) y sincronizar contadores del proyecto', async (): Promise<void> => {
+    it('validates finding fields (status, type, severity, toolCategory, sourceTool) and syncs project counters', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         scanNumber: 1045,
@@ -540,7 +614,7 @@ describe('ScansService', () => {
       );
     });
 
-    it('debe reutilizar la lista de scans del proyecto cuando el scan actual ya existe en la consulta', async (): Promise<void> => {
+    it('reuses the project scan list when it already contains the current scan', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         id: 'scan-1',
         scanNumber: 1045,
@@ -594,7 +668,7 @@ describe('ScansService', () => {
   });
 
   describe('findAll', (): void => {
-    it('debe retornar los scans de los proyectos asignados cuando no hay filtros', async (): Promise<void> => {
+    it('returns scans of the assigned projects when no filters are given', async (): Promise<void> => {
       repository.find!.mockResolvedValue(mockScans);
       const result = await service.findAll({}, analyst);
       expect(repository.find).toHaveBeenCalledWith({
@@ -604,7 +678,7 @@ describe('ScansService', () => {
       expect(result).toHaveLength(2);
     });
 
-    it('debe filtrar por projectId cuando se provee', async (): Promise<void> => {
+    it('filters by projectId when provided', async (): Promise<void> => {
       repository.find!.mockResolvedValue([mockScans[0]]);
       await service.findAll({ projectId: 'p1' }, analyst);
       expect(repository.find).toHaveBeenCalledWith(
@@ -615,7 +689,7 @@ describe('ScansService', () => {
     });
 
     it.each(['pending', 'running', 'completed', 'failed'])(
-      'debe aceptar el estado %s como filtro (RF-006)',
+      'accepts %s as a status filter (RF-006)',
       async (status: string): Promise<void> => {
         repository.find!.mockResolvedValue([]);
         await service.findAll({ status }, analyst);
@@ -627,27 +701,27 @@ describe('ScansService', () => {
       },
     );
 
-    it('debe rechazar un estado desconocido con BadRequestException (RF-006)', async (): Promise<void> => {
+    it('rejects an unknown status with BadRequestException (RF-006)', async (): Promise<void> => {
       await expect(
         service.findAll({ status: 'done' }, analyst),
       ).rejects.toThrow(BadRequestException);
       expect(repository.find).not.toHaveBeenCalled();
     });
 
-    it('debe retornar [] si el projectId pedido no está asignado al usuario', async (): Promise<void> => {
+    it('returns [] when the requested projectId is not assigned to the user', async (): Promise<void> => {
       const result = await service.findAll({ projectId: 'p9' }, analyst);
       expect(result).toEqual([]);
       expect(repository.find).not.toHaveBeenCalled();
     });
 
-    it('debe filtrar en memoria por severity, dejando solo scans con conteo > 0', async (): Promise<void> => {
+    it('filters by severity, keeping only scans with a count > 0', async (): Promise<void> => {
       repository.find!.mockResolvedValue(mockScans);
       const result = await service.findAll({ severity: 'critical' }, analyst);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('1');
     });
 
-    it('cada scan retornado debe tener su projectId poblado (RF-007)', async (): Promise<void> => {
+    it('populates projectId on every returned scan (RF-007)', async (): Promise<void> => {
       repository.find!.mockResolvedValue(mockScans);
       const result = await service.findAll({}, analyst);
       result.forEach((scan) => {
@@ -655,7 +729,7 @@ describe('ScansService', () => {
       });
     });
 
-    it('debe filtrar por rango de fechas dateFrom y dateTo y retornar [] cuando no hay proyectos accesibles', async (): Promise<void> => {
+    it('filters by the dateFrom/dateTo range and returns [] without accessible projects', async (): Promise<void> => {
       repository.find!.mockResolvedValue([mockScans[0]]);
       await service.findAll(
         { dateFrom: '2026-08-01', dateTo: '2026-08-31' },
@@ -676,7 +750,7 @@ describe('ScansService', () => {
   });
 
   describe('findScanIdsForProjects & findProjectIdForScan', (): void => {
-    it('debe retornar IDs de scans para proyectos dados o [] si la lista está vacía', async (): Promise<void> => {
+    it('returns scan ids for the given projects or [] for an empty list', async (): Promise<void> => {
       expect(await service.findScanIdsForProjects([])).toEqual([]);
       repository.find!.mockResolvedValue([{ id: 's1' }, { id: 's2' }]);
       expect(await service.findScanIdsForProjects(['p1'])).toEqual([
@@ -685,7 +759,7 @@ describe('ScansService', () => {
       ]);
     });
 
-    it('debe retornar el projectId de un scan o null si no existe', async (): Promise<void> => {
+    it('returns the projectId of a scan or null when it does not exist', async (): Promise<void> => {
       repository.findOne!.mockResolvedValueOnce({ id: 's1', projectId: 'p1' });
       expect(await service.findProjectIdForScan('s1')).toBe('p1');
 
@@ -695,7 +769,7 @@ describe('ScansService', () => {
   });
 
   describe('scan.entity helpers', (): void => {
-    it('debe validar estados, estados de resultado, herramientas y transiciones', (): void => {
+    it('validates statuses, result statuses, tools and transitions', (): void => {
       expect(isScanStatus('pending')).toBe(true);
       expect(isScanStatus('unknown')).toBe(false);
       expect(isResultScanStatus('completed')).toBe(true);
@@ -717,7 +791,7 @@ describe('ScansService', () => {
   });
 
   describe('findOne', (): void => {
-    it('debe retornar el scan cuando existe', async (): Promise<void> => {
+    it('returns the scan when it exists', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(mockScans[0]);
       const result = await service.findOne('1', analyst);
       expect(result).toEqual(mockScans[0]);
@@ -727,14 +801,14 @@ describe('ScansService', () => {
       });
     });
 
-    it('debe lanzar NotFoundException cuando el scan no existe', async (): Promise<void> => {
+    it('throws NotFoundException when the scan does not exist', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(null);
       await expect(service.findOne('no-existe', analyst)).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it('debe lanzar ForbiddenException si el scan es de un proyecto no asignado', async (): Promise<void> => {
+    it('throws ForbiddenException when the scan belongs to an unassigned project', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue({
         ...mockScans[0],
         projectId: 'p9',
@@ -744,7 +818,7 @@ describe('ScansService', () => {
       );
     });
 
-    it('debe incluir los findings asociados al scan seleccionado (RF-027)', async (): Promise<void> => {
+    it('includes the findings of the selected scan (RF-027)', async (): Promise<void> => {
       const scanWithFindings = {
         ...mockScans[0],
         findings: [
@@ -759,7 +833,7 @@ describe('ScansService', () => {
       expect(result.findings[0].scanId).toBe('1');
     });
 
-    it('debe indicar que el scan no tiene findings cuando el array viene vacío (RF-027)', async (): Promise<void> => {
+    it('reports no findings when the array is empty (RF-027)', async (): Promise<void> => {
       const scanWithoutFindings = { ...mockScans[0], findings: [] };
       repository.findOne!.mockResolvedValue(scanWithoutFindings);
 
@@ -770,7 +844,7 @@ describe('ScansService', () => {
   });
 
   describe('computeProjectCountersFromScans (RF-028, RF-029)', (): void => {
-    it('debe calcular los contadores del proyecto desde su último scan completado ignorando scans en curso', (): void => {
+    it('computes project counters from the latest completed scan, ignoring in-progress scans', (): void => {
       const counters = computeProjectCountersFromScans([
         {
           scanNumber: 1043,
@@ -811,7 +885,7 @@ describe('ScansService', () => {
       });
     });
 
-    it('debe retornar estado pending y contadores en 0 si no hay scans cerrados', (): void => {
+    it('returns pending status and zero counters when no scan is closed', (): void => {
       const counters = computeProjectCountersFromScans([
         {
           scanNumber: 1044,

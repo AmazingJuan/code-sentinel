@@ -1,8 +1,8 @@
 import type { Severity } from '../../domain/finding.js';
 
 /**
- * RF-022: regla documentada para traducir la severidad de Semgrep.
- * Semgrep CE usa ERROR/WARNING/INFO; las versiones nuevas también pueden emitir CRITICAL/HIGH/MEDIUM/LOW.
+ * RF-022: documented Semgrep severity mapping. Semgrep CE emits ERROR/WARNING/INFO; newer
+ * versions may also emit CRITICAL/HIGH/MEDIUM/LOW.
  */
 const SEMGREP_SEVERITY_MAP: Readonly<Record<string, Severity>> = {
   CRITICAL: 'critical',

@@ -1,4 +1,3 @@
-// apps/frontend/src/services/ProjectService.ts
 import type { ProjectAssignment } from '@/interfaces/ProjectAssignmentInterface'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 import { httpClient } from '@/services/httpClient'
@@ -6,7 +5,16 @@ import type { ProjectDirectoryEntryInterface } from '@/interfaces/ProjectDirecto
 
 export type CreateProjectDto = Omit<
   ProjectInterface,
-  'id' | 'tools' | 'status' | 'lastScan' | 'criticalCount' | 'highCount' | 'mediumCount' | 'lowCount' | 'createdAt' | 'userId'
+  | 'id'
+  | 'tools'
+  | 'status'
+  | 'lastScan'
+  | 'criticalCount'
+  | 'highCount'
+  | 'mediumCount'
+  | 'lowCount'
+  | 'createdAt'
+  | 'userId'
 >
 
 export type UpdateProjectDto = Partial<Pick<ProjectInterface, 'repo' | 'tools'>>
@@ -38,7 +46,10 @@ export class ProjectService {
   }
 
   static async assignUser(projectId: string, userId: string): Promise<ProjectAssignment> {
-    const response = await httpClient.post<ProjectAssignment>(`/projects/${projectId}/assignments`, { userId })
+    const response = await httpClient.post<ProjectAssignment>(
+      `/projects/${projectId}/assignments`,
+      { userId },
+    )
     return response.data
   }
 

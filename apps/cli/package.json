@@ -2,20 +2,36 @@
   "name": "@amazingwalin/code-sentinel-cli",
   "version": "0.4.0",
   "description": "Official CLI for Code Sentinel AppSec and vulnerability management platform",
+  "keywords": [
+    "security",
+    "appsec",
+    "sast",
+    "secret-scanning",
+    "semgrep",
+    "opengrep",
+    "gitleaks",
+    "vulnerability-management",
+    "cli",
+    "code-sentinel"
+  ],
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/AmazingJuan/code-sentinel.git",
     "directory": "apps/cli"
   },
+  "homepage": "https://github.com/AmazingJuan/code-sentinel/tree/main/apps/cli#readme",
+  "bugs": {
+    "url": "https://github.com/AmazingJuan/code-sentinel/issues"
+  },
   "bin": {
     "code-sentinel": "./dist/main.js"
   },
   "main": "./dist/main.js",
-  "types": "./dist/main.d.ts",
   "files": [
     "dist",
-    "rules",
+    "!dist/**/*.map",
     "README.md"
   ],
   "publishConfig": {
@@ -26,11 +42,14 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run test/e2e.spec.ts",
     "lint": "eslint \"{src,test}/**/*.ts\"",
-    "format": "prettier --write \"{src,test}/**/*.ts\""
+    "format": "prettier --write \"{src,test}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\"",
+    "prepublishOnly": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

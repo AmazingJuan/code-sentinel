@@ -1,5 +1,4 @@
-// apps/frontend/src/interfaces/ProjectAssignmentInterface.ts
-import type { ManagedUser } from './UserInterface'
+import type { ManagedUser } from '@/interfaces/UserInterface'
 
 export interface ProjectAssignment {
   id: string

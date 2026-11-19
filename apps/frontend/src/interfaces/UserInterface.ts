@@ -5,3 +5,13 @@ export interface ManagedUser {
   role: 'admin' | 'analyst'
   createdAt: string
 }
+
+export interface UpdateUserPayload {
+  name: string
+  email: string
+  role: ManagedUser['role']
+}
+
+export interface CreateUserPayload extends UpdateUserPayload {
+  password: string
+}

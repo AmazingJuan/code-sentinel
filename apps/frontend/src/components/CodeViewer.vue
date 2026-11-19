@@ -1,13 +1,8 @@
-<!-- apps/frontend/src/components/CodeViewer.vue -->
 <script setup lang="ts">
 import { Check, Copy, FileCode2 } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 
-export interface CodeRow {
-  line: number
-  text: string
-  highlight?: boolean
-}
+import type { CodeRow } from '@/interfaces/CodeSnippetInterface'
 
 const props = defineProps<{
   filePath?: string | null
@@ -15,30 +10,32 @@ const props = defineProps<{
   codeSnippet?: string | CodeRow[] | null
 }>()
 
-const copied = ref(false)
+const copied = ref<boolean>(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
+function splitPlainSnippet(snippet: string): CodeRow[] {
+  return snippet.split('\n').map(
+    (text: string, index: number): CodeRow => ({
+      line: (props.targetLine ?? 1) + index,
+      text,
+      highlight: index === 0,
+    }),
+  )
+}
+
+// Snippets arrive either as JSON-encoded rows or as plain source text.
 const parsedRows = computed<CodeRow[]>(() => {
-  if (!props.codeSnippet) return []
+  const snippet = props.codeSnippet
+  if (!snippet) return []
+  if (Array.isArray(snippet)) return snippet
 
-  if (Array.isArray(props.codeSnippet)) {
-    return props.codeSnippet
+  try {
+    const parsed: unknown = JSON.parse(snippet)
+    if (Array.isArray(parsed)) return parsed as CodeRow[]
+  } catch {
+    // Not JSON: fall back to plain source text.
   }
-
-  if (typeof props.codeSnippet === 'string') {
-    try {
-      const parsed = JSON.parse(props.codeSnippet) as CodeRow[]
-      if (Array.isArray(parsed)) return parsed
-    } catch {
-      // If it's a plain string, split lines
-      return props.codeSnippet.split('\n').map((text, idx) => ({
-        line: (props.targetLine ?? 1) + idx,
-        text,
-        highlight: idx === 0,
-      }))
-    }
-  }
-
-  return []
+  return splitPlainSnippet(snippet)
 })
 
 async function copyFilePath(): Promise<void> {
@@ -47,18 +44,20 @@ async function copyFilePath(): Promise<void> {
   try {
     await navigator.clipboard.writeText(textToCopy)
     copied.value = true
-    setTimeout(() => {
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout((): void => {
       copied.value = false
     }, 2000)
   } catch {
-    // Clipboard permission denied or unavailable
+    // Clipboard access can be denied by the browser; copying is best-effort.
   }
 }
+
+onBeforeUnmount((): void => clearTimeout(copiedTimer))
 </script>
 
 <template>
   <div class="rounded-lg border border-border bg-card overflow-hidden">
-    <!-- Header bar -->
     <div class="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5 text-xs">
       <div class="flex items-center gap-2 truncate font-mono">
         <FileCode2 class="size-4 shrink-0 text-muted-foreground" />
@@ -68,8 +67,9 @@ async function copyFilePath(): Promise<void> {
 
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        class="inline-flex items-center gap-1 rounded px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
         title="Copy path and line"
+        :disabled="!filePath"
         @click="copyFilePath"
       >
         <Check v-if="copied" class="size-3 text-emerald-500" />
@@ -78,11 +78,10 @@ async function copyFilePath(): Promise<void> {
       </button>
     </div>
 
-    <!-- Code Block -->
     <div v-if="parsedRows.length > 0" class="overflow-x-auto bg-[oklch(0.13_0.01_260)] py-3 font-mono text-xs leading-relaxed">
       <div
-        v-for="row in parsedRows"
-        :key="row.line"
+        v-for="(row, index) in parsedRows"
+        :key="`${index}-${row.line}`"
         class="flex px-3 transition-colors"
         :class="row.highlight ? 'bg-destructive/15 border-l-2 border-destructive' : 'hover:bg-muted/10'"
       >
@@ -101,7 +100,6 @@ async function copyFilePath(): Promise<void> {
       </div>
     </div>
 
-    <!-- Fallback if no code rows exist -->
     <div v-else class="p-6 text-center text-xs text-muted-foreground">
       <p>Source code snippet not available for this finding.</p>
       <p v-if="filePath" class="mt-1 font-mono text-term-cyan">{{ filePath }}:{{ targetLine ?? 1 }}</p>
