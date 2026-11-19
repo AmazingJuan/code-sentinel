@@ -1,11 +1,9 @@
-// apps/backend/src/scans/scans.controller.spec.ts
-import { Request } from 'express';
-import { User, UserRole } from '../users/entities/user.entity';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { UserRole } from '../users/entities/user.entity';
+import { ScanFiltersDto } from './dto/scan-filters.dto';
 import { Scan } from './scan.entity';
 import { ScansController } from './scans.controller';
 import { ScansService } from './scans.service';
-
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
 
 describe('ScansController', (): void => {
   let controller: ScansController;
@@ -50,7 +48,7 @@ describe('ScansController', (): void => {
     controller = new ScansController(scansService as unknown as ScansService);
   });
 
-  it('debe delegar create en ScansService', async (): Promise<void> => {
+  it('delegates create to ScansService', async (): Promise<void> => {
     const result = await controller.create(
       { projectId: 'p1', tools: ['SAST'] },
       request,
@@ -62,7 +60,7 @@ describe('ScansController', (): void => {
     );
   });
 
-  it('debe delegar updateStatus en ScansService', async (): Promise<void> => {
+  it('delegates updateStatus to ScansService', async (): Promise<void> => {
     const result = await controller.updateStatus(
       'scan-1',
       { status: 'running' },
@@ -76,7 +74,7 @@ describe('ScansController', (): void => {
     );
   });
 
-  it('debe delegar submitResults en ScansService', async (): Promise<void> => {
+  it('delegates submitResults to ScansService', async (): Promise<void> => {
     const result = await controller.submitResults(
       'scan-1',
       { status: 'completed', findings: [] },
@@ -90,29 +88,20 @@ describe('ScansController', (): void => {
     );
   });
 
-  it('debe delegar findAll con filtros en ScansService', async (): Promise<void> => {
-    const result = await controller.findAll(
-      request,
-      'p1',
-      '2026-08-01',
-      '2026-08-31',
-      'completed',
-      'critical',
-    );
+  it('delegates findAll with filters to ScansService', async (): Promise<void> => {
+    const filters: ScanFiltersDto = {
+      projectId: 'p1',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-31',
+      status: 'completed',
+      severity: 'critical',
+    };
+    const result = await controller.findAll(request, filters);
     expect(result).toEqual([mockScan]);
-    expect(scansService.findAll).toHaveBeenCalledWith(
-      {
-        projectId: 'p1',
-        dateFrom: '2026-08-01',
-        dateTo: '2026-08-31',
-        status: 'completed',
-        severity: 'critical',
-      },
-      request.user,
-    );
+    expect(scansService.findAll).toHaveBeenCalledWith(filters, request.user);
   });
 
-  it('debe delegar findOne en ScansService', async (): Promise<void> => {
+  it('delegates findOne to ScansService', async (): Promise<void> => {
     const result = await controller.findOne('scan-1', request);
     expect(result).toEqual(mockScan);
     expect(scansService.findOne).toHaveBeenCalledWith('scan-1', request.user);

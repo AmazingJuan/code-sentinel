@@ -1,8 +1,6 @@
-// apps/backend/src/__mocks__/nestjs-typeorm.ts
-// Mock manual para Jest: @nestjs/typeorm@12 se publica como ESM puro y el runtime
-// de Jest (CommonJS) no puede parsear su sintaxis "export". Este mock reemplaza
-// el paquete SOLO durante los tests, replicando el único comportamiento que usamos
-// en el código real: el decorador @InjectRepository().
+// Jest stub: @nestjs/typeorm@12 ships as pure ESM, which the CommonJS Jest
+// runtime cannot parse. It replaces the package only in tests and reproduces
+// the one behavior the code under test relies on: @InjectRepository().
 import { Inject } from '@nestjs/common';
 
 export function getRepositoryToken(entity: { name: string }): string {

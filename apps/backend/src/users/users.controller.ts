@@ -4,18 +4,18 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UsersService } from './users.service';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { User, UserRole } from './entities/user.entity';
-import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { PublicUser, UserRole } from './entities/user.entity';
+import { UsersService } from './users.service';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -24,30 +24,27 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  findAll(): Promise<Array<Omit<User, 'passwordHash'>>> {
+  findAll(): Promise<PublicUser[]> {
     return this.usersService.findAll();
   }
 
   @Post()
-  async create(
-    @Body() createUserDto: CreateUserDto,
-  ): Promise<Omit<User, 'passwordHash'>> {
-    const passwordHash = await bcrypt.hash(createUserDto.password, 12);
+  async create(@Body() createUserDto: CreateUserDto): Promise<PublicUser> {
     return this.usersService.toPublicUser(
-      await this.usersService.create(createUserDto, passwordHash),
+      await this.usersService.create(createUserDto),
     );
   }
 
   @Patch(':id')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<Omit<User, 'passwordHash'>> {
+  ): Promise<PublicUser> {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string): Promise<void> {
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.usersService.remove(id);
   }
 }

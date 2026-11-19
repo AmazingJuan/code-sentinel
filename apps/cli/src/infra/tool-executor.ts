@@ -4,34 +4,34 @@ import { join, sep } from 'node:path';
 
 import type { CommandResult, CommandRunner } from './command-runner.js';
 
-/** Rutas tal como las ve la herramienta (host en nativo, contenedor en Docker). */
+/** Paths as the tool sees them (host paths natively, container paths in Docker). */
 export interface ResolvedToolPaths {
-  /** Entradas adicionales de solo lectura (reglas, configuración) por nombre lógico. */
+  /** Extra read-only inputs (rules, configuration) keyed by logical name. */
   inputs: Record<string, string>;
-  /** Archivo donde la herramienta debe escribir su reporte. */
+  /** File the tool must write its report to. */
   reportPath: string;
 }
 
 export interface ToolRunRequest {
-  /** Directorio del host con los archivos a escanear; la herramienta corre con cwd ahí. */
+  /** Host directory with the files to scan; the tool runs with it as cwd. */
   workspace: string;
-  /** Archivos o carpetas del host que la herramienta necesita, por nombre lógico. */
+  /** Host files or folders the tool needs, keyed by logical name. */
   inputs?: Record<string, string>;
-  /** Construye los argumentos de la herramienta (sin el binario) a partir de las rutas. */
+  /** Builds the tool arguments (without the binary) from the resolved paths. */
   buildArgs(paths: ResolvedToolPaths): string[];
 }
 
-/** Ejecuta una herramienta de análisis. `stdout` del resultado contiene el reporte. */
+/** Runs an analysis tool. The result `stdout` holds the report. */
 export interface ToolExecutor {
   readonly kind: 'native' | 'container';
-  /** Descripción corta para logs, p. ej. "native: /usr/bin/gitleaks". */
+  /** Short description for logs, e.g. "native: /usr/bin/gitleaks". */
   readonly description: string;
-  /** Nombre del binario que corre realmente (semgrep vs opengrep cambian los flags). */
+  /** Name of the binary actually run (semgrep and opengrep accept different flags). */
   readonly binaryName: string;
   execute(request: ToolRunRequest): Promise<CommandResult>;
 }
 
-/** Corre el binario instalado en la máquina, sin VM ni montajes: lo más rápido en Windows. */
+/** Runs a binary installed on the host, with no VM or mounts: the fastest option on Windows. */
 export class NativeToolExecutor implements ToolExecutor {
   readonly kind = 'native';
   readonly description: string;
@@ -45,7 +45,7 @@ export class NativeToolExecutor implements ToolExecutor {
   }
 
   async execute(request: ToolRunRequest): Promise<CommandResult> {
-    // El reporte va a un directorio aparte para no quedar dentro del workspace escaneado.
+    // The report goes to a separate directory so it is never part of the scanned workspace.
     const reportDir = mkdtempSync(join(tmpdir(), 'code-sentinel-report-'));
     const reportPath = join(reportDir, 'report.json');
     try {
@@ -64,10 +64,10 @@ export type MountStrategy = 'bind' | 'copy';
 const CONTAINER_WORKSPACE = '/workspace';
 
 /**
- * Corre la herramienta en un contenedor sin red. Con `copy` los archivos se envían con
- * `docker cp` (un único stream tar) en lugar de un bind mount: en Docker Desktop
- * (Windows/macOS) cada lectura sobre un bind mount cruza la frontera de la VM y es
- * órdenes de magnitud más lenta.
+ * Runs the tool in a container without network access (`--network none`). With `copy`
+ * the files are sent with `docker cp` (a single tar stream) instead of a bind mount: on
+ * Docker Desktop (Windows/macOS) every read through a bind mount crosses the VM boundary
+ * and is orders of magnitude slower.
  */
 export class ContainerToolExecutor implements ToolExecutor {
   readonly kind = 'container';
@@ -76,7 +76,7 @@ export class ContainerToolExecutor implements ToolExecutor {
   constructor(
     private readonly runtime: string,
     private readonly image: string,
-    /** Comando dentro de la imagen; vacío si el ENTRYPOINT ya es la herramienta. */
+    /** Command inside the image; empty when the ENTRYPOINT already is the tool. */
     private readonly containerCommand: readonly string[],
     readonly binaryName: string,
     private readonly mountStrategy: MountStrategy,
@@ -85,7 +85,7 @@ export class ContainerToolExecutor implements ToolExecutor {
     this.description = `${runtime}: ${image} (${mountStrategy})`;
   }
 
-  /** Rutas fijas dentro del contenedor para cada entrada lógica. */
+  /** Fixed in-container path for each logical input. */
   static containerInputPath(name: string): string {
     return `/cs-input-${name}`;
   }
@@ -146,7 +146,7 @@ export class ContainerToolExecutor implements ToolExecutor {
       return created;
     }
     try {
-      // `dir<sep>.` copia el contenido de la carpeta; el destino se crea si no existe.
+      // `dir<sep>.` copies the folder contents; the destination is created if missing.
       const copies: Array<[string, string]> = [
         [`${request.workspace}${sep}.`, CONTAINER_WORKSPACE],
         ...Object.entries(request.inputs ?? {}).map(
@@ -164,7 +164,7 @@ export class ContainerToolExecutor implements ToolExecutor {
         ]);
         if (copied.exitCode !== 0) return copied;
       }
-      // `start -a` devuelve el exit code del contenedor y separa stdout de stderr.
+      // `start -a` returns the container exit code and keeps stdout and stderr apart.
       return await this.runner.run(this.runtime, ['start', '-a', containerId]);
     } finally {
       await this.runner.run(this.runtime, ['rm', '-f', containerId]).catch((): void => undefined);

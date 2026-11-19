@@ -25,9 +25,9 @@ jobs:
       - name: Trigger Render Deploy Hook
         if: env.RENDER_HOOK != ''
         run: |
-          echo "Disparando despliegue de backend en Render..."
-          curl -f -X POST "$RENDER_HOOK"
+          echo "Triggering backend deploy on Render..."
+          curl --fail --silent --show-error -X POST "$RENDER_HOOK" > /dev/null
       - name: Skip notification if hook not configured
         if: env.RENDER_HOOK == ''
         run: |
-          echo "RENDER_DEPLOY_HOOK_URL no esta configurado en los secrets del repositorio. Saltando despliegue."
+          echo "RENDER_DEPLOY_HOOK_URL is not configured in the repository secrets. Skipping deploy."

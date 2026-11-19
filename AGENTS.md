@@ -9,6 +9,7 @@ Code Sentinel is an AppSec and vulnerability management platform. It centralizes
 - A NestJS backend with TypeScript, PostgreSQL, and TypeORM.
 - The main frontend application built with Vue 3, Vite, and TypeScript.
 - A separate frontend subproject at `apps/frontend/code-sentinel-2/`, built with Next.js, React, and Tailwind. Treat it as an independent surface until the team decides to integrate or remove it.
+- A Node/TypeScript CLI at `apps/cli/`, published to npm as `@amazingwalin/code-sentinel-cli`, that runs the scanners locally and syncs normalized findings to the backend.
 - Docker Compose configuration for PostgreSQL, the backend, and the Vue frontend.
 - Functional, technical, and engineering documentation in `docs/`.
 
@@ -33,7 +34,7 @@ The dominant language of the code is English. Project documentation mixes Spanis
 /
 ├── docker-compose.yml          # db, back y front
 ├── README.md                   # uso local y Docker
-├── .env.example                # currently empty; update when adding variables
+├── .env.example                # documented environment variables; update when adding variables
 ├── apps/
 │   ├── backend/                # NestJS + PostgreSQL + TypeORM
 │   │   ├── src/auth/
@@ -41,7 +42,13 @@ The dominant language of the code is English. Project documentation mixes Spanis
 │   │   ├── src/projects/
 │   │   ├── src/scans/
 │   │   ├── src/findings/
-│   │   └── test/               # e2e tests
+│   │   └── test/               # integration and e2e tests
+│   ├── cli/                    # npm CLI: scanners, normalization, sync
+│   │   ├── src/cli/            # argument parsing and dispatch
+│   │   ├── src/commands/       # scan, setup, login, logout, whoami
+│   │   ├── src/adapters/       # one folder per scanner
+│   │   ├── src/infra/          # execution engine, managed binaries, workspace
+│   │   └── rules/              # bundled Semgrep rules
 │   └── frontend/               # Vue/Vite, the Compose frontend
 │       ├── src/components/
 │       ├── src/layouts/
@@ -59,7 +66,7 @@ The dominant language of the code is English. Project documentation mixes Spanis
     └── ai-usage/prompts/       # verification prompts
 ```
 
-There is no `package.json` at the repository root. Install dependencies and run scripts from the relevant application directory.
+Install dependencies and run scripts from the relevant application directory. The root `package.json`, `package-lock.json`, and `neon.ts` only hold the Neon CLI configuration; they are not an application workspace.
 
 ## Requirements and Dependencies
 
@@ -101,12 +108,14 @@ POSTGRES_DB=code_sentinel
 POSTGRES_USER=code_sentinel
 POSTGRES_PASSWORD=code_sentinel
 JWT_SECRET=development-only-secret
-JWT_EXPIRES_IN=1h
+JWT_EXPIRES_IN=7d
+DB_SYNCHRONIZE=true
+CORS_ORIGINS=
 ```
 
-Compose passes `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME` to the backend based on these values. `JWT_SECRET` must be strong and environment-specific outside development. Never rely on the default secret in production.
+Compose passes `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME` to the backend based on these values. `JWT_SECRET` must be strong and environment-specific outside development; the backend refuses to start without it when `NODE_ENV=production`. Never rely on the default secret in production.
 
-Note that `.env.example` exists but is currently empty. When adding or depending on a variable, document it there and in the README without including real secret values.
+When adding or depending on a variable, document it in `.env.example` and in the README without including real secret values.
 
 ## Backend: NestJS
 
@@ -160,12 +169,18 @@ Currently implemented routes include:
 - `GET /scans` and `GET /scans/:id` with project, date, status, and severity filters, scoped to the requester's assigned projects unless they are an administrator.
 - `GET /findings` and `GET /findings/:id` with type, severity, scan, and tool filters, scoped to the requester's assigned projects unless they are an administrator.
 - `GET /users`, `POST /users`, `PATCH /users/:id`, and `DELETE /users/:id`, protected for administrators.
+- `GET /projects/directory`, protected for administrators.
+- `POST /scans`, `PATCH /scans/:id/status`, and `POST /scans/:id/results` for the CLI ingestion flow (see `docs/contracts/scan-contract.md`). Status changes are guarded against concurrent updates; duplicate submissions return 409.
+- `POST /scans/:scanId/reports`, `POST /reports/:id/download`, and `POST /scans/:scanId/report/download` for password-protected reports, restricted to analysts.
+- `GET /` and `GET /health` are public.
 
-`main.ts` enables CORS and a global `ValidationPipe` with `whitelist` and `forbidNonWhitelisted`. Preserve these protections when extending the API. Use `JwtAuthGuard` for authenticated resources and `RolesGuard`/`@Roles` for role authorization.
+All `:id` parameters are validated with `ParseUUIDPipe`, and the scans and findings filters use query DTOs (`ScanFiltersDto`, `FindingFiltersDto`); invalid values return 400.
+
+`main.ts` enables CORS (allow-list from `CORS_ORIGINS`) and a global `ValidationPipe` with `whitelist` and `forbidNonWhitelisted`. Preserve these protections when extending the API. Use `JwtAuthGuard` for authenticated resources and `RolesGuard`/`@Roles` for role authorization.
 
 Services must throw appropriate Nest HTTP exceptions with useful messages that do not reveal internal information. Validate and transform route and query parameters to the expected types; do not accept unvalidated strings when the domain expects a UUID, number, date, status, or enum.
 
-The `Scan` entity uses typed statuses and tools. `Finding` normalizes severity, source, location, description, and recommendation. When changing entities or relationships, review DTOs, services, seed data, tests, future migrations, and frontend views. `synchronize: true` is marked for development only; do not use it as a production migration strategy.
+The `Scan` entity uses typed statuses and tools. `Finding` normalizes severity, source, location, description, and recommendation. When changing entities or relationships, review DTOs, services, seed data, tests, future migrations, and frontend views. Schema sync is controlled by `DB_SYNCHRONIZE` (default `true` outside production, `false` in production). Compose and Render set it to `true` explicitly because there are no migrations yet; do not treat this as the long-term production migration strategy.
 
 ### Data and Configuration
 
@@ -218,6 +233,26 @@ Current route protection checks the token and administrator role for `/users`. W
 
 Keep the interface focused on security operations: overview, scans, findings, detail views, and user administration. Reuse existing components and status/severity badges. Provide loading, empty, error, and permission-denied states. Do not hide API errors or display sensitive data. Preserve responsive behavior and avoid unnecessary global styles.
 
+## CLI: `apps/cli`
+
+TypeScript ESM CLI with no runtime dependencies, published to npm by `.github/workflows/publish-cli.yml` when `package.json` has a version that is not yet on npm. Bump the version in `apps/cli/package.json` to release.
+
+Run from `apps/cli`:
+
+```bash
+pnpm install
+pnpm run lint
+pnpm run typecheck
+pnpm test
+pnpm run build
+node dist/main.js --help
+```
+
+- `src/main.ts` is only the bin entrypoint; commands live in `src/commands/`, parsing in `src/cli/`, the backend client in `src/backend/`.
+- Scanners implement `ToolAdapter` and run through the execution engine in `src/infra/` (`--engine auto|native|docker`). Native binaries are pinned versions with SHA-256 hashes embedded in `src/infra/managed-tools.ts`; update version, URL, and hash together. Tools always run without network access.
+- Unit tests never run real scanners or download binaries (`test/setup.ts` forces the Docker engine with fakes).
+- Keep the ingestion contract in `docs/contracts/scan-contract.md` in sync with the backend.
+
 ## `apps/frontend/code-sentinel-2` Subproject
 
 This is a separate Next.js 16 + React 19 + TypeScript + Tailwind/shadcn application with its own `package.json` and lockfile. It is not the frontend served by `apps/frontend/Dockerfile` and is not automatically part of the Vue workflow.
@@ -252,12 +287,13 @@ Match validation effort to change risk:
 | Change | Minimum validation |
 | --- | --- |
 | Backend service/controller/DTO | `pnpm run lint`, relevant unit tests, and `pnpm run test` |
-| Backend auth, guards, or permissions | Authorization tests and `pnpm run test:e2e` |
+| Backend auth, guards, or permissions | Authorization tests, `pnpm run test:integration`, and `pnpm run test:e2e` (builds first; needs PostgreSQL) |
 | Entity, relationship, or query | Build, unit tests, and PostgreSQL/Compose testing when applicable |
 | Vue component/view/store/service | `pnpm run type-check`, `pnpm run lint`, and a relevant unit test |
 | Frontend flow or routing | `pnpm run build` and relevant Cypress e2e test |
 | Docker, Nginx, or environment | `docker compose config` and the affected image's build/startup |
 | Next subproject | `pnpm run lint` and `pnpm run build` from `code-sentinel-2` |
+| CLI | `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, `pnpm run build`, and a `--dry-run` scan of a small fixture |
 
 Run the smallest check that can falsify the change hypothesis first, then expand to lint, builds, and related tests. Report commands that could not run and why.
 
@@ -273,7 +309,7 @@ Code Sentinel procesa informacion potencialmente sensible: codigo fuente, findin
 - Apply least privilege and do not return internal entity fields unnecessarily.
 - Do not trust frontend data to decide roles, ownership, or permissions.
 - Avoid logging Authorization headers, secrets, complete finding payloads, or sensitive paths.
-- Keep CORS restricted and `JWT_SECRET` secure in production. The current `app.enableCors()` is suitable for development but must be reviewed before exposure.
+- Keep CORS restricted with `CORS_ORIGINS` and `JWT_SECRET` secure in production. An empty `CORS_ORIGINS` allows every origin and is only suitable for development.
 - Do not download or execute scanning tools with user-controlled input without validating commands, paths, and permissions.
 - Treat imported reports and files as untrusted data; validate their format, size, and location.
 
@@ -308,7 +344,7 @@ Before finishing a change:
 ## Known Repository State
 
 - Compose publishes the backend at `localhost:8000`, although the generated Nest README contains generic `localhost:3000` references; use the root README and Compose as the source of truth for integrated deployment.
-- The engineering rules require `.env.example`, but the current file is empty; do not assume variables are documented there until it is updated.
-- `TypeOrmModule` uses `synchronize: true` with a development-only note; production work must replace this with migrations or an approved strategy.
+- There are no TypeORM migrations; deployments rely on `DB_SYNCHRONIZE=true`. Replacing this with migrations is pending.
+- The demo login buttons with the seeded accounts in the Vue login page and the CLI login page are intentional; keep them.
 - The Vue frontend is the Compose `front` service. `code-sentinel-2` is a separate Next subproject and must not be confused with the artifact deployed by that Dockerfile.
 - Always check `git status`: existing untracked files belong to the user's working state until confirmed otherwise.

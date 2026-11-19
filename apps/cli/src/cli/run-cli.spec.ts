@@ -1,17 +1,18 @@
+import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-import * as credentialsModule from './auth/credentials.js';
-import * as loginServerModule from './auth/login-server.js';
-import type { ToolAdapter } from './domain/tool-adapter.js';
-import {
-  DEFAULT_API_URL,
-  fetchWithTimeout,
-  getPackageVersion,
-  isAdapterSelected,
-  runCli,
-} from './main.js';
-import * as runAdaptersModule from './pipeline/run-adapters.js';
-import * as projectResolverModule from './project/project-resolver.js';
+import * as credentialsModule from '../auth/credentials.js';
+import * as loginServerModule from '../auth/login-server.js';
+import { fetchWithTimeout } from '../backend/http.js';
+import { DEFAULT_API_URL } from '../config/endpoint.js';
+import type { ToolAdapter } from '../domain/tool-adapter.js';
+import * as runAdaptersModule from '../pipeline/run-adapters.js';
+import * as projectResolverModule from '../project/project-resolver.js';
+import { isAdapterSelected } from '../scan/tool-selection.js';
+import { runCli } from './run-cli.js';
+import { getPackageVersion } from './version.js';
 
 describe('Code Sentinel CLI main', () => {
   it('defines a valid default backend API URL', () => {
@@ -131,10 +132,14 @@ describe('Code Sentinel CLI main', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith('/scans')) {
-        return Promise.resolve(new Response(JSON.stringify({ id: 'scan-abc-456' }), { status: 201 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: 'scan-abc-456' }), { status: 201 }),
+        );
       }
       if (url.includes('/status')) {
-        return Promise.resolve(new Response(JSON.stringify({ status: 'running' }), { status: 200 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: 'running' }), { status: 200 }),
+        );
       }
       if (url.includes('/results')) {
         return Promise.resolve(new Response(JSON.stringify({ totalCount: 0 }), { status: 201 }));
@@ -144,8 +149,12 @@ describe('Code Sentinel CLI main', () => {
 
     const exitCode = await runCli(['scan', '--target', '.']);
     expect(exitCode).toBe(0);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Auto-registered project: "code-sentinel"'));
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Successfully synchronized scan #scan-abc-456!'));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Auto-registered project: "code-sentinel"'),
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Successfully synchronized scan #scan-abc-456!'),
+    );
 
     globalThis.fetch = originalFetch;
     logSpy.mockRestore();
@@ -198,16 +207,102 @@ describe('Code Sentinel CLI main', () => {
     (notFoundError as { code?: string }).code = 'ENOTFOUND';
     globalThis.fetch = vi.fn().mockRejectedValue(notFoundError);
 
-    await expect(
-      fetchWithTimeout('https://invalid-host.test', {}, 1000),
-    ).rejects.toThrow(/Backend host not found/);
+    await expect(fetchWithTimeout('https://invalid-host.test', {}, 1000)).rejects.toThrow(
+      /Backend host not found/,
+    );
 
     globalThis.fetch = originalFetch;
   });
 
+  it('rejects an --api-url that is not an http(s) URL', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const exitCode = await runCli(['whoami', '--api-url', 'file:///etc/passwd']);
+    expect(exitCode).toBe(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid --api-url'));
+  });
+
+  it('fails when --tools matches no supported tool', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const runAdaptersSpy = vi.spyOn(runAdaptersModule, 'runAdapters');
+    const exitCode = await runCli(['scan', '--dry-run', '--tools', 'nmap']);
+    expect(exitCode).toBe(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('No supported tools match'));
+    expect(runAdaptersSpy).not.toHaveBeenCalled();
+  });
+
+  it('exits with 1 when every selected tool failed instead of reporting a clean scan', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(runAdaptersModule, 'runAdapters').mockResolvedValue({
+      findings: [],
+      errors: ['Semgrep failed to execute: docker unavailable'],
+      timings: [{ sourceTool: 'Semgrep', durationMs: 5, ok: false }],
+    });
+    const exitCode = await runCli(['scan', '--dry-run', '--tools', 'semgrep']);
+    expect(exitCode).toBe(1);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('every selected tool failed'));
+  });
+
+  it('saves the fallback report next to a single-file target when sync fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cs-single-file-'));
+    const file = join(dir, 'app.js');
+    writeFileSync(file, 'eval(userInput);\n', 'utf8');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(projectResolverModule, 'resolveOrCreateProject').mockResolvedValue({
+      id: 'proj-1',
+      name: 'app',
+      repo: 'local://app',
+      isNew: false,
+    });
+    vi.spyOn(runAdaptersModule, 'runAdapters').mockResolvedValue({
+      findings: [],
+      errors: [],
+      timings: [],
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('{"message":"down"}', { status: 503 })),
+    );
+
+    try {
+      const exitCode = await runCli([
+        'scan',
+        file,
+        '--token',
+        'jwt',
+        '--api-url',
+        'http://backend.test',
+      ]);
+      expect(exitCode).toBe(1);
+      expect(existsSync(join(dir, 'code-sentinel-findings.json'))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('stores credentials readable by the owner only', () => {
+    if (process.platform === 'win32') return;
+    credentialsModule.saveSession({ token: 'secret-token' });
+    try {
+      expect(statSync(credentialsModule.getCredentialsFilePath()).mode & 0o777).toBe(0o600);
+    } finally {
+      credentialsModule.clearSession();
+    }
+  });
+
   describe('isAdapterSelected', () => {
-    const semgrep = { sourceTool: 'Semgrep', toolCategory: 'SAST' as const } as unknown as ToolAdapter;
-    const gitleaks = { sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' as const } as unknown as ToolAdapter;
+    const semgrep = {
+      sourceTool: 'Semgrep',
+      toolCategory: 'SAST' as const,
+    } as unknown as ToolAdapter;
+    const gitleaks = {
+      sourceTool: 'Gitleaks',
+      toolCategory: 'Secret Scanner' as const,
+    } as unknown as ToolAdapter;
 
     it('matches when "all" is requested', () => {
       expect(isAdapterSelected(semgrep, ['all'])).toBe(true);

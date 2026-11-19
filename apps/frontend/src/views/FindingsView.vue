@@ -1,93 +1,103 @@
-<!-- apps/frontend/src/views/FindingsView.vue -->
 <script setup lang="ts">
 import { ChevronRight, FolderKanban, RotateCcw, Search } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import EmptyState from '@/components/EmptyState.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
-import LoadingState from '@/components/LoadingState.vue'
-import ErrorState from '@/components/ErrorState.vue'
-import EmptyState from '@/components/EmptyState.vue'
 import type { FindingFiltersInterface } from '@/interfaces/FindingFiltersInterface'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ProjectInterface } from '@/interfaces/ProjectInterface'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 import { FindingService } from '@/services/FindingService'
 import { ProjectService } from '@/services/ProjectService'
-import { extractErrorMessage } from '@/services/ErrorHelper'
+
+interface FindingStats {
+  total: number
+  critical: number
+  high: number
+  medium: number
+  low: number
+}
+
+const LOAD_ERROR = 'We could not load the findings. Please try again.'
 
 const findings = ref<FindingInterface[]>([])
 const projects = ref<ProjectInterface[]>([])
 const filters = ref<FindingFiltersInterface>({})
 const selectedProjectId = ref<string>('')
-const searchQuery = ref('')
-const isLoading = ref(true)
+const searchQuery = ref<string>('')
+const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
 
-async function loadData(): Promise<void> {
+let loadSequence = 0
+
+async function loadFindings(): Promise<void> {
+  const sequence = ++loadSequence
   isLoading.value = true
   errorMessage.value = null
   try {
-    const [loadedFindings, loadedProjects] = await Promise.all([
-      FindingService.getFindings(filters.value),
-      ProjectService.getProjects().catch(() => [] as ProjectInterface[]),
-    ])
-    findings.value = loadedFindings
-    projects.value = loadedProjects
+    const loaded = await FindingService.getFindings(filters.value)
+    // Drop responses that were superseded by a newer filter change.
+    if (sequence === loadSequence) findings.value = loaded
   } catch (error) {
-    errorMessage.value = extractErrorMessage(error, 'We could not load the findings. Please try again.')
+    if (sequence === loadSequence) errorMessage.value = extractErrorMessage(error, LOAD_ERROR)
   } finally {
-    isLoading.value = false
+    if (sequence === loadSequence) isLoading.value = false
   }
 }
 
-async function applyFilters(): Promise<void> {
-  errorMessage.value = null
-  try {
-    findings.value = await FindingService.getFindings(filters.value)
-  } catch (error) {
-    errorMessage.value = extractErrorMessage(error, 'We could not load the findings. Please try again.')
-  }
+async function loadData(): Promise<void> {
+  // The project list only feeds the optional project filter; its failure is not fatal.
+  const projectsRequest = ProjectService.getProjects().catch((): ProjectInterface[] => [])
+  await loadFindings()
+  projects.value = await projectsRequest
 }
 
 function resetFilters(): void {
   filters.value = {}
   selectedProjectId.value = ''
   searchQuery.value = ''
-  applyFilters()
+  void loadFindings()
 }
 
-const displayedFindings = computed(() => {
+const displayedFindings = computed<FindingInterface[]>(() => {
   let list = findings.value
 
   if (selectedProjectId.value) {
-    list = list.filter((f) => f.scan?.projectId === selectedProjectId.value || f.scan?.project?.id === selectedProjectId.value)
+    list = list.filter(
+      (finding) =>
+        finding.scan?.projectId === selectedProjectId.value ||
+        finding.scan?.project?.id === selectedProjectId.value,
+    )
   }
 
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return list
 
-  return list.filter((f) => {
-    const projectName = f.scan?.project?.name ?? ''
-    return (
-      f.type.toLowerCase().includes(query) ||
-      (f.cwe && f.cwe.toLowerCase().includes(query)) ||
-      (f.filePath && f.filePath.toLowerCase().includes(query)) ||
-      f.sourceTool.toLowerCase().includes(query) ||
-      (f.description && f.description.toLowerCase().includes(query)) ||
-      projectName.toLowerCase().includes(query)
-    )
-  })
+  return list.filter((finding) =>
+    [
+      finding.type,
+      finding.cwe,
+      finding.filePath,
+      finding.sourceTool,
+      finding.description,
+      finding.scan?.project?.name,
+    ].some((field) => field?.toLowerCase().includes(query)),
+  )
 })
 
-const stats = computed(() => {
+const stats = computed<FindingStats>(() => {
   const all = displayedFindings.value
   return {
     total: all.length,
-    critical: all.filter((f) => f.severity === 'critical').length,
-    high: all.filter((f) => f.severity === 'high').length,
-    medium: all.filter((f) => f.severity === 'medium').length,
-    low: all.filter((f) => f.severity === 'low').length,
+    critical: all.filter((finding) => finding.severity === 'critical').length,
+    high: all.filter((finding) => finding.severity === 'high').length,
+    medium: all.filter((finding) => finding.severity === 'medium').length,
+    low: all.filter((finding) => finding.severity === 'low').length,
   }
 })
 
@@ -102,7 +112,6 @@ onMounted(loadData)
       description="Aggregated vulnerabilities and security defects across all analyzed projects."
     />
 
-    <!-- Quick Severity Metric Counters -->
     <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
       <div class="rounded-lg border border-border bg-card p-3.5 text-center">
         <p class="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Total Findings</p>
@@ -126,20 +135,19 @@ onMounted(loadData)
       </div>
     </div>
 
-    <!-- Filter & Search Toolbar -->
     <div class="mb-5 space-y-3 rounded-lg border border-border bg-card p-4">
       <div class="relative">
-        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+        <Search class="absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden="true" />
         <input
           v-model="searchQuery"
-          type="text"
+          type="search"
+          aria-label="Search findings"
           placeholder="Filter by finding type, CWE, project, file path, or source tool..."
           class="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <!-- Project filter -->
         <div>
           <label for="filter-project" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">PROJECT</label>
           <select
@@ -154,14 +162,13 @@ onMounted(loadData)
           </select>
         </div>
 
-        <!-- Severity filter -->
         <div>
           <label for="filter-severity" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">SEVERITY</label>
           <select
             id="filter-severity"
             v-model="filters.severity"
             class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-            @change="applyFilters"
+            @change="loadFindings"
           >
             <option :value="undefined">All Severities</option>
             <option value="critical">Critical</option>
@@ -171,14 +178,13 @@ onMounted(loadData)
           </select>
         </div>
 
-        <!-- Tool filter -->
         <div>
           <label for="filter-tool" class="mb-1.5 block font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">TOOL</label>
           <select
             id="filter-tool"
             v-model="filters.sourceTool"
             class="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
-            @change="applyFilters"
+            @change="loadFindings"
           >
             <option :value="undefined">All Tools</option>
             <option value="Semgrep">Semgrep</option>
@@ -188,7 +194,6 @@ onMounted(loadData)
           </select>
         </div>
 
-        <!-- Actions / Reset -->
         <div class="flex items-end">
           <button
             type="button"
@@ -210,7 +215,6 @@ onMounted(loadData)
       />
     </div>
 
-    <!-- Table -->
     <div v-if="!errorMessage" class="overflow-x-auto rounded-lg border border-border bg-card">
       <table class="w-full min-w-[840px] text-left text-sm">
         <thead class="border-b border-border bg-muted/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

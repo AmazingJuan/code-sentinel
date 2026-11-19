@@ -1,4 +1,3 @@
-// apps/frontend/src/__tests__/ScanAndFindingServices.spec.ts
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { FindingService } from '@/services/FindingService'

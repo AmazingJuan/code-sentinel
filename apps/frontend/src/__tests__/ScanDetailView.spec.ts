@@ -70,8 +70,11 @@ async function mountScanDetailView(): Promise<ReturnType<typeof mount>> {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/overview', name: 'overview', component: { template: '<div />' } },
+      { path: '/projects/:id', name: 'project.show', component: { template: '<div />' } },
+      { path: '/scan', name: 'scan.index', component: { template: '<div />' } },
       { path: '/scan/:id', name: 'scan.show', component: { template: '<div />' } },
-      { path: '/findings/:id', name: 'finding.show', component: { template: '<div />' } },
+      { path: '/finding/:id', name: 'finding.show', component: { template: '<div />' } },
     ],
   })
   await router.push('/scan/scan-1')

@@ -42,10 +42,10 @@ code-sentinel scan ./path/to/project
 ## Commands
 
 - `code-sentinel setup`: Installs native scanners (pinned, SHA-256 verified) into `~/.code-sentinel/tools` and caches the Semgrep `p/default` ruleset. After this, scans run without Docker.
-- `code-sentinel login`: Opens an interactive web login interface to authorize the CLI session.
-- `code-sentinel scan [options]`: Analyzes target directory and synchronizes findings to Code Sentinel.
+- `code-sentinel login`: Opens a local web login page (on `127.0.0.1`, valid for 5 minutes) to authorize the CLI session.
+- `code-sentinel scan [path] [options]`: Analyzes the target directory or file (`path` is a shorthand for `--target`) and synchronizes findings to Code Sentinel. This is the default command.
 - `code-sentinel whoami`: Displays the active authenticated user and session details.
-- `code-sentinel logout`: Clears saved session credentials from `~/.code-sentinel/credentials.json`.
+- `code-sentinel logout`: Clears saved session credentials from `~/.code-sentinel/credentials.json` (stored with owner-only permissions).
 
 ## Scan Options
 
@@ -53,9 +53,9 @@ code-sentinel scan ./path/to/project
 | --- | --- | --- |
 | `-d, --target <path>` | Target project directory or file to analyze | `.` |
 | `-p, --project <id>` | Project ID or name override (auto-detected if omitted) | Auto-detected |
-| `-u, --api-url <url>` | Code Sentinel backend API URL | Saved session or embedded endpoint |
-| `-t, --token <jwt>` | Authentication token override | Saved session or `CODE_SENTINEL_TOKEN` |
-| `--tools <list>` | Comma-separated tools: `semgrep,gitleaks` | All tools |
+| `-u, --api-url <url>` | Code Sentinel backend API URL (`http`/`https` only) | `CODE_SENTINEL_API_URL`, saved session, or embedded endpoint |
+| `-t, --token <jwt>` | Authentication token override | `CODE_SENTINEL_TOKEN` or saved session |
+| `--tools <list>` | Comma-separated tools or categories: `semgrep`, `gitleaks`, `sast`, `secrets`. Fails if nothing matches | Project tools, else all |
 | `--engine <mode>` | Scanner engine: `auto`, `native`, `docker` | `auto` or `CODE_SENTINEL_ENGINE` |
 | `--refresh-rules` | Re-download the cached Semgrep `p/default` ruleset before scanning | `false` |
 | `--dry-run` | Run scan locally without syncing results to backend | `false` |
@@ -86,6 +86,8 @@ Native binaries installed by the CLI are pinned versions whose SHA-256 is embedd
 
 | Variable | Description | Default |
 | --- | --- | --- |
+| `CODE_SENTINEL_API_URL` | Backend API URL (overridden by `--api-url`) | Embedded at build time |
+| `CODE_SENTINEL_TOKEN` | Authentication token for non-interactive use, e.g. CI (overridden by `--token`) | |
 | `CODE_SENTINEL_ENGINE` | `auto`, `native` or `docker` (overridden by `--engine`) | `auto` |
 | `CODE_SENTINEL_CONTAINER_RUNTIME` | Container CLI to use, e.g. `podman` | `docker` |
 | `CODE_SENTINEL_DOCKER_MOUNT` | `copy` (`docker cp`) or `bind` (volume mount) | `bind` on Linux, `copy` elsewhere |
@@ -94,12 +96,27 @@ Native binaries installed by the CLI are pinned versions whose SHA-256 is embedd
 | `CODE_SENTINEL_SEMGREP_REGISTRY` | `off` to scan only with the rules bundled in the CLI | enabled |
 | `CODE_SENTINEL_CONFIG_DIR` | Directory for session, tools and caches | `~/.code-sentinel` |
 
+## Exit Codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Scan finished without critical or high findings. |
+| `1` | Critical/high findings (CI gate), every selected tool failed, a requested backend sync failed, or invalid usage. |
+| `130` / `143` | Interrupted (`SIGINT` / `SIGTERM`); the temporary workspace is removed. |
+
+## Security Notes
+
+- A saved session token is only sent to the backend it was issued for; scanning against another `--api-url` requires `--token`, `CODE_SENTINEL_TOKEN` or a new login.
+- Backend error bodies are truncated and tokens are masked before they are printed.
+- Code snippets are attached to SAST findings only; secret findings never include the surrounding source lines.
+- If every selected tool fails, the scan is reported to the backend as `failed` instead of as a clean scan.
+
 ## Key Capabilities
 
 - **Zero-Touch Project Registration (RF-038):** Automatically identifies local projects via Git origin, package definition, or folder name. Projects are automatically created and assigned in Code Sentinel if they do not exist.
 - **Web-Based Authentication (RF-037):** Seamless browser-based login flow with visual feedback, eliminating manual copy-pasting of API tokens.
 - **Multi-Tool Pipeline:** Executes SAST and secret scanners, normalizing outputs into unified Code Sentinel findings.
-- **Resilient Offline Fallback:** Automatically syncs results to backend. If the backend is unreachable or offline, findings are saved locally to `code-sentinel-findings.json`.
+- **Resilient Offline Fallback:** Automatically syncs results to backend. If the project cannot be bound or the sync fails, findings are saved to `code-sentinel-findings.json` in the project directory (the parent directory for a single-file target) and the CLI exits with `1`. A scan left half-uploaded is marked `failed` on a best-effort basis.
 
 ## License
 

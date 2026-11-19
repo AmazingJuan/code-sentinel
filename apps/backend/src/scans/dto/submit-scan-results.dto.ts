@@ -1,4 +1,3 @@
-// apps/backend/src/scans/dto/submit-scan-results.dto.ts
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -7,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -48,10 +48,12 @@ export class ScanFindingItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   commitSha?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   cwe?: string | null;
 
   @IsOptional()
@@ -73,10 +75,12 @@ export class SubmitScanResultsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   commitSha?: string | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   branch?: string | null;
 
   @IsOptional()

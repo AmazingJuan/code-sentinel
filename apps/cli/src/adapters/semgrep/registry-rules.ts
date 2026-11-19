@@ -11,7 +11,7 @@ const MAX_RULES_BYTES = 30 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 60_000;
 
 export interface RegistryRulesOptions {
-  /** Ignora la caché vigente y vuelve a descargar. */
+  /** Ignore a fresh cache and download again. */
   refresh?: boolean;
   log?: (message: string) => void;
   fetchImpl?: typeof fetch;
@@ -20,7 +20,7 @@ export interface RegistryRulesOptions {
 
 type RulesFormat = 'json' | 'yml';
 
-/** Semgrep decide el parser por la extensión, así que la caché la conserva. */
+/** Semgrep picks the parser from the file extension, so the cache keeps the right one. */
 export function registryRulesCachePath(format: RulesFormat = 'json'): string {
   return join(getConfigDirectory(), 'cache', `semgrep-p-default.${format}`);
 }
@@ -36,7 +36,7 @@ export function isRegistryRulesDisabled(env: NodeJS.ProcessEnv = process.env): b
   return env.CODE_SENTINEL_SEMGREP_REGISTRY?.trim().toLowerCase() === 'off';
 }
 
-/** El registry responde YAML o JSON según el cliente; ambos son configs válidas de Semgrep. */
+/** The registry answers YAML or JSON depending on the client; both are valid Semgrep configs. */
 export function detectRulesFormat(content: string): RulesFormat | null {
   const trimmed = content.trimStart();
   if (trimmed.startsWith('rules:')) return 'yml';
@@ -52,10 +52,10 @@ export function detectRulesFormat(content: string): RulesFormat | null {
 }
 
 /**
- * Devuelve la ruta local del ruleset `p/default`, descargándolo como mucho una vez por
- * semana. Así Semgrep no baja ni compila el registry en cada corrida y puede ejecutarse
- * sin red. Solo se descargan reglas (YAML o JSON): nunca se envía código del proyecto.
- * Devuelve null si no hay copia disponible; el análisis sigue con las reglas locales.
+ * Returns the local path of the `p/default` ruleset, downloading it at most once a week,
+ * so Semgrep neither fetches nor compiles the registry on every run and can run without
+ * network access. Only rules are downloaded; project code is never sent anywhere.
+ * Returns null when no copy is available and the scan continues with the bundled rules.
  */
 export async function resolveRegistryRules(
   options: RegistryRulesOptions = {},

@@ -16,4 +16,10 @@ services:
         value: 1h
       - key: DATABASE_URL
         sync: false
+      # No migrations exist yet; schema auto-sync keeps the database in step with the entities.
+      - key: DB_SYNCHRONIZE
+        value: "true"
+      # Comma-separated allow-list of browser origins. Unset keeps CORS open (a warning is logged).
+      - key: CORS_ORIGINS
+        sync: false
 

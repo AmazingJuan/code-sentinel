@@ -1,9 +1,8 @@
 import type { Severity } from '../../domain/finding.js';
 
 /**
- * RF-022: Regla documentada para asignar severidad a secretos detectados.
- * Credenciales de alta privacía (claves privadas, tokens de nube, accesos PAT, JWT)
- * se clasifican como 'critical', mientras que claves API generales se clasifican como 'high'.
+ * RF-022: documented severity rule for detected secrets. Highly privileged credentials
+ * (private keys, cloud tokens, PATs, JWTs, passwords) are 'critical'; any other secret is 'high'.
  */
 const CRITICAL_RULE_PATTERNS = [
   'private-key',

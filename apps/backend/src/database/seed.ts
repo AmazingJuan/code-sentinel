@@ -1,77 +1,46 @@
-// apps/backend/src/database/seed.ts
-import * as dotenv from 'dotenv';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { hashPassword } from '../common/password';
 import { User } from '../users/entities/user.entity';
-import { Project } from '../projects/project.entity';
-import { ProjectAssignment } from '../projects/project-assignment.entity';
-import { Scan } from '../scans/scan.entity';
-import { Finding } from '../findings/finding.entity';
 import { DEFAULT_USERS } from '../users/users.service';
-
-// Look for .env in current directory and monorepo root
-const rootEnv = resolve(__dirname, '../../../../.env');
-if (existsSync(rootEnv)) {
-  dotenv.config({ path: rootEnv });
-}
-dotenv.config();
+import { createScriptDataSource } from './script-data-source';
 
 /**
- * Production-ready seeder.
- * Only idempotently provisions the initial default users with deterministic UUIDs.
- * Does NOT generate dummy projects, scans, or sample findings.
- * Does NOT delete or overwrite existing user data or project records.
+ * Idempotently provisions the default users with deterministic UUIDs. Existing
+ * default accounts get their name, role and password reset to the defaults;
+ * no other users, projects, scans or findings are touched.
  */
 async function seed(): Promise<void> {
-  const databaseUrl = process.env.DATABASE_URL;
-  const isSsl = process.env.DB_SSL === 'true' || Boolean(databaseUrl);
-
-  const dataSource = new DataSource({
-    type: 'postgres',
-    ...(databaseUrl
-      ? { url: databaseUrl }
-      : {
-          host: process.env.DB_HOST,
-          port: Number(process.env.DB_PORT),
-          username: process.env.DB_USERNAME,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-        }),
-    ssl: isSsl ? { rejectUnauthorized: false } : false,
-    entities: [User, Project, ProjectAssignment, Scan, Finding],
-    synchronize: true,
-  });
-
+  const dataSource = createScriptDataSource();
   await dataSource.initialize();
-  const userRepo = dataSource.getRepository(User);
 
-  for (const def of DEFAULT_USERS) {
-    const existing = await userRepo.findOne({
-      where: { email: def.email.toLowerCase() },
-    });
-
-    if (existing) {
-      existing.name = def.name;
-      existing.role = def.role;
-      existing.passwordHash = await bcrypt.hash(def.password, 12);
-      await userRepo.save(existing);
-      console.log(`Updated user: ${def.email} (ID: ${existing.id})`);
-    } else {
-      const newUser = userRepo.create({
-        id: def.id,
-        email: def.email.toLowerCase(),
-        name: def.name,
-        passwordHash: await bcrypt.hash(def.password, 12),
-        role: def.role,
+  try {
+    const userRepo = dataSource.getRepository(User);
+    for (const def of DEFAULT_USERS) {
+      const existing = await userRepo.findOne({
+        where: { email: def.email.toLowerCase() },
       });
-      await userRepo.save(newUser);
-      console.log(`Created user: ${def.email} (ID: ${def.id})`);
-    }
-  }
 
-  await dataSource.destroy();
+      if (existing) {
+        existing.name = def.name;
+        existing.role = def.role;
+        existing.passwordHash = await hashPassword(def.password);
+        await userRepo.save(existing);
+        console.log(`Updated user: ${def.email} (ID: ${existing.id})`);
+      } else {
+        await userRepo.save(
+          userRepo.create({
+            id: def.id,
+            email: def.email.toLowerCase(),
+            name: def.name,
+            passwordHash: await hashPassword(def.password),
+            role: def.role,
+          }),
+        );
+        console.log(`Created user: ${def.email} (ID: ${def.id})`);
+      }
+    }
+  } finally {
+    await dataSource.destroy();
+  }
   console.log('Seed completed successfully: default users verified.');
 }
 

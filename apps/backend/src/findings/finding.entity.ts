@@ -1,4 +1,3 @@
-// apps/backend/src/findings/finding.entity.ts
 import {
   Column,
   Entity,
@@ -36,7 +35,8 @@ export class Finding {
   scanId: string;
 
   @Column()
-  type: string; // e.g. 'github-pat', 'SQL Injection', 'Open Port'
+  /** Rule or detector identifier, e.g. 'github-pat' or 'SQL Injection'. */
+  type: string;
 
   @Column({ type: 'varchar', nullable: true })
   severity: FindingSeverity | null;
@@ -60,7 +60,8 @@ export class Finding {
   codeSnippet: string | null;
 
   @Column()
-  sourceTool: string; // Real tool name: 'Semgrep', 'Gitleaks', 'CodeSentinel' (RF-018)
+  /** Concrete tool that produced the finding, e.g. 'Semgrep' (RF-018). */
+  sourceTool: string;
 
   @Column({ type: 'text', nullable: true })
   description: string | null;

@@ -1,5 +1,4 @@
-// apps/frontend/src/interfaces/ScanInterface.ts
-import type { ProjectInterface } from './ProjectInterface'
+import type { ProjectInterface } from '@/interfaces/ProjectInterface'
 
 // RF-006: same lifecycle as the backend (pending → running → completed | failed).
 export const SCAN_STATUSES = ['pending', 'running', 'completed', 'failed'] as const
@@ -83,9 +82,7 @@ export function computeProjectSummariesFromScans(
       highCount,
       mediumCount,
       lowCount,
-      totalCount:
-        latestCompleted?.totalCount ??
-        criticalCount + highCount + mediumCount + lowCount,
+      totalCount: latestCompleted?.totalCount ?? criticalCount + highCount + mediumCount + lowCount,
     })
   }
 

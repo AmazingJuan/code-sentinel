@@ -1,4 +1,3 @@
-// apps/backend/src/scans/dto/update-scan-status.dto.ts
 import { IsIn, IsOptional, IsString } from 'class-validator';
 import { SCAN_STATUSES, type ScanStatus } from '../scan.entity';
 

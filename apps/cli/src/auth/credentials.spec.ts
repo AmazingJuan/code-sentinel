@@ -63,13 +63,23 @@ describe('Credentials Manager', () => {
     expect(resolveEffectiveToken()).toBe('stored-token');
   });
 
+  it('never reuses a saved token for a different backend', () => {
+    saveSession({ token: 'stored-token', apiUrl: 'https://a.example.com' });
+
+    expect(resolveEffectiveToken(undefined, 'https://a.example.com')).toBe('stored-token');
+    expect(resolveEffectiveToken(undefined, 'https://b.example.com')).toBeNull();
+  });
+
   it('validateTokenWithBackend returns valid and user on 200', async () => {
     const mockUser = { id: 'u1', email: 'demo@code-sentinel.local', role: 'analyst' };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => mockUser,
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockUser,
+      }),
+    );
 
     const result = await validateTokenWithBackend('http://localhost:8000', 'valid-token');
     expect(result.valid).toBe(true);
@@ -78,10 +88,13 @@ describe('Credentials Manager', () => {
   });
 
   it('validateTokenWithBackend returns invalid on 401', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      }),
+    );
 
     const result = await validateTokenWithBackend('http://localhost:8000', 'expired-token');
     expect(result.valid).toBe(false);
@@ -97,4 +110,3 @@ describe('Credentials Manager', () => {
     vi.unstubAllGlobals();
   });
 });
-

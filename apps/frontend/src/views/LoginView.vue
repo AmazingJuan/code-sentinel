@@ -1,25 +1,20 @@
 <script setup lang="ts">
+import { AlertCircle, ArrowRight, Eye, EyeOff, Terminal } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  Terminal,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  AlertCircle,
-} from 'lucide-vue-next'
-import TerminalWindow from '../components/TerminalWindow.vue'
+
+import TerminalWindow from '@/components/TerminalWindow.vue'
 import { AuthService } from '@/services/AuthService'
 
-const showPassword = ref(false)
-
-const email = ref('')
-const password = ref('')
-const isLoading = ref(false)
-const errorMessage = ref('')
 const router = useRouter()
+const showPassword = ref<boolean>(false)
+const email = ref<string>('')
+const password = ref<string>('')
+const isLoading = ref<boolean>(false)
+const errorMessage = ref<string>('')
 
 async function onSubmit(): Promise<void> {
+  if (isLoading.value) return
   isLoading.value = true
   errorMessage.value = ''
 
@@ -43,12 +38,8 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
 
 <template>
   <div class="grid min-h-screen min-w-0 lg:grid-cols-2">
-
-    <!-- Left: auth form -->
     <div class="min-w-0 flex flex-col justify-center px-6 py-12 sm:px-12">
       <div class="mx-auto w-full max-w-sm">
-
-        <!-- Logo -->
         <div class="mb-8 flex items-center gap-2.5">
           <div
             class="flex size-9 items-center justify-center rounded-md
@@ -56,14 +47,12 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
           >
             <Terminal class="size-5 text-primary" />
           </div>
-
           <div class="leading-none">
             <span
               class="font-mono text-lg font-semibold tracking-tight"
             >
               code<span class="text-primary">sentinel</span>
             </span>
-
             <p
               class="mt-1 text-[11px] uppercase tracking-widest
                      text-muted-foreground"
@@ -72,23 +61,16 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
             </p>
           </div>
         </div>
-
-        <!-- Header -->
         <h1 class="text-xl font-semibold tracking-tight">
           Sign in
         </h1>
-
         <p class="mt-1 text-sm text-muted-foreground">
           Enter your credentials to access the platform.
         </p>
-
-        <!-- Form -->
         <form
           @submit.prevent="onSubmit"
           class="mt-8 flex flex-col gap-4"
         >
-
-          <!-- Email -->
           <div class="flex flex-col gap-1.5">
             <label
               for="email"
@@ -96,7 +78,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
             >
               Email
             </label>
-
             <input
               id="email"
               v-model="email"
@@ -111,10 +92,7 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
                      focus:ring-primary/40"
             />
           </div>
-
-          <!-- Password -->
           <div class="flex flex-col gap-1.5">
-
             <div class="flex items-center justify-between">
               <label
                 for="password"
@@ -122,9 +100,7 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
               >
                 Password
               </label>
-
             </div>
-
             <div class="relative">
               <input
                 id="password"
@@ -138,7 +114,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
                        focus:border-primary/60
                        focus:ring-1 focus:ring-primary/40"
               />
-
               <button
                 type="button"
                 @click="showPassword = !showPassword"
@@ -156,7 +131,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
                   v-if="showPassword"
                   class="size-4"
                 />
-
                 <Eye
                   v-else
                   class="size-4"
@@ -164,7 +138,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
               </button>
             </div>
           </div>
-
           <div
             v-if="errorMessage"
             role="alert"
@@ -173,8 +146,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
             <AlertCircle class="size-4 shrink-0" />
             <span>{{ errorMessage }}</span>
           </div>
-
-          <!-- Submit -->
           <button
             type="submit"
             class="mt-2 flex h-10 w-full items-center
@@ -183,15 +154,12 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
                    text-primary-foreground
                    transition-opacity hover:opacity-90 disabled:cursor-not-allowed
                    disabled:opacity-60"
-                 :disabled="isLoading"
+            :disabled="isLoading"
           >
-                 {{ isLoading ? 'Signing in...' : 'Sign In' }}
-
+            {{ isLoading ? 'Signing in...' : 'Sign In' }}
             <ArrowRight class="size-4" />
           </button>
         </form>
-
-        <!-- Quick Demo Login Section -->
         <div class="mt-8 border-t border-border/80 pt-6">
           <div class="flex items-center justify-between mb-3">
             <span class="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -201,7 +169,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
               Instant
             </span>
           </div>
-
           <div class="flex flex-col gap-2">
             <button
               type="button"
@@ -216,7 +183,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
               </div>
               <span class="text-[11px] text-primary">Login &rarr;</span>
             </button>
-
             <button
               type="button"
               data-testid="demo-login-admin"
@@ -230,7 +196,6 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
               </div>
               <span class="text-[11px] text-primary">Login &rarr;</span>
             </button>
-
             <button
               type="button"
               data-testid="demo-login-analyst"
@@ -248,15 +213,11 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
         </div>
       </div>
     </div>
-
-    <!-- Right: terminal showcase -->
     <div
       class="relative hidden min-w-0 items-center justify-center
              overflow-hidden border-l border-border
              bg-[oklch(0.14_0.01_260)] p-10 lg:flex"
     >
-
-      <!-- Grid background -->
       <div
         class="pointer-events-none absolute inset-0 opacity-[0.04]"
         :style="{
@@ -268,9 +229,7 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
         }"
         aria-hidden="true"
       />
-
       <div class="relative min-w-0 w-full max-w-lg">
-
         <TerminalWindow
           title="zsh - ~/projects/code-sentinel"
           :lines="[
@@ -375,6 +334,5 @@ async function quickLogin(demoEmail: string, demoPassword: string): Promise<void
         />
       </div>
     </div>
-
   </div>
 </template>

@@ -1,40 +1,35 @@
-// apps/backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ScansModule } from './scans/scans.module';
+import { AuthModule } from './auth/auth.module';
+import { isProductionEnv, parseBooleanEnv } from './common/runtime-env';
+import { buildPostgresConnectionOptions } from './database/postgres-connection';
 import { FindingsModule } from './findings/findings.module';
 import { ProjectsModule } from './projects/projects.module';
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
 import { ReportsModule } from './reports/reports.module';
+import { ScansModule } from './scans/scans.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const databaseUrl = config.get<string>('DATABASE_URL');
-        const isSsl =
-          config.get<string>('DB_SSL') === 'true' || Boolean(databaseUrl);
-
+      useFactory: (config: ConfigService): TypeOrmModuleOptions => {
+        const readEnv = (key: string): string | undefined =>
+          config.get<string>(key);
         return {
-          type: 'postgres',
-          ...(databaseUrl
-            ? { url: databaseUrl }
-            : {
-                host: config.get<string>('DB_HOST'),
-                port: config.get<number>('DB_PORT'),
-                username: config.get<string>('DB_USERNAME'),
-                password: config.get<string>('DB_PASSWORD'),
-                database: config.get<string>('DB_NAME'),
-              }),
-          ssl: isSsl ? { rejectUnauthorized: false } : false,
+          ...buildPostgresConnectionOptions(readEnv),
           autoLoadEntities: true,
-          synchronize: true, // solo para desarrollo, nunca en producción
+          // Schema auto-sync is a development convenience only. It is off by
+          // default in production; set DB_SYNCHRONIZE explicitly to override
+          // until a migration strategy exists.
+          synchronize: parseBooleanEnv(
+            readEnv('DB_SYNCHRONIZE'),
+            !isProductionEnv(readEnv('NODE_ENV')),
+          ),
         };
       },
     }),

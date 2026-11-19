@@ -2,7 +2,7 @@ import axios from 'axios'
 
 import type { AuthUser, LoginResponse } from '@/interfaces/AuthInterface'
 import { useAuthStore } from '@/stores/authStore'
-import { httpClient } from './httpClient'
+import { httpClient } from '@/services/httpClient'
 
 export const AuthService = {
   async login(email: string, password: string): Promise<AuthUser> {
@@ -37,9 +37,9 @@ export const AuthService = {
   },
 
   /**
- * RF-032: each role has its own landing page. The admin never lands on
- * security content; the analyst starts on the security overview.
- */
+   * RF-032: each role has its own landing page. The admin never lands on
+   * security content; the analyst starts on the security overview.
+   */
   getHomeRouteName(): 'users' | 'overview' {
     return useAuthStore().user?.role === 'admin' ? 'users' : 'overview'
   },

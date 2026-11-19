@@ -1,7 +1,6 @@
-// apps/backend/test/integration/fake-jwt-auth.guard.ts
-// Reemplaza al JwtAuthGuard en los tests de integración: en vez de validar un
-// JWT, crea el usuario autenticado según el header `x-test-role`. Así cada test
-// decide si actúa como analyst (por defecto) o como admin.
+// Replaces JwtAuthGuard in integration tests: instead of validating a JWT it
+// builds the authenticated user from the `x-test-role` header, so each test
+// chooses whether it acts as an analyst (default) or an admin.
 import { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Request } from 'express';
 

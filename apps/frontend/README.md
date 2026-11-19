@@ -1,70 +1,26 @@
-# frontend
+# Code Sentinel Dashboard
 
-This template should help get you started developing with Vue 3 in Vite.
+Vue 3 + Vite + TypeScript dashboard of Code Sentinel: overview, projects, scan history, findings with filters, finding detail with code viewer, protected report export and user administration.
 
-## Recommended IDE Setup
+## Quick start
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
+cd apps/frontend
 pnpm install
+CODE_SENTINEL_API_URL=http://localhost:8000 pnpm dev
 ```
 
-### Compile and Hot-Reload for Development
+## Scripts
 
-```sh
-pnpm dev
-```
+| Script | What it does |
+| --- | --- |
+| `pnpm dev` | Development server with hot reload |
+| `pnpm build` | Type-check and production build |
+| `pnpm type-check` | `vue-tsc` type check |
+| `pnpm lint` / `pnpm format` | oxlint + ESLint with autofix / Prettier |
+| `pnpm test:unit` | Vitest unit tests |
+| `pnpm test:e2e` | Cypress tests against the production preview |
 
-### Type-Check, Compile and Minify for Production
+`code-sentinel-2/` is an independent Next.js subproject and is not part of this app's build or checks.
 
-```sh
-pnpm build
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-pnpm test:unit
-```
-
-### Run End-to-End Tests with [Cypress](https://www.cypress.io/)
-
-```sh
-pnpm test:e2e:dev
-```
-
-This runs the end-to-end tests against the Vite development server.
-It is much faster than the production build.
-
-But it's still recommended to test the production build with `test:e2e` before deploying (e.g. in CI environments):
-
-```sh
-pnpm build
-pnpm test:e2e
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-pnpm lint
-```
+See the [root README](../../README.md#frontend) for configuration and the dashboard workflows.

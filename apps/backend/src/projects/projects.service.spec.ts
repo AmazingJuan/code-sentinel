@@ -5,9 +5,8 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 
-// `@nestjs/typeorm`'s published build is ESM-only and cannot be parsed by the
-// CommonJS Jest transform configured for this project. `ProjectsService` only
-// uses `InjectRepository` as a parameter decorator, so a no-op stub is safe here.
+// ProjectsService only uses InjectRepository as a parameter decorator, so a
+// no-op stub is enough when constructing it by hand.
 jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
 }));
@@ -16,7 +15,7 @@ import { ProjectAssignment } from './project-assignment.entity';
 import { Project } from './project.entity';
 import { ProjectsService } from './projects.service';
 import { RequestingUser } from '../types/requesting-user.type';
-import { User, UserRole } from '../users/entities/user.entity';
+import { PublicUser, User, UserRole } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
 
 interface MockProjectRepository {
@@ -39,7 +38,7 @@ interface MockAssignmentRepository {
 
 interface MockUsersService {
   findById: jest.Mock<Promise<User | null>, [string]>;
-  toPublicUser: jest.Mock<Omit<User, 'passwordHash'>, [User]>;
+  toPublicUser: jest.Mock<PublicUser, [User]>;
 }
 
 function createMockProjectRepository(): MockProjectRepository {
@@ -73,10 +72,10 @@ function createMockAssignmentRepository(): MockAssignmentRepository {
 function createMockUsersService(): MockUsersService {
   return {
     findById: jest.fn<Promise<User | null>, [string]>(),
-    toPublicUser: jest.fn<Omit<User, 'passwordHash'>, [User]>((user) => {
+    toPublicUser: jest.fn<PublicUser, [User]>((user) => {
       const publicUser: Partial<User> = { ...user };
       delete publicUser.passwordHash;
-      return publicUser as Omit<User, 'passwordHash'>;
+      return publicUser as PublicUser;
     }),
   };
 }
@@ -94,6 +93,20 @@ describe('ProjectsService', () => {
     projectsRepository = createMockProjectRepository();
     assignmentsRepository = createMockAssignmentRepository();
     usersService = createMockUsersService();
+    const transactionManager = {
+      getRepository: (
+        entity: unknown,
+      ): MockProjectRepository | MockAssignmentRepository =>
+        entity === Project ? projectsRepository : assignmentsRepository,
+    };
+    Object.assign(projectsRepository, {
+      manager: {
+        transaction: jest.fn(
+          (work: (manager: typeof transactionManager) => Promise<unknown>) =>
+            work(transactionManager),
+        ),
+      },
+    });
     service = new ProjectsService(
       projectsRepository as unknown as Repository<Project>,
       assignmentsRepository as unknown as Repository<ProjectAssignment>,
@@ -150,6 +163,19 @@ describe('ProjectsService', () => {
         repo: 'git@github.com:org/repo.git',
         userId: 'user-1',
       });
+    });
+
+    it('maps a concurrent duplicate name to ConflictException', async () => {
+      projectsRepository.findOne.mockResolvedValue(null);
+      projectsRepository.save.mockRejectedValueOnce({ code: '23505' });
+
+      await expect(
+        service.create(
+          { name: 'code-sentinel', repo: 'git@github.com:org/repo.git' },
+          'user-1',
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(assignmentsRepository.save).not.toHaveBeenCalled();
     });
 
     it('rejects a project name that is already registered', async () => {

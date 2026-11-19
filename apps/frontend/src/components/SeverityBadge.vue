@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/SeverityBadge.vue -->
 <script setup lang="ts">
 import type { FindingSeverity } from '@/interfaces/FindingInterface'
 

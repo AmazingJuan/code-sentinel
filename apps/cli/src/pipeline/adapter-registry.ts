@@ -10,9 +10,7 @@ export class AdapterRegistry {
       throw new Error('An adapter requires sourceTool');
     }
     if (!isToolCategory(adapter.toolCategory)) {
-      throw new Error(
-        `${adapter.sourceTool}: unknown category "${String(adapter.toolCategory)}"`,
-      );
+      throw new Error(`${adapter.sourceTool}: unknown category "${String(adapter.toolCategory)}"`);
     }
     if (this.adapters.has(adapter.sourceTool)) {
       throw new Error(`Adapter ${adapter.sourceTool} is already registered`);

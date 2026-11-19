@@ -1,4 +1,3 @@
-// apps/backend/test/integration/scans.integration-spec.ts
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -14,14 +13,19 @@ import { ScansController } from '../../src/scans/scans.controller';
 import { ScansService } from '../../src/scans/scans.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
-describe('Scans — integración (Controller + Service)', (): void => {
+const SCAN_ID = '11111111-1111-4111-8111-111111111111';
+const PROJECT_ID = '22222222-2222-4222-8222-222222222222';
+const UNASSIGNED_PROJECT_ID = '33333333-3333-4333-8333-333333333333';
+const MISSING_SCAN_ID = '44444444-4444-4444-8444-444444444444';
+
+describe('Scans integration (controller + service)', (): void => {
   let app: INestApplication<App>;
 
   const mockScans: Partial<Scan>[] = [
     {
-      id: '1',
+      id: SCAN_ID,
       scanNumber: 1042,
-      projectId: 'p1',
+      projectId: PROJECT_ID,
       status: 'completed',
       errorMessage: null,
       tools: ['SAST', 'Secret Scanner'],
@@ -40,6 +44,13 @@ describe('Scans — integración (Controller + Service)', (): void => {
     save: jest.fn((data: Partial<Scan>): Promise<Partial<Scan>> =>
       Promise.resolve({ id: 'scan-created', ...data }),
     ),
+    update: jest.fn().mockResolvedValue({ affected: 1 }),
+    manager: {
+      transaction: jest.fn(
+        (work: (manager: TransactionManager) => Promise<unknown>) =>
+          work(transactionManager),
+      ),
+    },
   };
 
   const mockFindingRepository = {
@@ -51,13 +62,21 @@ describe('Scans — integración (Controller + Service)', (): void => {
     ),
   };
 
+  interface TransactionManager {
+    getRepository: (entity: unknown) => unknown;
+  }
+  const transactionManager: TransactionManager = {
+    getRepository: (entity: unknown): unknown =>
+      entity === Finding ? mockFindingRepository : mockRepository,
+  };
+
   const mockProjectsService = {
-    getAccessibleProjectIds: jest.fn().mockResolvedValue(['p1']),
+    getAccessibleProjectIds: jest.fn().mockResolvedValue([PROJECT_ID]),
   };
 
   const mockProjectRepository = {
     findOne: jest.fn().mockResolvedValue({
-      id: 'p1',
+      id: PROJECT_ID,
       name: 'code-sentinel',
       status: 'pending',
       lastScan: null,
@@ -108,7 +127,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
     mockRepository.findOne.mockResolvedValue(mockScans[0]);
   });
 
-  it('GET /scans debe retornar 200 con la lista de scans', async (): Promise<void> => {
+  it('GET /scans returns 200 with the scan list', async (): Promise<void> => {
     const response = await request(app.getHttpServer()).get('/scans');
     const body = response.body as Scan[];
 
@@ -117,7 +136,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
     expect(body[0].scanNumber).toBe(1042);
   });
 
-  it('GET /scans?status=completed debe pasar el filtro al service', async (): Promise<void> => {
+  it('GET /scans?status=completed forwards the filter to the query', async (): Promise<void> => {
     await request(app.getHttpServer())
       .get('/scans')
       .query({ status: 'completed' });
@@ -129,7 +148,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
     );
   });
 
-  it('GET /scans?status=running debe aceptar el nuevo estado (RF-006)', async (): Promise<void> => {
+  it('GET /scans?status=running accepts the running status (RF-006)', async (): Promise<void> => {
     const response = await request(app.getHttpServer())
       .get('/scans')
       .query({ status: 'running' });
@@ -137,7 +156,7 @@ describe('Scans — integración (Controller + Service)', (): void => {
     expect(response.status).toBe(200);
   });
 
-  it('GET /scans?status=done debe retornar 400 por estado desconocido (RF-006)', async (): Promise<void> => {
+  it('GET /scans?status=done returns 400 for an unknown status (RF-006)', async (): Promise<void> => {
     const response = await request(app.getHttpServer())
       .get('/scans')
       .query({ status: 'done' });
@@ -145,27 +164,45 @@ describe('Scans — integración (Controller + Service)', (): void => {
     expect(response.status).toBe(400);
   });
 
-  it('GET /scans/:id debe retornar 200 con el scan solicitado', async (): Promise<void> => {
-    const response = await request(app.getHttpServer()).get('/scans/1');
+  it('GET /scans/:id returns 200 with the requested scan', async (): Promise<void> => {
+    const response = await request(app.getHttpServer()).get(
+      `/scans/${SCAN_ID}`,
+    );
     const body = response.body as Scan;
 
     expect(response.status).toBe(200);
-    expect(body.id).toBe('1');
+    expect(body.id).toBe(SCAN_ID);
   });
 
-  it('GET /scans/:id debe retornar 404 cuando el scan no existe', async (): Promise<void> => {
+  it('GET /scans/:id returns 404 when the scan does not exist', async (): Promise<void> => {
     mockRepository.findOne.mockResolvedValueOnce(null);
 
-    const response = await request(app.getHttpServer()).get('/scans/no-existe');
+    const response = await request(app.getHttpServer()).get(
+      `/scans/${MISSING_SCAN_ID}`,
+    );
 
     expect(response.status).toBe(404);
   });
 
-  describe('Endpoints del contrato de ingesta (POST /scans, PATCH /scans/:id/status, POST /scans/:id/results)', (): void => {
-    it('POST /scans debe crear un scan en pending y retornar 201 (RF-005)', async (): Promise<void> => {
+  it('GET /scans/:id returns 400 for a malformed id', async (): Promise<void> => {
+    const response = await request(app.getHttpServer()).get(
+      '/scans/not-a-uuid',
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('GET /scans returns 400 for a malformed date filter', async (): Promise<void> => {
+    const response = await request(app.getHttpServer())
+      .get('/scans')
+      .query({ dateFrom: 'yesterday' });
+    expect(response.status).toBe(400);
+  });
+
+  describe('Ingestion contract (POST /scans, PATCH /scans/:id/status, POST /scans/:id/results)', (): void => {
+    it('POST /scans creates a pending scan and returns 201 (RF-005)', async (): Promise<void> => {
       const response = await request(app.getHttpServer())
         .post('/scans')
-        .send({ projectId: 'p1', tools: ['SAST', 'Secret Scanner'] });
+        .send({ projectId: PROJECT_ID, tools: ['SAST', 'Secret Scanner'] });
       const body = response.body as Scan;
 
       expect(response.status).toBe(201);
@@ -173,23 +210,23 @@ describe('Scans — integración (Controller + Service)', (): void => {
       expect(body.scanNumber).toBe(1043);
     });
 
-    it('POST /scans debe retornar 403 si el proyecto no está asignado al analista (RF-035)', async (): Promise<void> => {
+    it('POST /scans returns 403 when the project is not assigned to the analyst (RF-035)', async (): Promise<void> => {
       const response = await request(app.getHttpServer())
         .post('/scans')
-        .send({ projectId: 'p-unassigned', tools: ['SAST'] });
+        .send({ projectId: UNASSIGNED_PROJECT_ID, tools: ['SAST'] });
 
       expect(response.status).toBe(403);
     });
 
-    it('PATCH /scans/:id/status debe mover un scan de pending a running y retornar 200 (RF-006)', async (): Promise<void> => {
+    it('PATCH /scans/:id/status moves a scan from pending to running and returns 200 (RF-006)', async (): Promise<void> => {
       mockRepository.findOne.mockResolvedValueOnce({
-        id: 'scan-pending',
-        projectId: 'p1',
+        id: SCAN_ID,
+        projectId: PROJECT_ID,
         status: 'pending',
       });
 
       const response = await request(app.getHttpServer())
-        .patch('/scans/scan-pending/status')
+        .patch(`/scans/${SCAN_ID}/status`)
         .send({ status: 'running' });
       const body = response.body as Scan;
 
@@ -197,29 +234,29 @@ describe('Scans — integración (Controller + Service)', (): void => {
       expect(body.status).toBe('running');
     });
 
-    it('PATCH /scans/:id/status debe retornar 409 en una transición inválida (RF-006)', async (): Promise<void> => {
+    it('PATCH /scans/:id/status returns 409 for an invalid transition (RF-006)', async (): Promise<void> => {
       mockRepository.findOne.mockResolvedValueOnce({
-        id: 'scan-closed',
-        projectId: 'p1',
+        id: SCAN_ID,
+        projectId: PROJECT_ID,
         status: 'completed',
       });
 
       const response = await request(app.getHttpServer())
-        .patch('/scans/scan-closed/status')
+        .patch(`/scans/${SCAN_ID}/status`)
         .send({ status: 'running' });
 
       expect(response.status).toBe(409);
     });
 
-    it('POST /scans/:id/results debe cerrar el scan en 200 con conteos calculados y findings registrados (RF-010, RF-019)', async (): Promise<void> => {
+    it('POST /scans/:id/results closes the scan with computed counters and stored findings (RF-010, RF-019)', async (): Promise<void> => {
       mockRepository.findOne.mockResolvedValueOnce({
-        id: 'scan-running',
-        projectId: 'p1',
+        id: SCAN_ID,
+        projectId: PROJECT_ID,
         status: 'running',
       });
 
       const response = await request(app.getHttpServer())
-        .post('/scans/scan-running/results')
+        .post(`/scans/${SCAN_ID}/results`)
         .send({
           status: 'completed',
           errorMessage: null,
@@ -245,15 +282,30 @@ describe('Scans — integración (Controller + Service)', (): void => {
       expect(body.totalCount).toBe(1);
     });
 
-    it('POST /scans/:id/results debe retornar 409 si el scan ya estaba cerrado', async (): Promise<void> => {
+    it('POST /scans/:id/results returns 409 when another submission closed the scan first', async (): Promise<void> => {
       mockRepository.findOne.mockResolvedValueOnce({
-        id: 'scan-closed',
-        projectId: 'p1',
+        id: SCAN_ID,
+        projectId: PROJECT_ID,
+        status: 'running',
+      });
+      mockRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      const response = await request(app.getHttpServer())
+        .post(`/scans/${SCAN_ID}/results`)
+        .send({ status: 'completed', findings: [] });
+
+      expect(response.status).toBe(409);
+    });
+
+    it('POST /scans/:id/results returns 409 when the scan is already closed', async (): Promise<void> => {
+      mockRepository.findOne.mockResolvedValueOnce({
+        id: SCAN_ID,
+        projectId: PROJECT_ID,
         status: 'failed',
       });
 
       const response = await request(app.getHttpServer())
-        .post('/scans/scan-closed/results')
+        .post(`/scans/${SCAN_ID}/results`)
         .send({
           status: 'completed',
           errorMessage: null,
@@ -263,9 +315,9 @@ describe('Scans — integración (Controller + Service)', (): void => {
       expect(response.status).toBe(409);
     });
 
-    it('POST /scans/:id/results debe sincronizar los contadores del proyecto y rechazar con 400 secretos en texto plano (RF-028, RF-029)', async (): Promise<void> => {
+    it('POST /scans/:id/results syncs project counters and rejects plaintext secrets with 400 (RF-028, RF-029)', async (): Promise<void> => {
       const forbiddenResponse = await request(app.getHttpServer())
-        .post('/scans/scan-running-2/results')
+        .post(`/scans/${SCAN_ID}/results`)
         .send({
           status: 'completed',
           findings: [
@@ -284,14 +336,14 @@ describe('Scans — integración (Controller + Service)', (): void => {
     });
   });
 
-  describe('RF-027 — findings correspondientes solo al scan seleccionado', (): void => {
-    it('GET /scans/:id debe retornar únicamente los findings de ese scan, no de otros', async (): Promise<void> => {
+  describe('RF-027: findings scoped to the selected scan', (): void => {
+    it('GET /scans/:id returns only the findings of that scan', async (): Promise<void> => {
       const scanWithScopedFindings = {
         ...mockScans[0],
         findings: [
           {
             id: 'f1',
-            scanId: '1',
+            scanId: SCAN_ID,
             type: 'Hardcoded Secret',
             severity: 'critical',
           },
@@ -299,30 +351,34 @@ describe('Scans — integración (Controller + Service)', (): void => {
       };
       mockRepository.findOne.mockResolvedValueOnce(scanWithScopedFindings);
 
-      const response = await request(app.getHttpServer()).get('/scans/1');
+      const response = await request(app.getHttpServer()).get(
+        `/scans/${SCAN_ID}`,
+      );
       const body = response.body as { findings: { scanId: string }[] };
 
       expect(body.findings).toHaveLength(1);
       expect(
-        body.findings.every((f: { scanId: string }) => f.scanId === '1'),
+        body.findings.every((f: { scanId: string }) => f.scanId === SCAN_ID),
       ).toBe(true);
     });
 
-    it('GET /scans/:id debe retornar findings: [] cuando el scan no tiene hallazgos', async (): Promise<void> => {
+    it('GET /scans/:id returns findings: [] when the scan has no findings', async (): Promise<void> => {
       mockRepository.findOne.mockResolvedValueOnce({
         ...mockScans[0],
         findings: [],
       });
 
-      const response = await request(app.getHttpServer()).get('/scans/1');
+      const response = await request(app.getHttpServer()).get(
+        `/scans/${SCAN_ID}`,
+      );
       const body = response.body as { findings: unknown[] };
 
       expect(body.findings).toEqual([]);
     });
   });
 
-  describe('RF-032 — el administrador no accede a los scans', (): void => {
-    it('GET /scans como admin debe retornar 403 sin consultar la base de datos', async (): Promise<void> => {
+  describe('RF-032: administrators cannot access scans', (): void => {
+    it('GET /scans as admin returns 403 without querying the database', async (): Promise<void> => {
       mockRepository.find.mockClear();
 
       const response = await request(app.getHttpServer())
@@ -333,19 +389,19 @@ describe('Scans — integración (Controller + Service)', (): void => {
       expect(mockRepository.find).not.toHaveBeenCalled();
     });
 
-    it('GET /scans/:id como admin debe retornar 403', async (): Promise<void> => {
+    it('GET /scans/:id as admin returns 403', async (): Promise<void> => {
       const response = await request(app.getHttpServer())
-        .get('/scans/1')
+        .get(`/scans/${SCAN_ID}`)
         .set(TEST_ROLE_HEADER, 'admin');
 
       expect(response.status).toBe(403);
     });
 
-    it('POST /scans como admin debe retornar 403 (RF-032)', async (): Promise<void> => {
+    it('POST /scans as admin returns 403 (RF-032)', async (): Promise<void> => {
       const response = await request(app.getHttpServer())
         .post('/scans')
         .set(TEST_ROLE_HEADER, 'admin')
-        .send({ projectId: 'p1', tools: ['SAST'] });
+        .send({ projectId: PROJECT_ID, tools: ['SAST'] });
 
       expect(response.status).toBe(403);
     });

@@ -1,4 +1,3 @@
-// apps/backend/src/app.service.ts
 import { Injectable } from '@nestjs/common';
 
 export interface HealthCheckResponse {

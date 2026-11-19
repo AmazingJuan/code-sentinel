@@ -1,4 +1,4 @@
-/** Partes del JSON de `semgrep --json` que usa el CLI. El resto del reporte se ignora. */
+/** The subset of `semgrep --json` output the CLI uses; the rest of the report is ignored. */
 export interface SemgrepResult {
   check_id: string;
   path: string;
@@ -18,7 +18,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function isSemgrepResult(value: unknown): value is SemgrepResult {
+function isSemgrepResult(value: unknown): value is SemgrepResult {
   return (
     isRecord(value) &&
     typeof value.check_id === 'string' &&

@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/ErrorState.vue -->
 <script setup lang="ts">
 import { AlertTriangle, RotateCcw } from 'lucide-vue-next'
 
@@ -30,7 +29,6 @@ const emit = defineEmits<{
     role="alert"
   >
     <div class="relative flex items-center justify-center">
-      <!-- Glow ring -->
       <div class="absolute size-9 rounded-full bg-destructive/20 blur-sm" />
       <div class="flex size-10 items-center justify-center rounded-full border border-destructive/40 bg-destructive/15">
         <AlertTriangle class="size-5 text-destructive" />

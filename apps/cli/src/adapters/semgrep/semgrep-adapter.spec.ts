@@ -50,7 +50,9 @@ function buildAdapter(
 function argsOf(executor: FakeExecutor): string[] {
   const request = executor.lastRequest as ToolRunRequest;
   return request.buildArgs({
-    inputs: Object.fromEntries(Object.keys(request.inputs ?? {}).map((name) => [name, `/in/${name}`])),
+    inputs: Object.fromEntries(
+      Object.keys(request.inputs ?? {}).map((name) => [name, `/in/${name}`]),
+    ),
     reportPath: '/dev/stdout',
   });
 }
@@ -123,7 +125,10 @@ describe('SemgrepAdapter.run', (): void => {
 
     expect(rawReport).toBe(fixtureReport);
     expect(executor.lastRequest?.workspace).toBe(target.rootPath);
-    expect(executor.lastRequest?.inputs).toEqual({ rules: '/rules', registry: '/cache/p-default.yml' });
+    expect(executor.lastRequest?.inputs).toEqual({
+      rules: '/rules',
+      registry: '/cache/p-default.yml',
+    });
     const args = argsOf(executor);
     expect(args).toEqual([
       'scan',
@@ -188,6 +193,8 @@ describe('SemgrepAdapter.run', (): void => {
       registryRules: (): Promise<string | null> => Promise.resolve(null),
     });
 
-    await expect(adapter.run(target)).rejects.toThrow('Semgrep failed to execute: docker is not available');
+    await expect(adapter.run(target)).rejects.toThrow(
+      'Semgrep failed to execute: docker is not available',
+    );
   });
 });

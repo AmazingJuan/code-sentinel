@@ -1,57 +1,65 @@
-import { exec } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
 
-import { saveSession, type StoredSession } from './credentials.js';
+import { fetchWithTimeout } from '../backend/http.js';
+import { errorMessage } from '../domain/errors.js';
+import { saveSession, type SessionUser, type StoredSession } from './credentials.js';
+
+/** How long the local login page waits for the user before giving up. */
+const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_LOGIN_BODY_BYTES = 16 * 1024;
+const SERVER_CLOSE_DELAY_MS = 2500;
 
 export interface LoginResult {
   token: string;
-  user: {
-    id?: string;
-    email: string;
-    name?: string;
-    role?: string;
-  };
+  user: SessionUser;
+}
+
+export interface LoginServer {
+  server: Server;
+  port: number;
+  sessionPromise: Promise<StoredSession>;
 }
 
 export function openBrowser(url: string): void {
-  const platform = process.platform;
-  let command = '';
-  if (platform === 'darwin') {
-    command = `open "${url}"`;
-  } else if (platform === 'win32') {
-    command = `start "" "${url}"`;
-  } else {
-    command = `xdg-open "${url}" > /dev/null 2>&1`;
+  // Arguments are passed without a shell so the URL can never be interpreted as a command.
+  const [command, args] =
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : ['xdg-open', [url]];
+  try {
+    const child = spawn(command, args, { stdio: 'ignore', detached: true, windowsHide: true });
+    // Headless environments have no browser; the URL is printed for manual use.
+    child.on('error', (): void => undefined);
+    child.unref();
+  } catch {
+    // Same as above: opening the browser is a convenience, never a requirement.
   }
-
-  exec(command, () => {
-    // Ignore browser open errors (e.g. headless Linux environments)
-  });
 }
 
+/** Pages live next to the compiled module in dist/, and under src/ when running tests. */
 function resolvePagePath(pageName: string): string {
-  // 1. In dist/auth/pages (when running bundled from dist)
   const distPath = fileURLToPath(new URL(`./pages/${pageName}`, import.meta.url));
   if (existsSync(distPath)) return distPath;
 
-  // 2. In src/auth/pages (when running from src or tests)
   const srcPath = fileURLToPath(new URL(`../pages/${pageName}`, import.meta.url));
   if (existsSync(srcPath)) return srcPath;
 
   return distPath;
 }
 
-export function renderLoginPage(): string {
+function renderLoginPage(): string {
   try {
     const pagePath = resolvePagePath('login.html');
     if (existsSync(pagePath)) {
       return readFileSync(pagePath, 'utf8');
     }
   } catch {
-    // Fallback if file read fails
+    // Fall back to the inline page below.
   }
 
   return `<!DOCTYPE html>
@@ -142,14 +150,14 @@ export function renderLoginPage(): string {
 </html>`;
 }
 
-export function renderSuccessPage(): string {
+function renderSuccessPage(): string {
   try {
     const pagePath = resolvePagePath('success.html');
     if (existsSync(pagePath)) {
       return readFileSync(pagePath, 'utf8');
     }
   } catch {
-    // Fallback if file read fails
+    // Fall back to the inline page below.
   }
 
   return `<!DOCTYPE html>
@@ -177,129 +185,153 @@ export function renderSuccessPage(): string {
 </html>`;
 }
 
-export async function authenticateViaBackend(
+async function authenticateViaBackend(
   apiUrl: string,
   email: string,
   password: string,
-): Promise<{ token: string; user: { id?: string; email: string; name?: string; role?: string } }> {
-  const loginRes = await fetch(`${apiUrl}/auth/login`, {
+): Promise<LoginResult> {
+  const loginRes = await fetchWithTimeout(`${apiUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
 
   if (!loginRes.ok) {
-    const errData = await loginRes.json().catch(() => ({ message: 'Invalid credentials' }));
+    const errData = (await loginRes.json().catch((): unknown => null)) as {
+      message?: unknown;
+    } | null;
     const message = Array.isArray(errData?.message)
-      ? errData.message.join(' ')
-      : errData?.message || `HTTP ${loginRes.status}: Failed to sign in`;
-    throw new Error(message);
+      ? errData.message.map(String).join(' ')
+      : typeof errData?.message === 'string'
+        ? errData.message
+        : `HTTP ${loginRes.status}: Failed to sign in`;
+    throw new Error(message.slice(0, 300));
   }
 
   const data = (await loginRes.json()) as {
     accessToken?: string;
     access_token?: string;
     token?: string;
-    user?: { id?: string; email: string; name?: string; role?: string };
+    user?: SessionUser;
   };
 
   const token = data.accessToken || data.access_token || data.token;
   if (!token) {
     throw new Error('Server response did not include a valid access token');
   }
-
-  const user = data.user || { email };
-  return { token, user };
+  return { token, user: data.user ?? { email } };
 }
 
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req: IncomingMessage, limit: number): Promise<string> {
+  return new Promise<string>((resolve, reject): void => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer): void => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('Request body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', (): void => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Serves the login page on 127.0.0.1 and resolves `sessionPromise` once the user signs
+ * in. No CORS headers are sent: only the page served by this server may call /api/login.
+ */
 export function startLoginServer(
   apiUrl: string,
   preferredPort: number = 0,
-): Promise<{ server: Server; port: number; sessionPromise: Promise<StoredSession> }> {
-  return new Promise((resolveServer, rejectServer) => {
-    let server: Server;
+  timeoutMs: number = LOGIN_TIMEOUT_MS,
+): Promise<LoginServer> {
+  let resolveSession!: (session: StoredSession) => void;
+  let rejectSession!: (error: Error) => void;
+  const sessionPromise = new Promise<StoredSession>((resolve, reject): void => {
+    resolveSession = resolve;
+    rejectSession = reject;
+  });
+  // Avoid an unhandled rejection if the caller never awaits the session.
+  sessionPromise.catch((): void => undefined);
 
-    const sessionPromise = new Promise<StoredSession>((resolveSession, rejectSession) => {
-      server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-        // Set CORS headers for local requests
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  let completed = false;
 
-        if (req.method === 'OPTIONS') {
-          res.writeHead(204);
-          res.end();
-          return;
-        }
+  const handleLogin = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    let credentials: { email?: unknown; password?: unknown };
+    try {
+      credentials = JSON.parse(await readBody(req, MAX_LOGIN_BODY_BYTES)) as typeof credentials;
+    } catch {
+      sendJson(res, 400, { error: 'Invalid request body' });
+      return;
+    }
+    const { email, password } = credentials ?? {};
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+      sendJson(res, 400, { error: 'Email and password are required' });
+      return;
+    }
 
-        const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    try {
+      const { token, user } = await authenticateViaBackend(apiUrl, email, password);
+      saveSession({ token, apiUrl, user });
+      sendJson(res, 200, { success: true, user });
+      completed = true;
+      clearTimeout(timer);
+      // Give the browser time to load /success before the server goes away.
+      setTimeout((): void => {
+        server.close();
+        resolveSession({ token, apiUrl, user, savedAt: new Date().toISOString() });
+      }, SERVER_CLOSE_DELAY_MS);
+    } catch (error: unknown) {
+      sendJson(res, 401, { error: errorMessage(error) });
+    }
+  };
 
-        if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/login')) {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(renderLoginPage());
-          return;
-        }
+  const server = createServer((req: IncomingMessage, res: ServerResponse): void => {
+    const url = new URL(req.url || '/', 'http://127.0.0.1');
 
-        if (req.method === 'GET' && url.pathname === '/success') {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(renderSuccessPage());
-          return;
-        }
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/login')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderLoginPage());
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/success') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderSuccessPage());
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/login' && !completed) {
+      void handleLogin(req, res);
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+  });
 
-        if (req.method === 'POST' && url.pathname === '/api/login') {
-          let body = '';
-          req.on('data', (chunk) => {
-            body += chunk;
-          });
+  const timer = setTimeout((): void => {
+    server.close();
+    rejectSession(new Error(`No login completed within ${Math.round(timeoutMs / 60_000)} minutes`));
+  }, timeoutMs);
+  timer.unref();
 
-          req.on('end', async () => {
-            try {
-              const { email, password } = JSON.parse(body);
-              if (!email || !password) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Email and password are required' }));
-                return;
-              }
-
-              const { token, user } = await authenticateViaBackend(apiUrl, email, password);
-
-              saveSession({ token, apiUrl, user });
-
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: true, user }));
-
-              // Allow browser to complete redirection to /success before closing server
-              setTimeout(() => {
-                server.close();
-                resolveSession({
-                  token,
-                  apiUrl,
-                  user,
-                  savedAt: new Date().toISOString(),
-                });
-              }, 2500);
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : String(err);
-              res.writeHead(401, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: message }));
-            }
-          });
-          return;
-        }
-
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not found');
-      });
-
-      server.on('error', (err) => {
-        rejectServer(err);
-        rejectSession(err);
-      });
-
-      server.listen(preferredPort, '127.0.0.1', () => {
-        const address = server.address() as { port: number };
-        resolveServer({ server, port: address.port, sessionPromise });
-      });
+  return new Promise<LoginServer>((resolveServer, rejectServer): void => {
+    server.on('error', (error: Error): void => {
+      clearTimeout(timer);
+      rejectServer(error);
+      rejectSession(error);
+    });
+    server.listen(preferredPort, '127.0.0.1', (): void => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : preferredPort;
+      resolveServer({ server, port, sessionPromise });
     });
   });
 }

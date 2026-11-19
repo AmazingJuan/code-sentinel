@@ -1,4 +1,3 @@
-// apps/frontend/src/services/ScanService.ts
 import type { ScanFiltersInterface } from '@/interfaces/ScanFiltersInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
 import { httpClient } from '@/services/httpClient'

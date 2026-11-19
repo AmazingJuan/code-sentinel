@@ -1,4 +1,3 @@
-// apps/backend/src/projects/projects.service.ts
 import {
   ConflictException,
   ForbiddenException,
@@ -6,25 +5,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
+import { isUniqueViolation } from '../common/postgres-errors';
+import { RequestingUser } from '../types/requesting-user.type';
+import { PublicUser, UserRole } from '../users/entities/user.entity';
+import { UsersService } from '../users/users.service';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectAssignment } from './project-assignment.entity';
 import { Project } from './project.entity';
-import { RequestingUser } from '../types/requesting-user.type';
-import { User, UserRole } from '../users/entities/user.entity';
-import { UsersService } from '../users/users.service';
 
 export type PublicProjectAssignment = Omit<ProjectAssignment, 'user'> & {
-  user: Omit<User, 'passwordHash'>;
+  user: PublicUser;
 };
 
-/**
- * Minimal view of a project for the administrator (RF-032 + RF-035): just
- * enough to assign it to users, without any security content.
- */
+/** Id and name only: what an administrator needs to manage assignments. */
 export type ProjectDirectoryEntry = Pick<Project, 'id' | 'name'>;
+
+const PROJECT_NAME_TAKEN_MESSAGE =
+  'A project with this name is already registered';
+const ALREADY_ASSIGNED_MESSAGE = 'This user is already assigned to the project';
+const NOT_ASSIGNED_MESSAGE = 'You are not assigned to this project';
 
 @Injectable()
 export class ProjectsService {
@@ -45,27 +47,31 @@ export class ProjectsService {
 
     const existingProject = await this.findByName(name);
     if (existingProject) {
-      throw new ConflictException(
-        'A project with this name is already registered',
-      );
+      throw new ConflictException(PROJECT_NAME_TAKEN_MESSAGE);
     }
 
-    const project = await this.projectsRepository.save(
-      this.projectsRepository.create({
-        name,
-        repo,
-        userId,
-      }),
-    );
-
-    // The registrant is automatically assigned so the project they just
-    // registered is immediately available to them for configuration and
-    // scanning, without waiting on a separate administrator action.
-    await this.assignmentsRepository.save(
-      this.assignmentsRepository.create({ projectId: project.id, userId }),
-    );
-
-    return project;
+    try {
+      return await this.projectsRepository.manager.transaction(
+        async (manager: EntityManager): Promise<Project> => {
+          const projects = manager.getRepository(Project);
+          const assignments = manager.getRepository(ProjectAssignment);
+          const project = await projects.save(
+            projects.create({ name, repo, userId }),
+          );
+          // The registrant is assigned right away so the project is usable
+          // without waiting for an administrator.
+          await assignments.save(
+            assignments.create({ projectId: project.id, userId }),
+          );
+          return project;
+        },
+      );
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(PROJECT_NAME_TAKEN_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   findByName(name: string): Promise<Project | null> {
@@ -83,7 +89,6 @@ export class ProjectsService {
     });
   }
 
-  /** Id and name of every project, for the administrator's assignment view. */
   findDirectory(): Promise<ProjectDirectoryEntry[]> {
     return this.projectsRepository.find({
       select: { id: true, name: true },
@@ -122,10 +127,12 @@ export class ProjectsService {
       relations: { user: true },
       order: { assignedAt: 'ASC' },
     });
-    return assignments.map((assignment) => ({
-      ...assignment,
-      user: this.usersService.toPublicUser(assignment.user),
-    }));
+    return assignments.map(
+      (assignment: ProjectAssignment): PublicProjectAssignment => ({
+        ...assignment,
+        user: this.usersService.toPublicUser(assignment.user),
+      }),
+    );
   }
 
   async assignUser(
@@ -143,17 +150,22 @@ export class ProjectsService {
       where: { projectId, userId: assignProjectDto.userId },
     });
     if (existingAssignment) {
-      throw new ConflictException(
-        'This user is already assigned to the project',
-      );
+      throw new ConflictException(ALREADY_ASSIGNED_MESSAGE);
     }
 
-    return this.assignmentsRepository.save(
-      this.assignmentsRepository.create({
-        projectId,
-        userId: assignProjectDto.userId,
-      }),
-    );
+    try {
+      return await this.assignmentsRepository.save(
+        this.assignmentsRepository.create({
+          projectId,
+          userId: assignProjectDto.userId,
+        }),
+      );
+    } catch (error: unknown) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(ALREADY_ASSIGNED_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   async unassignUser(projectId: string, userId: string): Promise<void> {
@@ -168,9 +180,9 @@ export class ProjectsService {
   }
 
   /**
-   * Returns the ids of the projects whose security content the requester may
-   * access. Administrators always get an empty list (RF-032): they manage
-   * identities, never projects, scans, findings or reports.
+   * Ids of the projects whose security content the requester may access.
+   * Administrators always get an empty list (RF-032): they manage identities,
+   * never projects, scans, findings or reports.
    */
   async getAccessibleProjectIds(requester: RequestingUser): Promise<string[]> {
     if (requester.role === UserRole.ADMIN) {
@@ -179,7 +191,9 @@ export class ProjectsService {
     const assignments = await this.assignmentsRepository.find({
       where: { userId: requester.id },
     });
-    return assignments.map((assignment) => assignment.projectId);
+    return assignments.map(
+      (assignment: ProjectAssignment): string => assignment.projectId,
+    );
   }
 
   private async assertAccess(
@@ -188,7 +202,7 @@ export class ProjectsService {
   ): Promise<void> {
     const accessibleProjectIds = await this.getAccessibleProjectIds(requester);
     if (!accessibleProjectIds.includes(projectId)) {
-      throw new ForbiddenException('You are not assigned to this project');
+      throw new ForbiddenException(NOT_ASSIGNED_MESSAGE);
     }
   }
 

@@ -1,19 +1,19 @@
 import type { ParsedFinding, ToolCategory } from './finding.js';
 
 export interface ScanTarget {
-  /** Ruta absoluta de la carpeta del proyecto a escanear. */
+  /** Absolute path of the directory to scan. */
   rootPath: string;
 }
 
 /**
- * Contrato que cumple toda herramienta integrada (RF-030, NFR-005).
- * Integrar una herramienta nueva = una clase que implemente esto + registrarla.
+ * Contract for every integrated tool (RF-030, NFR-005). Adding a tool means implementing
+ * this interface and registering the adapter.
  */
 export interface ToolAdapter {
   readonly sourceTool: string;
   readonly toolCategory: ToolCategory;
-  /** Ejecuta la herramienta en local y devuelve su reporte crudo (NFR-007). */
+  /** Runs the tool locally and returns its raw report (NFR-007). */
   run(target: ScanTarget): Promise<string>;
-  /** Convierte el reporte crudo en findings (RF-016). Lanza ReportParseError si es inválido. */
+  /** Parses the raw report into findings (RF-016); throws ReportParseError when invalid. */
   parse(rawReport: string, target: ScanTarget): ParsedFinding[];
 }

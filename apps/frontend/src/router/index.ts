@@ -1,4 +1,3 @@
-// apps/frontend/src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 
 import type { AuthUser } from '@/interfaces/AuthInterface'
@@ -12,8 +11,8 @@ import ProjectDetailView from '@/views/ProjectDetailView.vue'
 import ProjectsView from '@/views/ProjectsView.vue'
 import ScanDetailView from '@/views/ScanDetailView.vue'
 import ScansView from '@/views/ScansView.vue'
-import { AuthService } from '@/services/AuthService'
 import UsersView from '@/views/UsersView.vue'
+import { AuthService } from '@/services/AuthService'
 
 type Role = AuthUser['role']
 
@@ -53,7 +52,11 @@ const router = createRouter({
           path: 'projects/:id',
           name: 'project.show',
           component: ProjectDetailView,
-          meta: { title: 'Project Configuration', breadcrumb: 'projects/detail', roles: ANALYST_ONLY },
+          meta: {
+            title: 'Project Configuration',
+            breadcrumb: 'projects/detail',
+            roles: ANALYST_ONLY,
+          },
         },
         {
           path: 'scan',
@@ -97,8 +100,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const token = AuthService.getToken()
-  const isAuthenticated = Boolean(token)
+  const isAuthenticated = Boolean(AuthService.getToken())
 
   if (to.name !== 'login' && !isAuthenticated) {
     return { name: 'login' }
@@ -113,19 +115,15 @@ router.beforeEach(async (to) => {
   const allowedRoles = to.meta.roles
   if (!allowedRoles) return
 
-  let user = AuthService.getUser()
-  if (!user && token) {
-    user = await AuthService.fetchCurrentUser()
+  const user = AuthService.getUser() ?? (await AuthService.fetchCurrentUser())
+  if (!user) {
+    // A token whose user cannot be resolved is an unusable session; drop it so the
+    // login route does not bounce straight back to a role-protected home page.
+    AuthService.logout()
+    return { name: 'login' }
   }
 
-  const role = user?.role
-  if (!role) {
-    if (!AuthService.getToken()) {
-      return { name: 'login' }
-    }
-    return
-  }
-  if (!allowedRoles.includes(role)) {
+  if (!allowedRoles.includes(user.role)) {
     return { name: AuthService.getHomeRouteName() }
   }
 })

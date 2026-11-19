@@ -1,4 +1,3 @@
-<!-- apps/frontend/src/components/ProjectAssignmentsPanel.vue -->
 <script setup lang="ts">
 import { UserMinus, UserPlus, Users } from 'lucide-vue-next'
 import { ref } from 'vue'
@@ -17,7 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   assign: [userId: string]
   unassign: [userId: string]
-  }>()
+}>()
 
 const selectedUserId = ref<string>('')
 
@@ -44,7 +43,6 @@ function submitAssignment(): void {
       <select
         id="assign-user-select"
         v-model="selectedUserId"
-        aria-label="Select a user to assign"
         :disabled="props.isSaving || props.availableUsers.length === 0"
         class="rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
       >

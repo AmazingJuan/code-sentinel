@@ -1,23 +1,43 @@
-<!-- apps/frontend/src/views/ScanDetailView.vue -->
 <script setup lang="ts">
-import axios from 'axios'
-import { Calendar, ChevronLeft, ChevronRight, FolderKanban, GitBranch, GitCommit, Hash, Lock } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  FolderKanban,
+  GitBranch,
+  GitCommit,
+  Hash,
+  Lock,
+} from 'lucide-vue-next'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import ErrorState from '@/components/ErrorState.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import SeverityBar from '@/components/SeverityBar.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
-import LoadingState from '@/components/LoadingState.vue'
-import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
 import type { ScanInterface } from '@/interfaces/ScanInterface'
-import { buildCommitUrl } from '@/services/GitHelper'
+import type { SeverityCounts } from '@/interfaces/SeverityCountsInterface'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 import { FindingService } from '@/services/FindingService'
+import { formatDateTime } from '@/services/FormatHelper'
+import { buildCommitUrl, formatCommitSha } from '@/services/GitHelper'
 import { ReportService } from '@/services/ReportService'
 import { ScanService } from '@/services/ScanService'
 import { getToastStore } from '@/stores/toastStore'
+
+type ReportFormat = 'html' | 'json'
+
+interface SummaryItem {
+  label: string
+  value: number
+  tone: string
+}
+
+const MIN_REPORT_PASSWORD_LENGTH = 4
 
 const route = useRoute()
 const router = useRouter()
@@ -27,24 +47,100 @@ const findings = ref<FindingInterface[]>([])
 const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
 
-const isExportModalOpen = ref(false)
-const reportPassword = ref('')
-const reportFormat = ref<'html' | 'json'>('html')
-const isDownloading = ref(false)
+const isExportModalOpen = ref<boolean>(false)
+const reportPassword = ref<string>('')
+const reportFormat = ref<ReportFormat>('html')
+const isDownloading = ref<boolean>(false)
 const exportError = ref<string | null>(null)
 
+const projectId = computed<string | null>(
+  () => scan.value?.project?.id || scan.value?.projectId || null,
+)
+
+const commitUrl = computed<string | null>(() =>
+  buildCommitUrl(scan.value?.project?.repo, scan.value?.commitSha),
+)
+
+const counts = computed<SeverityCounts>(() => ({
+  critical: scan.value?.criticalCount ?? 0,
+  high: scan.value?.highCount ?? 0,
+  medium: scan.value?.mediumCount ?? 0,
+  low: scan.value?.lowCount ?? 0,
+}))
+
+const summaryItems = computed<SummaryItem[]>(() => [
+  { label: 'Critical', value: counts.value.critical, tone: 'text-critical' },
+  { label: 'High', value: counts.value.high, tone: 'text-high' },
+  { label: 'Medium', value: counts.value.medium, tone: 'text-medium' },
+  { label: 'Low', value: counts.value.low, tone: 'text-low' },
+  { label: 'Total', value: scan.value?.totalCount ?? 0, tone: 'text-foreground' },
+])
+
+let loadSequence = 0
+
+async function loadScanDetails(id: string): Promise<void> {
+  const sequence = ++loadSequence
+  isLoading.value = true
+  errorMessage.value = null
+  try {
+    const [loadedScan, loadedFindings] = await Promise.all([
+      ScanService.getScanById(id),
+      FindingService.getFindings({ scanId: id }),
+    ])
+    if (sequence !== loadSequence) return
+    scan.value = loadedScan
+    findings.value = loadedFindings
+  } catch (error) {
+    if (sequence !== loadSequence) return
+    scan.value = null
+    errorMessage.value = extractErrorMessage(error, 'We could not load the details for this scan.', {
+      forbidden: 'You do not have access to this scan.',
+    })
+  } finally {
+    if (sequence === loadSequence) isLoading.value = false
+  }
+}
+
+function reload(): void {
+  void loadScanDetails(String(route.params.id))
+}
+
+async function goBack(): Promise<void> {
+  if (window.history.state?.back) {
+    router.back()
+  } else if (projectId.value) {
+    await router.push({ name: 'project.show', params: { id: projectId.value } })
+  } else {
+    await router.push({ name: 'scan.index' })
+  }
+}
+
+function openExportModal(): void {
+  exportError.value = null
+  reportPassword.value = ''
+  isExportModalOpen.value = true
+}
+
+function closeExportModal(): void {
+  if (isDownloading.value) return
+  isExportModalOpen.value = false
+  // Do not keep the report password in memory after the dialog closes.
+  reportPassword.value = ''
+  exportError.value = null
+}
+
 async function handleDownloadReport(): Promise<void> {
-  if (!scan.value?.id) return
-  if (!reportPassword.value || reportPassword.value.length < 4) {
-    exportError.value = 'Password must be at least 4 characters long.'
+  if (!scan.value?.id || isDownloading.value) return
+  if (reportPassword.value.length < MIN_REPORT_PASSWORD_LENGTH) {
+    exportError.value = `Password must be at least ${MIN_REPORT_PASSWORD_LENGTH} characters long.`
     return
   }
   isDownloading.value = true
   exportError.value = null
   try {
     await ReportService.downloadProtectedReport(scan.value.id, reportPassword.value, reportFormat.value)
-    isExportModalOpen.value = false
-    reportPassword.value = ''
+    isDownloading.value = false
+    closeExportModal()
     toastStore.success('Report downloaded', 'Protected security report generated successfully.')
   } catch {
     exportError.value = 'Failed to generate protected report. Please verify your permissions.'
@@ -53,62 +149,25 @@ async function handleDownloadReport(): Promise<void> {
   }
 }
 
-function extractErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && error.response?.status === 403) {
-    return 'You do not have access to this scan.'
-  }
-  return 'We could not load the details for this scan.'
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && isExportModalOpen.value) closeExportModal()
 }
 
-async function loadScanDetails(): Promise<void> {
-  const id = route.params.id as string
-  isLoading.value = true
-  errorMessage.value = null
-  try {
-    scan.value = await ScanService.getScanById(id)
-    findings.value = await FindingService.getFindings({ scanId: id })
-  } catch (error) {
-    errorMessage.value = extractErrorMessage(error)
-  } finally {
-    isLoading.value = false
-  }
-}
+document.addEventListener('keydown', onKeydown)
+onBeforeUnmount((): void => document.removeEventListener('keydown', onKeydown))
 
-onMounted(loadScanDetails)
-
-function goBack(): void {
-  if (window.history.state && window.history.state.back) {
-    router.back()
-  } else if (scan.value?.projectId) {
-    router.push({ name: 'project.show', params: { id: scan.value.projectId } })
-  } else {
-    router.push({ name: 'scan.index' })
-  }
-}
-
-const commitUrl = computed(() => {
-  return buildCommitUrl(scan.value?.project?.repo, scan.value?.commitSha)
-})
-
-const counts = computed(() => ({
-  critical: scan.value?.criticalCount ?? 0,
-  high: scan.value?.highCount ?? 0,
-  medium: scan.value?.mediumCount ?? 0,
-  low: scan.value?.lowCount ?? 0,
-}))
-
-const summaryItems = computed(() => [
-  { label: 'Critical', value: scan.value?.criticalCount ?? 0, tone: 'text-critical' },
-  { label: 'High', value: scan.value?.highCount ?? 0, tone: 'text-high' },
-  { label: 'Medium', value: scan.value?.mediumCount ?? 0, tone: 'text-medium' },
-  { label: 'Low', value: scan.value?.lowCount ?? 0, tone: 'text-low' },
-  { label: 'Total', value: scan.value?.totalCount ?? 0, tone: 'text-foreground' },
-])
+// The same view instance is reused when navigating between scans.
+watch(
+  () => route.params.id,
+  (id: string | string[] | undefined): void => {
+    if (id) void loadScanDetails(String(id))
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="p-5 sm:p-8">
-    <!-- Navigation toolbar with back button & interactive breadcrumbs -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <button
         type="button"
@@ -120,20 +179,20 @@ const summaryItems = computed(() => [
       </button>
 
       <nav aria-label="Breadcrumb" class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-        <RouterLink to="/overview" class="hover:text-foreground transition-colors">overview</RouterLink>
-        <span>/</span>
+        <RouterLink :to="{ name: 'overview' }" class="hover:text-foreground transition-colors">overview</RouterLink>
+        <span aria-hidden="true">/</span>
         <RouterLink
-          v-if="scan?.project"
-          :to="`/projects/${scan.project.id || scan.projectId}`"
+          v-if="scan?.project && projectId"
+          :to="{ name: 'project.show', params: { id: projectId } }"
           class="hover:text-primary transition-colors text-foreground font-medium"
         >
           {{ scan.project.name }}
         </RouterLink>
-        <RouterLink v-else to="/scan" class="hover:text-foreground transition-colors">
+        <RouterLink v-else :to="{ name: 'scan.index' }" class="hover:text-foreground transition-colors">
           scans
         </RouterLink>
-        <span>/</span>
-        <span class="text-primary font-semibold">#scan-{{ scan?.scanNumber }}</span>
+        <span aria-hidden="true">/</span>
+        <span class="text-primary font-semibold">#scan-{{ scan?.scanNumber ?? '...' }}</span>
       </nav>
     </div>
 
@@ -141,7 +200,7 @@ const summaryItems = computed(() => [
       <ErrorState
         title="Scan Report Unavailable"
         :message="errorMessage"
-        @retry="loadScanDetails"
+        @retry="reload"
       >
         <template #extra-actions>
           <button
@@ -171,7 +230,7 @@ const summaryItems = computed(() => [
           <div class="flex items-center gap-2">
             <button
               type="button"
-              @click="isExportModalOpen = true"
+              @click="openExportModal"
               class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-sm"
               title="Download password-protected report (RF-033 / RF-034)"
             >
@@ -183,7 +242,6 @@ const summaryItems = computed(() => [
         </template>
       </PageHeader>
 
-      <!-- Meta Strip -->
       <div class="mb-6 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
         <div class="bg-card p-4">
           <p class="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -191,8 +249,8 @@ const summaryItems = computed(() => [
             Project
           </p>
           <RouterLink
-            v-if="scan.project?.id || scan.projectId"
-            :to="`/projects/${scan.project?.id || scan.projectId}`"
+            v-if="projectId"
+            :to="{ name: 'project.show', params: { id: projectId } }"
             class="mt-1.5 block font-mono text-sm font-medium text-primary hover:underline truncate"
           >
             {{ scan.project.name }}
@@ -223,10 +281,10 @@ const summaryItems = computed(() => [
               rel="noopener noreferrer"
               class="text-term-cyan hover:underline"
             >
-              {{ scan.commitSha.slice(0, 7) }}
+              {{ formatCommitSha(scan.commitSha) }}
             </a>
             <span v-else-if="scan.commitSha" class="text-term-cyan">
-              {{ scan.commitSha.slice(0, 7) }}
+              {{ formatCommitSha(scan.commitSha) }}
             </span>
             <span v-else class="text-muted-foreground">-</span>
 
@@ -242,12 +300,11 @@ const summaryItems = computed(() => [
             Date
           </p>
           <p class="mt-1.5 font-mono text-sm text-foreground">
-            {{ new Date(scan.date).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
+            {{ formatDateTime(scan.date) }}
           </p>
         </div>
       </div>
 
-      <!-- Failure banner if scan failed -->
       <p
         v-if="scan.status === 'failed' && scan.errorMessage"
         role="alert"
@@ -256,7 +313,6 @@ const summaryItems = computed(() => [
         {{ scan.errorMessage }}
       </p>
 
-      <!-- Severity summary -->
       <div class="mb-6 rounded-lg border border-border bg-card p-5">
         <p class="mb-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">
           Vulnerability distribution
@@ -274,7 +330,6 @@ const summaryItems = computed(() => [
         </div>
       </div>
 
-      <!-- Findings table -->
       <div class="rounded-lg border border-border bg-card">
         <div class="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
@@ -334,6 +389,7 @@ const summaryItems = computed(() => [
                     :to="{ name: 'finding.show', params: { id: finding.id } }"
                     class="inline-flex items-center text-muted-foreground hover:text-foreground"
                     title="View finding detail"
+                    :aria-label="`View finding ${finding.type}`"
                   >
                     <ChevronRight class="size-4" />
                   </RouterLink>
@@ -345,15 +401,17 @@ const summaryItems = computed(() => [
       </div>
     </template>
 
-    <!-- Export Protected Report Modal (RF-033, RF-034) -->
     <div
       v-if="isExportModalOpen"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-report-title"
     >
       <div class="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
         <div class="flex items-center gap-2 text-primary">
           <Lock class="size-5" />
-          <h3 class="text-base font-semibold text-foreground">Export Protected Report</h3>
+          <h3 id="export-report-title" class="text-base font-semibold text-foreground">Export Protected Report</h3>
         </div>
         <p class="mt-2 text-xs text-muted-foreground">
           Code Sentinel security reports are encrypted with password protection (RF-033 &amp; RF-034). Set a password to encrypt and protect the security results.
@@ -361,23 +419,27 @@ const summaryItems = computed(() => [
 
         <form @submit.prevent="handleDownloadReport" class="mt-4 space-y-4">
           <div>
-            <label class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            <label for="report-password" class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
               Report Password
             </label>
             <input
+              id="report-password"
               v-model="reportPassword"
               type="password"
-              placeholder="Enter password (min 4 characters)..."
+              autocomplete="new-password"
+              :minlength="MIN_REPORT_PASSWORD_LENGTH"
+              :placeholder="`Enter password (min ${MIN_REPORT_PASSWORD_LENGTH} characters)...`"
               required
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+            <label for="report-format" class="block text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
               Format
             </label>
             <select
+              id="report-format"
               v-model="reportFormat"
               class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
             >
@@ -393,7 +455,7 @@ const summaryItems = computed(() => [
           <div class="flex justify-end gap-2 pt-2">
             <button
               type="button"
-              @click="isExportModalOpen = false"
+              @click="closeExportModal"
               :disabled="isDownloading"
               class="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
             >

@@ -1,17 +1,16 @@
-// apps/backend/src/scans/dto/create-scan.dto.ts
 import {
   ArrayNotEmpty,
   IsArray,
   IsIn,
-  IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
+  MaxLength,
 } from 'class-validator';
 import { SCAN_TOOLS, ScanTool } from '../scan.entity';
 
 export class CreateScanDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   projectId: string;
 
   @IsArray()
@@ -21,9 +20,11 @@ export class CreateScanDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   commitSha?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   branch?: string;
 }

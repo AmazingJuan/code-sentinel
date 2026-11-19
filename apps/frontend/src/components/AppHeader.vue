@@ -1,31 +1,37 @@
-<!-- apps/frontend/src/components/AppHeader.vue -->
 <script setup lang="ts">
 import { LogOut, Menu, Terminal } from 'lucide-vue-next'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
+import type { AuthUser } from '@/interfaces/AuthInterface'
 import { AuthService } from '@/services/AuthService'
 
 const emit = defineEmits<{ menu: [] }>()
 
 const route = useRoute()
 const router = useRouter()
-const user = AuthService.getUser()
-const initials =
-  user?.name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() ?? 'U'
+const user = computed<AuthUser | null>(() => AuthService.getUser())
+const initials = computed<string>(
+  () =>
+    user.value?.name
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'U',
+)
 
-function handleLogout(): void {
+async function handleLogout(): Promise<void> {
   AuthService.logout()
-  router.push({ name: 'login' })
+  await router.push({ name: 'login' })
 }
 </script>
 
 <template>
   <header class="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur-sm sm:px-6">
     <button
+      type="button"
       class="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
       aria-label="Open navigation"
       @click="emit('menu')"
@@ -51,6 +57,7 @@ function handleLogout(): void {
       </div>
 
       <button
+        type="button"
         class="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
         aria-label="Log out"
         @click="handleLogout"

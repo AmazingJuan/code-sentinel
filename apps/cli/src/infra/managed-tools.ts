@@ -18,22 +18,22 @@ export type ManagedToolId = 'gitleaks' | 'opengrep';
 interface ManagedAsset {
   file: string;
   sha256: string;
-  /** Formato del asset; `raw` es el ejecutable directamente. */
+  /** Asset format; `raw` means the asset is the executable itself. */
   archive: 'raw' | 'tar.gz' | 'zip';
 }
 
 interface ManagedToolManifest {
   version: string;
-  /** Nombre del ejecutable una vez instalado (sin extensión). */
+  /** Installed executable name (without extension). */
   binary: string;
   baseUrl: string;
-  /** Clave: `${platform}-${arch}` o `${platform}-${arch}-musl`. */
+  /** Keyed by `${platform}-${arch}` or `${platform}-${arch}-musl`. */
   assets: Record<string, ManagedAsset>;
 }
 
 /**
- * Versiones fijas y SHA-256 publicados por cada proyecto. Nunca se ejecuta un binario
- * descargado cuyo hash no coincida. Para actualizar: cambiar versión, URLs y hashes juntos.
+ * Pinned versions and the SHA-256 published by each project. A downloaded binary whose
+ * hash does not match is never executed. To upgrade, change version, URLs and hashes together.
  */
 export const MANAGED_TOOLS: Record<ManagedToolId, ManagedToolManifest> = {
   gitleaks: {
@@ -146,7 +146,7 @@ function executableName(binary: string): string {
   return process.platform === 'win32' ? `${binary}.exe` : binary;
 }
 
-/** Ruta donde vive (o viviría) el binario gestionado de la versión fijada. */
+/** Where the managed binary of the pinned version lives (or would live). */
 export function managedBinaryPath(tool: ManagedToolId): string {
   const manifest = MANAGED_TOOLS[tool];
   return join(
@@ -165,7 +165,7 @@ export function sha256Hex(data: Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
-/** En Windows se usa el bsdtar del sistema: el `tar` de Git Bash no abre .zip. */
+/** On Windows use the system bsdtar: the Git Bash `tar` cannot open .zip files. */
 function systemTar(): string {
   if (process.platform === 'win32') {
     return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
@@ -193,8 +193,8 @@ async function download(url: string): Promise<Uint8Array> {
 }
 
 /**
- * Descarga, verifica (SHA-256) e instala el binario fijado en ~/.code-sentinel/tools.
- * Devuelve la ruta del ejecutable. Idempotente.
+ * Downloads, verifies (SHA-256) and installs the pinned binary into
+ * `<config dir>/tools`. Returns the executable path. Idempotent.
  */
 export async function installManagedTool(
   tool: ManagedToolId,

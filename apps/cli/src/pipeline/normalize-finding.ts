@@ -41,7 +41,10 @@ export function normalizeFinding(
     line: cleanLine(parsedFinding.line),
     cwe: cleanText(parsedFinding.cwe),
     commitSha: cleanText(parsedFinding.commitSha),
-    codeSnippet: typeof parsedFinding.codeSnippet === 'string' && parsedFinding.codeSnippet.trim() !== '' ? parsedFinding.codeSnippet : null,
+    codeSnippet:
+      typeof parsedFinding.codeSnippet === 'string' && parsedFinding.codeSnippet.trim() !== ''
+        ? parsedFinding.codeSnippet
+        : null,
     description: cleanText(parsedFinding.description),
     recommendation: cleanText(parsedFinding.recommendation),
   };

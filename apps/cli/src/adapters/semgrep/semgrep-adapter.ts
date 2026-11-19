@@ -15,10 +15,10 @@ import { isRegistryRulesDisabled, resolveRegistryRules } from './registry-rules.
 import { isSemgrepReport, type SemgrepResult } from './semgrep-report.js';
 import { mapSemgrepSeverity } from './semgrep-severity.js';
 
-/** Versión fija de la imagen: el mismo código siempre da el mismo resultado. */
-export const SEMGREP_IMAGE = 'semgrep/semgrep:1.181.1';
+/** Pinned image version: the same code always yields the same result. */
+const SEMGREP_IMAGE = 'semgrep/semgrep:1.181.1';
 
-/** Cómo se ejecuta Semgrep en cada motor. Opengrep (fork LGPL) es el binario nativo gestionado. */
+/** How Semgrep runs with each engine. Opengrep (LGPL fork) is the managed native binary. */
 export const SEMGREP_TOOL: ToolDefinition = {
   sourceTool: 'Semgrep',
   binaryEnvVar: 'CODE_SENTINEL_SEMGREP_PATH',
@@ -29,33 +29,27 @@ export const SEMGREP_TOOL: ToolDefinition = {
   containerBinaryName: 'semgrep',
 };
 
-/** Resuelve la ruta al directorio de reglas tanto en desarrollo como en distribución npm. */
-export function resolveRulesDir(): string {
-  // 1. En dist/rules (copiado durante build dentro del paquete)
+/** Locates the bundled rules both in development and in the published npm package. */
+function resolveRulesDir(): string {
   const distRules = fileURLToPath(new URL('../../rules', import.meta.url));
   if (existsSync(distRules)) return distRules;
 
-  // 2. En la raíz del paquete (tanto en src/adapters/semgrep como en dist/adapters/semgrep)
   const pkgRules = fileURLToPath(new URL('../../../rules', import.meta.url));
   if (existsSync(pkgRules)) return pkgRules;
-
-  // 3. Fallback directo a nivel relativo
-  const directRules = fileURLToPath(new URL('../rules', import.meta.url));
-  if (existsSync(directRules)) return directRules;
 
   return pkgRules;
 }
 
 export interface SemgrepAdapterOptions {
-  /** Provee el ejecutor (nativo o contenedor). Por defecto lo resuelve el motor según el entorno. */
+  /** Provides the executor (native or container); defaults to the engine configured from the environment. */
   executor?: () => Promise<ToolExecutor>;
   engine?: ExecutionEngine;
   rulesDir?: string;
-  /** Ruta local del ruleset del registry, o null para usar solo las reglas propias. */
+  /** Local path of the registry ruleset, or null to use only the bundled rules. */
   registryRules?: () => Promise<string | null>;
 }
 
-/** RF-011: análisis estático con Semgrep CE u Opengrep, siempre sin red (NFR-007). */
+/** RF-011: static analysis with Semgrep CE or Opengrep, always offline (NFR-007). */
 export class SemgrepAdapter implements ToolAdapter {
   readonly sourceTool = 'Semgrep';
   readonly toolCategory: ToolCategory = 'SAST';
@@ -78,7 +72,6 @@ export class SemgrepAdapter implements ToolAdapter {
     this.rulesDir = options.rulesDir ?? resolveRulesDir();
   }
 
-  /** Argumentos de la herramienta; se ejecuta con cwd en el workspace y analiza ".". */
   buildArgs(binaryName: string, paths: ResolvedToolPaths): string[] {
     const configArgs = ['registry', 'rules']
       .filter((name: string): boolean => name in paths.inputs)
@@ -87,7 +80,7 @@ export class SemgrepAdapter implements ToolAdapter {
       'scan',
       '--quiet',
       '--json',
-      // Opengrep no tiene telemetría ni acepta el flag.
+      // Opengrep has no telemetry and rejects this flag.
       ...(binaryName === 'opengrep' ? [] : ['--metrics=off']),
       '--disable-version-check',
       ...configArgs,
@@ -106,20 +99,21 @@ export class SemgrepAdapter implements ToolAdapter {
       result = await executor.execute({
         workspace: target.rootPath,
         inputs,
-        buildArgs: (paths: ResolvedToolPaths): string[] => this.buildArgs(executor.binaryName, paths),
+        buildArgs: (paths: ResolvedToolPaths): string[] =>
+          this.buildArgs(executor.binaryName, paths),
       });
     } catch (error: unknown) {
       const detail = error instanceof Error ? error.message : String(error);
-      throw new ToolExecutionError(this.sourceTool, `could not start ${executor.description} (${detail})`);
+      throw new ToolExecutionError(
+        this.sourceTool,
+        `could not start ${executor.description} (${detail})`,
+      );
     }
 
     // Semgrep exits with 0 regardless of findings; any non-zero exit is a real failure.
     if (result.exitCode !== 0) {
       const detail = result.stderr.trim().split('\n').at(-1) || 'no detail provided';
-      throw new ToolExecutionError(
-        this.sourceTool,
-        `exit code ${result.exitCode}: ${detail}`,
-      );
+      throw new ToolExecutionError(this.sourceTool, `exit code ${result.exitCode}: ${detail}`);
     }
     return result.stdout;
   }
@@ -148,10 +142,7 @@ export class SemgrepAdapter implements ToolAdapter {
       throw new ReportParseError(this.sourceTool, 'output is not valid JSON');
     }
     if (!isSemgrepReport(report)) {
-      throw new ReportParseError(
-        this.sourceTool,
-        'missing "results" array or invalid items',
-      );
+      throw new ReportParseError(this.sourceTool, 'missing "results" array or invalid items');
     }
     return report.results.map((semgrepResult: SemgrepResult): ParsedFinding =>
       this.toParsedFinding(semgrepResult),
@@ -161,7 +152,6 @@ export class SemgrepAdapter implements ToolAdapter {
   private toParsedFinding(semgrepResult: SemgrepResult): ParsedFinding {
     const recommendation = semgrepResult.extra.metadata?.recommendation;
 
-    // Extract or infer CWE
     const cweRaw = semgrepResult.extra.metadata?.cwe;
     let cwe: string | null = null;
     if (typeof cweRaw === 'string') {
@@ -180,7 +170,7 @@ export class SemgrepAdapter implements ToolAdapter {
     }
 
     return {
-      // check_id llega como "rules.no-eval": el prefijo es la carpeta de reglas, no aporta.
+      // check_id arrives as "rules.no-eval"; the prefix is just the rules folder.
       type: semgrepResult.check_id.split('.').at(-1) ?? semgrepResult.check_id,
       severity: mapSemgrepSeverity(semgrepResult.extra.severity),
       filePath: toProjectRelativePath(semgrepResult.path),
@@ -192,7 +182,7 @@ export class SemgrepAdapter implements ToolAdapter {
   }
 }
 
-/** Normaliza a "/" y quita "./" o el directorio del contenedor: el backend espera rutas relativas. */
+/** Uses "/" and strips "./" or the container directory: the backend expects project-relative paths. */
 function toProjectRelativePath(semgrepPath: string): string {
   return semgrepPath
     .replaceAll('\\', '/')

@@ -62,7 +62,11 @@ describe('runAdapters', (): void => {
   it('records error if a tool fails while allowing others to continue (RF-030)', async (): Promise<void> => {
     const result = await runAdapters(
       [
-        new FakeAdapter('Semgrep', 'SAST', new ToolExecutionError('Semgrep', 'docker not responding')),
+        new FakeAdapter(
+          'Semgrep',
+          'SAST',
+          new ToolExecutionError('Semgrep', 'docker not responding'),
+        ),
         new FakeAdapter('Gitleaks', 'Secret Scanner', buildReport('github-pat')),
       ],
       target,
@@ -88,7 +92,10 @@ describe('runAdapters', (): void => {
       target,
     );
 
-    expect(result.findings[0]).toMatchObject({ sourceTool: 'Gitleaks', toolCategory: 'Secret Scanner' });
+    expect(result.findings[0]).toMatchObject({
+      sourceTool: 'Gitleaks',
+      toolCategory: 'Secret Scanner',
+    });
   });
 
   it('runs tools in parallel and reports per-tool timings', async (): Promise<void> => {
@@ -102,7 +109,10 @@ describe('runAdapters', (): void => {
 
     const startedAt = performance.now();
     const result = await runAdapters(
-      [new SlowAdapter('Semgrep', 'SAST', '[]'), new SlowAdapter('Gitleaks', 'Secret Scanner', '[]')],
+      [
+        new SlowAdapter('Semgrep', 'SAST', '[]'),
+        new SlowAdapter('Gitleaks', 'Secret Scanner', '[]'),
+      ],
       target,
     );
     const elapsed = performance.now() - startedAt;

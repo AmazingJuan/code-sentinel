@@ -65,5 +65,6 @@ CodeSentinel_Requisitos_completos_y_plan.md
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Neon CLI local state
 .neon
-node_modules/

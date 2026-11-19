@@ -1,10 +1,7 @@
-// apps/backend/src/projects/projects.controller.spec.ts
-import { Request } from 'express';
-import { User, UserRole } from '../users/entities/user.entity';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import { UserRole } from '../users/entities/user.entity';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
-
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
 
 describe('ProjectsController', (): void => {
   let controller: ProjectsController;
@@ -49,7 +46,7 @@ describe('ProjectsController', (): void => {
     );
   });
 
-  it('debe delegar todos los métodos en ProjectsService', async (): Promise<void> => {
+  it('delegates every method to ProjectsService', async (): Promise<void> => {
     expect(await controller.findDirectory()).toEqual([
       { id: 'p1', name: 'code-sentinel' },
     ]);
@@ -57,7 +54,7 @@ describe('ProjectsController', (): void => {
     expect(await controller.findOne('p1', request)).toEqual({ id: 'p1' });
     expect(
       await controller.create(
-        { name: 'code-sentinel', repo: 'repo-url', tools: ['SAST'] },
+        { name: 'code-sentinel', repo: 'repo-url' },
         request,
       ),
     ).toEqual({ id: 'p1', name: 'code-sentinel' });

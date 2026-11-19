@@ -1,17 +1,17 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../types/authenticated-request.type';
+import type { PublicUser } from '../users/entities/user.entity';
 import { AuthService, AuthTokenResponse } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { User } from '../users/entities/user.entity';
-
-type AuthenticatedRequest = Request & { user: Omit<User, 'passwordHash'> };
+import { LocalAuthGuard } from './guards/local-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // LoginDto is declared so the global ValidationPipe rejects malformed
+  // bodies; the credentials themselves are checked by LocalAuthGuard.
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(
@@ -23,7 +23,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() request: AuthenticatedRequest): Omit<User, 'passwordHash'> {
+  me(@Req() request: AuthenticatedRequest): PublicUser {
     return request.user;
   }
 }

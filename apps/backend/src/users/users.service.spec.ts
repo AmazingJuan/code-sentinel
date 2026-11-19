@@ -1,4 +1,3 @@
-// apps/backend/src/users/users.service.spec.ts
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ObjectLiteral, Repository } from 'typeorm';
@@ -56,40 +55,50 @@ describe('UsersService & UsersController', (): void => {
   });
 
   describe('UsersService', (): void => {
-    it('create debe guardar el usuario en minúsculas y lanzar ConflictException si el email ya existe', async (): Promise<void> => {
+    it('create lowercases the email, hashes the password and throws ConflictException for a taken email', async (): Promise<void> => {
       repository.findOne!.mockResolvedValueOnce(null);
-      const created = await service.create(
-        {
-          email: 'New@Code-Sentinel.local',
-          name: 'New User',
-          password: 'Password1!',
-        },
-        'hashed-pw',
-      );
+      const created = await service.create({
+        email: 'New@Code-Sentinel.local',
+        name: 'New User',
+        password: 'Password1!',
+      });
       expect(created.email).toBe('new@code-sentinel.local');
+      expect(created.passwordHash).not.toBe('Password1!');
       expect(created.role).toBe(UserRole.ANALYST);
 
       repository.findOne!.mockResolvedValueOnce(sampleUser);
       await expect(
-        service.create(
-          {
-            email: 'analyst@code-sentinel.local',
-            name: 'Duplicate',
-            password: 'Password1!',
-          },
-          'hashed-pw',
-        ),
+        service.create({
+          email: 'analyst@code-sentinel.local',
+          name: 'Duplicate',
+          password: 'Password1!',
+        }),
       ).rejects.toThrow(ConflictException);
     });
 
-    it('findAll debe retornar usuarios sin passwordHash', async (): Promise<void> => {
+    it('create maps a unique-constraint race on email to ConflictException', async (): Promise<void> => {
+      repository.findOne!.mockResolvedValueOnce(null);
+      repository.save!.mockRejectedValueOnce({
+        driverError: { code: '23505' },
+      });
+
+      await expect(
+        service.create({
+          email: 'race@code-sentinel.local',
+          name: 'Race',
+          password: 'Password1!',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('findAll returns users without passwordHash', async (): Promise<void> => {
       repository.find!.mockResolvedValue([sampleUser]);
       const users = await service.findAll();
       expect(users).toHaveLength(1);
       expect(users[0]).not.toHaveProperty('passwordHash');
     });
 
-    it('update debe actualizar email, nombre, rol y password, y manejar 404 / 409', async (): Promise<void> => {
+    it('update changes email, name, role and password, and handles 404 / 409', async (): Promise<void> => {
       repository.findOne!.mockResolvedValueOnce(null);
       await expect(
         service.update('missing', { name: 'Updated' }),
@@ -117,7 +126,7 @@ describe('UsersService & UsersController', (): void => {
       expect(updated).not.toHaveProperty('passwordHash');
     });
 
-    it('remove debe eliminar por id o lanzar NotFoundException si no existe', async (): Promise<void> => {
+    it('remove deletes by id or throws NotFoundException when missing', async (): Promise<void> => {
       repository.delete!.mockResolvedValueOnce({ affected: 0 });
       await expect(service.remove('missing')).rejects.toThrow(
         NotFoundException,
@@ -127,15 +136,15 @@ describe('UsersService & UsersController', (): void => {
       await expect(service.remove('u1')).resolves.toBeUndefined();
     });
 
-    it('ensureDefaultUsers debe crear los usuarios por defecto si no existen', async (): Promise<void> => {
+    it('ensureDefaultUsers creates the missing default users', async (): Promise<void> => {
       repository.findOne!.mockResolvedValue(null);
-      await service.ensureDefaultUsers();
+      await expect(service.ensureDefaultUsers()).resolves.toBe(3);
       expect(repository.save).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('UsersController', (): void => {
-    it('debe delegar findAll, create, update y remove en UsersService', async (): Promise<void> => {
+    it('delegates findAll, create, update and remove to UsersService', async (): Promise<void> => {
       repository.find!.mockResolvedValue([sampleUser]);
       expect(await controller.findAll()).toHaveLength(1);
 

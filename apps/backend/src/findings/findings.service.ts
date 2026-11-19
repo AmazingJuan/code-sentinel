@@ -1,16 +1,16 @@
-// apps/backend/src/findings/findings.service.ts
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
-import { Finding, FindingSeverity } from './finding.entity';
 import { ProjectsService } from '../projects/projects.service';
-import { isScanTool, ScanTool } from '../scans/scan.entity';
+import { isScanTool } from '../scans/scan.entity';
 import { ScansService } from '../scans/scans.service';
 import { RequestingUser } from '../types/requesting-user.type';
+import { Finding, isFindingSeverity } from './finding.entity';
 
 export interface FindingFilters {
   type?: string;
@@ -35,11 +35,22 @@ export class FindingsService {
   ): Promise<Finding[]> {
     const where: FindOptionsWhere<Finding> = {};
     if (filters.type) where.type = filters.type;
-    if (filters.severity) where.severity = filters.severity as FindingSeverity;
+    if (filters.severity) {
+      if (!isFindingSeverity(filters.severity)) {
+        throw new BadRequestException(`Invalid severity "${filters.severity}"`);
+      }
+      where.severity = filters.severity;
+    }
     if (filters.toolCategory) {
-      where.toolCategory = filters.toolCategory as ScanTool;
+      if (!isScanTool(filters.toolCategory)) {
+        throw new BadRequestException(
+          `Invalid toolCategory "${filters.toolCategory}"`,
+        );
+      }
+      where.toolCategory = filters.toolCategory;
     }
     if (filters.sourceTool) {
+      // Older clients send the tool category in `sourceTool`.
       if (isScanTool(filters.sourceTool) && !filters.toolCategory) {
         where.toolCategory = filters.sourceTool;
       } else {
@@ -53,8 +64,9 @@ export class FindingsService {
       const scanProjectId = await this.scansService.findProjectIdForScan(
         filters.scanId,
       );
-      if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId))
+      if (!scanProjectId || !accessibleProjectIds.includes(scanProjectId)) {
         return [];
+      }
       where.scanId = filters.scanId;
     } else {
       if (accessibleProjectIds.length === 0) return [];

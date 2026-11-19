@@ -11,6 +11,5 @@ import { ReportsService } from './reports.service';
   imports: [TypeOrmModule.forFeature([Report, Scan]), ProjectsModule],
   controllers: [ReportsController],
   providers: [ReportsService],
-  exports: [ReportsService],
 })
 export class ReportsModule {}

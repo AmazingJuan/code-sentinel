@@ -1,16 +1,34 @@
-// apps/backend/src/scans/scans.service.ts
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindOptionsWhere, In, Repository } from 'typeorm';
+import {
+  Between,
+  EntityManager,
+  FindOptionsWhere,
+  In,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
+import { isUniqueViolation } from '../common/postgres-errors';
+import {
+  Finding,
+  FindingSeverity,
+  isFindingSeverity,
+} from '../findings/finding.entity';
+import { Project } from '../projects/project.entity';
+import { ProjectsService } from '../projects/projects.service';
+import { RequestingUser } from '../types/requesting-user.type';
 import { CreateScanDto } from './dto/create-scan.dto';
-import { SubmitScanResultsDto } from './dto/submit-scan-results.dto';
+import {
+  ScanFindingItemDto,
+  SubmitScanResultsDto,
+} from './dto/submit-scan-results.dto';
 import { UpdateScanStatusDto } from './dto/update-scan-status.dto';
 import {
   canTransitionScanStatus,
@@ -21,46 +39,58 @@ import {
   Scan,
   SCAN_STATUSES,
   SCAN_TOOLS,
+  ScanStatus,
 } from './scan.entity';
-import { Finding, isFindingSeverity } from '../findings/finding.entity';
-import { Project } from '../projects/project.entity';
-import { ProjectsService } from '../projects/projects.service';
-import { RequestingUser } from '../types/requesting-user.type';
 
 export interface ScanFilters {
   projectId?: string;
   dateFrom?: string;
   dateTo?: string;
   status?: string;
-  severity?: 'critical' | 'high' | 'medium' | 'low';
+  severity?: FindingSeverity;
 }
 
+type SeverityCounters = Pick<
+  Scan,
+  'criticalCount' | 'highCount' | 'mediumCount' | 'lowCount'
+>;
+
+const SEVERITY_COUNTER_COLUMN: Record<FindingSeverity, keyof SeverityCounters> =
+  {
+    critical: 'criticalCount',
+    high: 'highCount',
+    medium: 'mediumCount',
+    low: 'lowCount',
+  };
+
+// Scanners report raw secrets under these keys (e.g. Gitleaks). They must
+// never be persisted, even if a client bypasses DTO whitelisting.
 const FORBIDDEN_SECRET_KEYS = ['Secret', 'secret', 'Match', 'match'] as const;
+
+const FIRST_SCAN_NUMBER_BASE = 1000;
+const SCAN_NUMBER_MAX_ATTEMPTS = 3;
+const NOT_ASSIGNED_MESSAGE = 'You are not assigned to this project';
 
 @Injectable()
 export class ScansService {
   constructor(
     @InjectRepository(Scan) private readonly scanRepository: Repository<Scan>,
     private readonly projectsService: ProjectsService,
-    @Optional()
-    @InjectRepository(Finding)
-    private readonly findingRepository?: Repository<Finding>,
-    @Optional()
     @InjectRepository(Project)
-    private readonly projectRepository?: Repository<Project>,
+    private readonly projectRepository: Repository<Project>,
   ) {}
 
   async create(
     createScanDto: CreateScanDto,
     requester: RequestingUser,
   ): Promise<Scan> {
-    if (!createScanDto.projectId || !createScanDto.projectId.trim()) {
+    if (!createScanDto.projectId?.trim()) {
       throw new BadRequestException('projectId is required');
     }
     if (
       !Array.isArray(createScanDto.tools) ||
       createScanDto.tools.length === 0 ||
-      !createScanDto.tools.every((tool) => isScanTool(tool))
+      !createScanDto.tools.every((tool: string): boolean => isScanTool(tool))
     ) {
       throw new BadRequestException(
         `Invalid tools. Use one or more of: ${SCAN_TOOLS.join(', ')}`,
@@ -69,28 +99,32 @@ export class ScansService {
 
     await this.assertProjectAccess(createScanDto.projectId, requester);
 
-    const latestScans = await this.scanRepository.find({
-      order: { scanNumber: 'DESC' },
-      take: 1,
-    });
-    const nextScanNumber = (latestScans[0]?.scanNumber ?? 1000) + 1;
-
-    const scan = this.scanRepository.create({
-      scanNumber: nextScanNumber,
-      projectId: createScanDto.projectId,
-      commitSha: createScanDto.commitSha ?? null,
-      branch: createScanDto.branch ?? null,
-      status: 'pending',
-      errorMessage: null,
-      tools: createScanDto.tools,
-      criticalCount: 0,
-      highCount: 0,
-      mediumCount: 0,
-      lowCount: 0,
-      totalCount: 0,
-    });
-
-    return this.scanRepository.save(scan);
+    // scanNumber is a global sequence derived from the current maximum; two
+    // concurrent creates can pick the same value, so a unique violation is
+    // retried with a freshly computed number.
+    for (let attempt = 1; ; attempt += 1) {
+      const scan = this.scanRepository.create({
+        scanNumber: await this.nextScanNumber(),
+        projectId: createScanDto.projectId,
+        commitSha: createScanDto.commitSha ?? null,
+        branch: createScanDto.branch ?? null,
+        status: 'pending',
+        errorMessage: null,
+        tools: createScanDto.tools,
+        criticalCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+        totalCount: 0,
+      });
+      try {
+        return await this.scanRepository.save(scan);
+      } catch (error: unknown) {
+        if (!isUniqueViolation(error) || attempt >= SCAN_NUMBER_MAX_ATTEMPTS) {
+          throw error;
+        }
+      }
+    }
   }
 
   async updateStatus(
@@ -98,34 +132,25 @@ export class ScansService {
     updateScanStatusDto: UpdateScanStatusDto,
     requester: RequestingUser,
   ): Promise<Scan> {
-    if (!isScanStatus(updateScanStatusDto.status)) {
+    const nextStatus = updateScanStatusDto.status;
+    if (!isScanStatus(nextStatus)) {
       throw new BadRequestException(
-        `Invalid status "${String(updateScanStatusDto.status)}". Use one of: ${SCAN_STATUSES.join(', ')}`,
+        `Invalid status "${String(nextStatus)}". Use one of: ${SCAN_STATUSES.join(', ')}`,
       );
     }
 
     const scan = await this.findScanForAuthorizedUser(id, requester);
+    this.assertTransition(scan.status, nextStatus);
 
-    if (!canTransitionScanStatus(scan.status, updateScanStatusDto.status)) {
-      throw new ConflictException(
-        `Cannot transition scan from "${scan.status}" to "${updateScanStatusDto.status}"`,
-      );
+    let errorMessage = scan.errorMessage;
+    if (nextStatus === 'failed') {
+      errorMessage = this.requireErrorMessage(updateScanStatusDto.errorMessage);
     }
 
-    if (updateScanStatusDto.status === 'failed') {
-      if (
-        !updateScanStatusDto.errorMessage ||
-        !updateScanStatusDto.errorMessage.trim()
-      ) {
-        throw new BadRequestException(
-          'errorMessage is required when status is "failed"',
-        );
-      }
-      scan.errorMessage = updateScanStatusDto.errorMessage.trim();
-    }
-    scan.status = updateScanStatusDto.status;
-
-    return this.scanRepository.save(scan);
+    await this.transitionScan(this.scanRepository, scan, nextStatus, {
+      errorMessage,
+    });
+    return scan;
   }
 
   async submitResults(
@@ -133,31 +158,22 @@ export class ScansService {
     submitScanResultsDto: SubmitScanResultsDto,
     requester: RequestingUser,
   ): Promise<Scan> {
-    if (!isResultScanStatus(submitScanResultsDto.status)) {
+    const nextStatus = submitScanResultsDto.status;
+    if (!isResultScanStatus(nextStatus)) {
       throw new BadRequestException(
         'Result status must be "completed" or "failed"',
       );
     }
 
     const scan = await this.findScanForAuthorizedUser(id, requester);
-
-    if (!canTransitionScanStatus(scan.status, submitScanResultsDto.status)) {
-      throw new ConflictException(
-        `Cannot transition scan from "${scan.status}" to "${submitScanResultsDto.status}"`,
-      );
-    }
+    this.assertTransition(scan.status, nextStatus);
 
     const findingsInput = submitScanResultsDto.findings ?? [];
-
-    if (submitScanResultsDto.status === 'failed') {
-      if (
-        !submitScanResultsDto.errorMessage ||
-        !submitScanResultsDto.errorMessage.trim()
-      ) {
-        throw new BadRequestException(
-          'errorMessage is required when status is "failed"',
-        );
-      }
+    let errorMessage: string | null = null;
+    if (nextStatus === 'failed') {
+      errorMessage = this.requireErrorMessage(
+        submitScanResultsDto.errorMessage,
+      );
       if (findingsInput.length > 0) {
         throw new BadRequestException(
           'findings must be empty when status is "failed"',
@@ -169,59 +185,54 @@ export class ScansService {
       }
     }
 
-    let criticalCount = 0;
-    let highCount = 0;
-    let mediumCount = 0;
-    let lowCount = 0;
+    const counters = this.countBySeverity(findingsInput);
+    const commitSha = submitScanResultsDto.commitSha || scan.commitSha;
+    const branch = submitScanResultsDto.branch || scan.branch;
 
-    for (const item of findingsInput) {
-      if (item.severity === 'critical') criticalCount += 1;
-      else if (item.severity === 'high') highCount += 1;
-      else if (item.severity === 'medium') mediumCount += 1;
-      else if (item.severity === 'low') lowCount += 1;
-    }
+    // Findings and the status change are committed atomically; the
+    // status-guarded update makes a concurrent submission for the same scan
+    // fail with 409 instead of storing duplicated findings.
+    await this.scanRepository.manager.transaction(
+      async (manager: EntityManager): Promise<void> => {
+        await this.transitionScan(
+          manager.getRepository(Scan),
+          scan,
+          nextStatus,
+          {
+            errorMessage,
+            commitSha,
+            branch,
+            ...counters,
+            totalCount: findingsInput.length,
+          },
+        );
 
-    if (submitScanResultsDto.commitSha) {
-      scan.commitSha = submitScanResultsDto.commitSha;
-    }
-    if (submitScanResultsDto.branch) {
-      scan.branch = submitScanResultsDto.branch;
-    }
+        if (findingsInput.length > 0) {
+          const findingRepository = manager.getRepository(Finding);
+          await findingRepository.save(
+            findingsInput.map((item: ScanFindingItemDto): Finding =>
+              findingRepository.create({
+                scanId: scan.id,
+                type: item.type,
+                severity: item.severity ?? null,
+                toolCategory: item.toolCategory,
+                sourceTool: item.sourceTool,
+                filePath: item.filePath ?? null,
+                line: item.line ?? null,
+                commitSha: item.commitSha ?? commitSha ?? null,
+                cwe: item.cwe ?? null,
+                codeSnippet: item.codeSnippet ?? null,
+                description: item.description ?? null,
+                recommendation: item.recommendation ?? null,
+              }),
+            ),
+          );
+        }
+      },
+    );
 
-    if (findingsInput.length > 0 && this.findingRepository) {
-      const findingEntities = findingsInput.map((item) =>
-        this.findingRepository!.create({
-          scanId: scan.id,
-          type: item.type,
-          severity: item.severity ?? null,
-          toolCategory: item.toolCategory,
-          sourceTool: item.sourceTool,
-          filePath: item.filePath ?? null,
-          line: item.line ?? null,
-          commitSha: item.commitSha ?? scan.commitSha ?? null,
-          cwe: item.cwe ?? null,
-          codeSnippet: item.codeSnippet ?? null,
-          description: item.description ?? null,
-          recommendation: item.recommendation ?? null,
-        }),
-      );
-      await this.findingRepository.save(findingEntities);
-    }
-
-    scan.status = submitScanResultsDto.status;
-    scan.errorMessage =
-      submitScanResultsDto.status === 'failed'
-        ? submitScanResultsDto.errorMessage!.trim()
-        : null;
-    scan.criticalCount = criticalCount;
-    scan.highCount = highCount;
-    scan.mediumCount = mediumCount;
-    scan.lowCount = lowCount;
-    scan.totalCount = findingsInput.length;
-
-    const savedScan = await this.scanRepository.save(scan);
-    await this.syncProjectCounters(scan.projectId, savedScan);
-    return savedScan;
+    await this.syncProjectCounters(scan.projectId, scan);
+    return scan;
   }
 
   async findAll(
@@ -231,7 +242,6 @@ export class ScansService {
     const where: FindOptionsWhere<Scan> = {};
 
     if (filters.status) {
-      // RF-006: reject unknown states instead of silently returning nothing.
       if (!isScanStatus(filters.status)) {
         throw new BadRequestException(
           `Invalid status "${filters.status}". Use one of: ${SCAN_STATUSES.join(', ')}`,
@@ -239,11 +249,15 @@ export class ScansService {
       }
       where.status = filters.status;
     }
-    if (filters.dateFrom && filters.dateTo) {
-      where.date = Between(
-        new Date(filters.dateFrom),
-        new Date(filters.dateTo),
-      );
+
+    const dateFrom = this.parseDateFilter('dateFrom', filters.dateFrom);
+    const dateTo = this.parseDateFilter('dateTo', filters.dateTo);
+    if (dateFrom && dateTo) {
+      where.date = Between(dateFrom, dateTo);
+    } else if (dateFrom) {
+      where.date = MoreThanOrEqual(dateFrom);
+    } else if (dateTo) {
+      where.date = LessThanOrEqual(dateTo);
     }
 
     const accessibleProjectIds =
@@ -256,24 +270,17 @@ export class ScansService {
       where.projectId = In(accessibleProjectIds);
     }
 
-    const severityColumnMap: Record<string, keyof Scan> = {
-      critical: 'criticalCount',
-      high: 'highCount',
-      medium: 'mediumCount',
-      low: 'lowCount',
-    };
-
-    let scans = await this.scanRepository.find({
+    const scans = await this.scanRepository.find({
       where,
       order: { scanNumber: 'DESC' },
     });
 
-    if (filters.severity) {
-      const column = severityColumnMap[filters.severity];
-      scans = scans.filter((scan) => (scan[column] as number) > 0);
+    if (!filters.severity) return scans;
+    const column = SEVERITY_COUNTER_COLUMN[filters.severity];
+    if (!column) {
+      throw new BadRequestException(`Invalid severity "${filters.severity}"`);
     }
-
-    return scans;
+    return scans.filter((scan: Scan): boolean => scan[column] > 0);
   }
 
   async findOne(id: string, requester: RequestingUser): Promise<Scan> {
@@ -288,20 +295,18 @@ export class ScansService {
     return scan;
   }
 
-  /** Ids of the scans that belong to any of the given projects. */
   async findScanIdsForProjects(projectIds: string[]): Promise<string[]> {
     if (projectIds.length === 0) return [];
     const scans = await this.scanRepository.find({
       where: { projectId: In(projectIds) },
       select: { id: true },
     });
-    return scans.map((scan) => scan.id);
+    return scans.map((scan: Scan): string => scan.id);
   }
 
   /**
-   * Looks up the project a scan belongs to, without enforcing access. Used
-   * by other services (e.g. findings) that need to resolve a scan's project
-   * before applying their own access check.
+   * Resolves the project a scan belongs to without enforcing access, so
+   * callers (e.g. findings) can apply their own authorization check.
    */
   async findProjectIdForScan(scanId: string): Promise<string | null> {
     const scan = await this.scanRepository.findOne({
@@ -309,6 +314,81 @@ export class ScansService {
       select: { id: true, projectId: true },
     });
     return scan ? scan.projectId : null;
+  }
+
+  private async nextScanNumber(): Promise<number> {
+    const latestScans = await this.scanRepository.find({
+      order: { scanNumber: 'DESC' },
+      take: 1,
+    });
+    return (latestScans[0]?.scanNumber ?? FIRST_SCAN_NUMBER_BASE) + 1;
+  }
+
+  private assertTransition(from: ScanStatus, to: ScanStatus): void {
+    if (!canTransitionScanStatus(from, to)) {
+      throw new ConflictException(
+        `Cannot transition scan from "${from}" to "${to}"`,
+      );
+    }
+  }
+
+  private requireErrorMessage(errorMessage: string | null | undefined): string {
+    const trimmed = errorMessage?.trim();
+    if (!trimmed) {
+      throw new BadRequestException(
+        'errorMessage is required when status is "failed"',
+      );
+    }
+    return trimmed;
+  }
+
+  /**
+   * Persists a status change only if the row still has the status that was
+   * read, so concurrent transitions cannot overwrite each other.
+   */
+  private async transitionScan(
+    repository: Repository<Scan>,
+    scan: Scan,
+    nextStatus: ScanStatus,
+    changes: Partial<Omit<Scan, 'id' | 'status'>>,
+  ): Promise<void> {
+    const result = await repository.update(
+      { id: scan.id, status: scan.status },
+      { ...changes, status: nextStatus },
+    );
+    if (!result.affected) {
+      throw new ConflictException(
+        'The scan was modified concurrently; reload it and retry',
+      );
+    }
+    Object.assign(scan, changes, { status: nextStatus });
+  }
+
+  private countBySeverity(findings: ScanFindingItemDto[]): SeverityCounters {
+    const counters: SeverityCounters = {
+      criticalCount: 0,
+      highCount: 0,
+      mediumCount: 0,
+      lowCount: 0,
+    };
+    for (const item of findings) {
+      if (item.severity) {
+        counters[SEVERITY_COUNTER_COLUMN[item.severity]] += 1;
+      }
+    }
+    return counters;
+  }
+
+  private parseDateFilter(
+    name: string,
+    value: string | undefined,
+  ): Date | null {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${name} must be a valid ISO 8601 date`);
+    }
+    return date;
   }
 
   private async findScanForAuthorizedUser(
@@ -330,16 +410,18 @@ export class ScansService {
     const accessibleProjectIds =
       await this.projectsService.getAccessibleProjectIds(requester);
     if (!accessibleProjectIds.includes(projectId)) {
-      throw new ForbiddenException('You are not assigned to this project');
+      throw new ForbiddenException(NOT_ASSIGNED_MESSAGE);
     }
   }
 
+  /**
+   * Recomputes the project's denormalized status and severity counters from
+   * its scan history (RF-028 / RF-029).
+   */
   private async syncProjectCounters(
     projectId: string,
     latestScan: Scan,
   ): Promise<void> {
-    if (!this.projectRepository) return;
-
     const project = await this.projectRepository.findOne({
       where: { id: projectId },
     });
@@ -351,7 +433,7 @@ export class ScansService {
         order: { scanNumber: 'DESC' },
       })) ?? [];
     const allScans = projectScans.some(
-      (existingScan) => existingScan.id === latestScan.id,
+      (existingScan: Scan): boolean => existingScan.id === latestScan.id,
     )
       ? projectScans
       : [latestScan, ...projectScans];

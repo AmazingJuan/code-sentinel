@@ -1,5 +1,4 @@
-// apps/backend/test/integration/findings.integration-spec.ts
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
@@ -13,12 +12,15 @@ import { ProjectsService } from '../../src/projects/projects.service';
 import { ScansService } from '../../src/scans/scans.service';
 import { fakeJwtAuthGuard, TEST_ROLE_HEADER } from './fake-jwt-auth.guard';
 
-describe('Findings — integración (Controller + Service)', (): void => {
+const FINDING_ID = '55555555-5555-4555-8555-555555555555';
+const MISSING_FINDING_ID = '66666666-6666-4666-8666-666666666666';
+
+describe('Findings integration (controller + service)', (): void => {
   let app: INestApplication<App>;
 
   const mockFindings: Partial<Finding>[] = [
     {
-      id: 'f1',
+      id: FINDING_ID,
       scanId: 's1',
       type: 'Hardcoded Secret',
       severity: 'critical',
@@ -57,6 +59,13 @@ describe('Findings — integración (Controller + Service)', (): void => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
   });
 
@@ -64,7 +73,7 @@ describe('Findings — integración (Controller + Service)', (): void => {
     await app.close();
   });
 
-  it('GET /findings debe retornar 200 con la lista de findings', async (): Promise<void> => {
+  it('GET /findings returns 200 with the finding list', async (): Promise<void> => {
     const response = await request(app.getHttpServer()).get('/findings');
     const body = response.body as Finding[];
 
@@ -72,7 +81,7 @@ describe('Findings — integración (Controller + Service)', (): void => {
     expect(body[0].type).toBe('Hardcoded Secret');
   });
 
-  it('GET /findings?severity=critical debe pasar el filtro al service', async (): Promise<void> => {
+  it('GET /findings?severity=critical forwards the filter to the query', async (): Promise<void> => {
     await request(app.getHttpServer())
       .get('/findings')
       .query({ severity: 'critical' });
@@ -84,28 +93,30 @@ describe('Findings — integración (Controller + Service)', (): void => {
     );
   });
 
-  it('GET /findings/:id debe retornar 404 cuando el finding no existe', async (): Promise<void> => {
+  it('GET /findings/:id returns 404 when the finding does not exist', async (): Promise<void> => {
     mockRepository.findOne.mockResolvedValueOnce(null);
 
     const response = await request(app.getHttpServer()).get(
-      '/findings/no-existe',
+      `/findings/${MISSING_FINDING_ID}`,
     );
 
     expect(response.status).toBe(404);
   });
 
-  it('GET /findings/:id debe retornar 200 cuando existe y el proyecto está asignado, o 403 si no está asignado', async (): Promise<void> => {
-    const okResponse = await request(app.getHttpServer()).get('/findings/f1');
+  it('GET /findings/:id returns 200 for an assigned project and 403 otherwise', async (): Promise<void> => {
+    const okResponse = await request(app.getHttpServer()).get(
+      `/findings/${FINDING_ID}`,
+    );
     expect(okResponse.status).toBe(200);
 
     mockScansService.findProjectIdForScan.mockResolvedValueOnce('p-unassigned');
     const forbiddenResponse = await request(app.getHttpServer()).get(
-      '/findings/f1',
+      `/findings/${FINDING_ID}`,
     );
     expect(forbiddenResponse.status).toBe(403);
   });
 
-  it('GET /findings debe soportar filtros por toolCategory y sourceTool (RF-019, RF-026)', async (): Promise<void> => {
+  it('GET /findings supports toolCategory and sourceTool filters (RF-019, RF-026)', async (): Promise<void> => {
     const response = await request(app.getHttpServer())
       .get('/findings')
       .query({ toolCategory: 'Secret Scanner', sourceTool: 'Gitleaks' });
@@ -121,8 +132,34 @@ describe('Findings — integración (Controller + Service)', (): void => {
     );
   });
 
-  describe('RF-032 — el administrador no accede a los findings', (): void => {
-    it('GET /findings como admin debe retornar 403 sin consultar la base de datos', async (): Promise<void> => {
+  it('GET /findings/:id returns 400 for a malformed id', async (): Promise<void> => {
+    const response = await request(app.getHttpServer()).get(
+      '/findings/not-a-uuid',
+    );
+    expect(response.status).toBe(400);
+  });
+
+  it('GET /findings returns 400 for invalid filter values', async (): Promise<void> => {
+    const badSeverity = await request(app.getHttpServer())
+      .get('/findings')
+      .query({ severity: 'urgent' });
+    expect(badSeverity.status).toBe(400);
+
+    const badScanId = await request(app.getHttpServer())
+      .get('/findings')
+      .query({ scanId: 'not-a-uuid' });
+    expect(badScanId.status).toBe(400);
+  });
+
+  it('GET /findings treats empty filter values as absent', async (): Promise<void> => {
+    const response = await request(app.getHttpServer())
+      .get('/findings')
+      .query({ type: '', severity: '' });
+    expect(response.status).toBe(200);
+  });
+
+  describe('RF-032: administrators cannot access findings', (): void => {
+    it('GET /findings as admin returns 403 without querying the database', async (): Promise<void> => {
       mockRepository.find.mockClear();
 
       const response = await request(app.getHttpServer())
@@ -133,9 +170,9 @@ describe('Findings — integración (Controller + Service)', (): void => {
       expect(mockRepository.find).not.toHaveBeenCalled();
     });
 
-    it('GET /findings/:id como admin debe retornar 403', async (): Promise<void> => {
+    it('GET /findings/:id as admin returns 403', async (): Promise<void> => {
       const response = await request(app.getHttpServer())
-        .get('/findings/f1')
+        .get(`/findings/${FINDING_ID}`)
         .set(TEST_ROLE_HEADER, 'admin');
 
       expect(response.status).toBe(403);

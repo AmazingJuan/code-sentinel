@@ -1,6 +1,4 @@
-<!-- apps/frontend/src/views/FindingDetailView.vue -->
 <script setup lang="ts">
-import axios from 'axios'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -14,138 +12,186 @@ import {
   Lightbulb,
   ShieldAlert,
 } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import type { RouteLocationRaw } from 'vue-router'
 
 import CodeViewer from '@/components/CodeViewer.vue'
+import ErrorState from '@/components/ErrorState.vue'
+import LoadingState from '@/components/LoadingState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import SeverityBadge from '@/components/SeverityBadge.vue'
 import TerminalWindow from '@/components/TerminalWindow.vue'
-import LoadingState from '@/components/LoadingState.vue'
-import ErrorState from '@/components/ErrorState.vue'
 import type { FindingInterface } from '@/interfaces/FindingInterface'
-import { buildCommitUrl, buildFileDeepLink } from '@/services/GitHelper'
+import type { TerminalLine } from '@/interfaces/TerminalInterface'
+import { extractErrorMessage } from '@/services/ErrorHelper'
 import { FindingService } from '@/services/FindingService'
-import { getVulnerabilityIntel } from '@/services/VulnerabilityIntel'
+import { buildCommitUrl, buildFileDeepLink, formatCommitSha } from '@/services/GitHelper'
+import { getVulnerabilityIntel, type VulnerabilityDetails } from '@/services/VulnerabilityIntel'
+
+interface MetaItem {
+  label: string
+  value: string
+  mono: boolean
+  link: RouteLocationRaw | null
+}
 
 const route = useRoute()
 const router = useRouter()
 const finding = ref<FindingInterface | null>(null)
 const isLoading = ref<boolean>(true)
 const errorMessage = ref<string | null>(null)
-const copiedSha = ref(false)
+const copiedSha = ref<boolean>(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
-function extractErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error) && error.response?.status === 403) {
-    return 'You do not have access to this finding.'
-  }
-  return 'We could not load this finding.'
-}
+const projectId = computed<string | null>(() => finding.value?.scan?.project?.id ?? null)
 
-onMounted(async () => {
-  isLoading.value = true
-  try {
-    finding.value = await FindingService.getFindingById(route.params.id as string)
-  } catch (error) {
-    errorMessage.value = extractErrorMessage(error)
-  } finally {
-    isLoading.value = false
-  }
-})
+const effectiveCommitSha = computed<string | null>(
+  () => finding.value?.commitSha || finding.value?.scan?.commitSha || null,
+)
 
-function goBack(): void {
-  if (window.history.state && window.history.state.back) {
-    router.back()
-  } else if (finding.value?.scan?.project?.id) {
-    router.push({ name: 'project.show', params: { id: finding.value.scan.project.id } })
-  } else {
-    router.push({ name: 'finding.index' })
-  }
-}
+const effectiveBranch = computed<string>(() => finding.value?.scan?.branch || 'main')
 
-const effectiveCommitSha = computed(() => {
-  return finding.value?.commitSha || finding.value?.scan?.commitSha || null
-})
+const repoUrl = computed<string | null>(() => finding.value?.scan?.project?.repo || null)
 
-const effectiveBranch = computed(() => {
-  return finding.value?.scan?.branch || 'main'
-})
-
-const repoUrl = computed(() => {
-  return finding.value?.scan?.project?.repo || null
-})
-
-const gitDeepLink = computed(() => {
-  return buildFileDeepLink(
+const gitDeepLink = computed<string | null>(() =>
+  buildFileDeepLink(
     repoUrl.value,
     finding.value?.filePath,
     finding.value?.line,
     effectiveCommitSha.value || effectiveBranch.value,
-  )
-})
+  ),
+)
 
-const commitWebUrl = computed(() => {
-  return buildCommitUrl(repoUrl.value, effectiveCommitSha.value)
-})
+const commitWebUrl = computed<string | null>(() =>
+  buildCommitUrl(repoUrl.value, effectiveCommitSha.value),
+)
 
-const intel = computed(() => {
-  if (!finding.value) return null
-  return getVulnerabilityIntel(finding.value.type, finding.value.cwe)
-})
-
-interface MetaItem {
-  label: string
-  value: string
-  mono: boolean
-  isCwe?: boolean
-  link?: string | null
-}
+const intel = computed<VulnerabilityDetails | null>(() =>
+  finding.value ? getVulnerabilityIntel(finding.value.type, finding.value.cwe) : null,
+)
 
 const meta = computed<MetaItem[]>(() => {
-  if (!finding.value) return []
+  const current = finding.value
+  if (!current) return []
   return [
     {
       label: 'Project',
-      value: finding.value.scan?.project?.name ?? 'Unassigned',
+      value: current.scan?.project?.name ?? 'Unassigned',
       mono: false,
-      link: finding.value.scan?.project?.id
-        ? `/projects/${finding.value.scan.project.id}`
-        : null,
+      link: projectId.value ? { name: 'project.show', params: { id: projectId.value } } : null,
     },
     {
       label: 'Scan Report',
-      value: finding.value.scan ? `#${finding.value.scan.scanNumber}` : 'N/A',
+      value: current.scan ? `#${current.scan.scanNumber}` : 'N/A',
       mono: true,
-      link: finding.value.scan?.id
-        ? `/scan/${finding.value.scan.id}`
-        : null,
+      link: current.scan?.id ? { name: 'scan.show', params: { id: current.scan.id } } : null,
     },
-    { label: 'Finding ID', value: finding.value.id, mono: true, link: null },
-    { label: 'Type', value: finding.value.type, mono: false, link: null },
-    { label: 'CWE', value: intel.value?.cwe ?? 'CWE-Unknown', mono: true, isCwe: true, link: null },
-    { label: 'Tool', value: finding.value.sourceTool, mono: false, link: null },
-    { label: 'File', value: finding.value.filePath ?? '-', mono: true, link: null },
-    { label: 'Line', value: finding.value.line !== null ? String(finding.value.line) : '-', mono: true, link: null },
+    { label: 'Finding ID', value: current.id, mono: true, link: null },
+    { label: 'Type', value: current.type, mono: false, link: null },
+    { label: 'CWE', value: intel.value?.cwe ?? 'CWE-Unknown', mono: true, link: null },
+    { label: 'Tool', value: current.sourceTool, mono: false, link: null },
+    { label: 'File', value: current.filePath ?? '-', mono: true, link: null },
+    {
+      label: 'Line',
+      value: current.line !== null ? String(current.line) : '-',
+      mono: true,
+      link: null,
+    },
   ]
 })
+
+const terminalLines = computed<TerminalLine[]>(() => {
+  const current = finding.value
+  if (!current) return []
+  const commitLines: TerminalLine[] = effectiveCommitSha.value
+    ? [[{ text: `Commit: ${formatCommitSha(effectiveCommitSha.value)}`, tone: 'default' }]]
+    : []
+  return [
+    [
+      { text: '$ ', tone: 'prompt' },
+      { text: `codesentinel inspect ${current.id}`, tone: 'default' },
+    ],
+    [],
+    [
+      {
+        text: `[${(current.severity ?? 'unclassified').toUpperCase()}] ${current.type}`,
+        tone: current.severity ?? 'dim',
+      },
+    ],
+    [{ text: `Project: ${current.scan?.project?.name ?? 'Unassigned'}`, tone: 'default' }],
+    [{ text: `CWE: ${intel.value?.cwe ?? 'N/A'}`, tone: 'default' }],
+    [{ text: `Tool: ${current.sourceTool}`, tone: 'dim' }],
+    [{ text: `File: ${current.filePath ?? '-'}`, tone: 'cyan' }],
+    [{ text: `Line: ${current.line ?? '-'}`, tone: 'cyan' }],
+    ...commitLines,
+    [],
+    [{ text: 'Status: Open', tone: 'high' }],
+  ]
+})
+
+let loadSequence = 0
+
+async function loadFinding(id: string): Promise<void> {
+  const sequence = ++loadSequence
+  isLoading.value = true
+  errorMessage.value = null
+  try {
+    const loaded = await FindingService.getFindingById(id)
+    if (sequence === loadSequence) finding.value = loaded
+  } catch (error) {
+    if (sequence !== loadSequence) return
+    finding.value = null
+    errorMessage.value = extractErrorMessage(error, 'We could not load this finding.', {
+      forbidden: 'You do not have access to this finding.',
+    })
+  } finally {
+    if (sequence === loadSequence) isLoading.value = false
+  }
+}
+
+function reload(): void {
+  void loadFinding(String(route.params.id))
+}
+
+async function goBack(): Promise<void> {
+  if (window.history.state?.back) {
+    router.back()
+  } else if (projectId.value) {
+    await router.push({ name: 'project.show', params: { id: projectId.value } })
+  } else {
+    await router.push({ name: 'finding.index' })
+  }
+}
 
 async function copyCommitSha(): Promise<void> {
   if (!effectiveCommitSha.value) return
   try {
     await navigator.clipboard.writeText(effectiveCommitSha.value)
     copiedSha.value = true
-    setTimeout(() => {
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout((): void => {
       copiedSha.value = false
     }, 2000)
   } catch {
-    // Clipboard permission
+    // Clipboard access can be denied by the browser; copying is best-effort.
   }
 }
+
+onBeforeUnmount((): void => clearTimeout(copiedTimer))
+
+// The same view instance is reused when navigating between findings.
+watch(
+  () => route.params.id,
+  (id: string | string[] | undefined): void => {
+    if (id) void loadFinding(String(id))
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="p-5 sm:p-8">
-    <!-- Navigation toolbar with back button & interactive breadcrumbs -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <button
         type="button"
@@ -157,27 +203,27 @@ async function copyCommitSha(): Promise<void> {
       </button>
 
       <nav aria-label="Breadcrumb" class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-        <RouterLink to="/overview" class="hover:text-foreground transition-colors">overview</RouterLink>
-        <span>/</span>
+        <RouterLink :to="{ name: 'overview' }" class="hover:text-foreground transition-colors">overview</RouterLink>
+        <span aria-hidden="true">/</span>
         <RouterLink
-          v-if="finding?.scan?.project"
-          :to="`/projects/${finding.scan.project.id}`"
+          v-if="finding?.scan?.project && projectId"
+          :to="{ name: 'project.show', params: { id: projectId } }"
           class="hover:text-primary transition-colors text-foreground font-medium"
         >
           {{ finding.scan.project.name }}
         </RouterLink>
-        <RouterLink v-else to="/finding" class="hover:text-foreground transition-colors">
+        <RouterLink v-else :to="{ name: 'finding.index' }" class="hover:text-foreground transition-colors">
           findings
         </RouterLink>
-        <span>/</span>
+        <span aria-hidden="true">/</span>
         <RouterLink
           v-if="finding?.scan"
-          :to="`/scan/${finding.scan.id}`"
+          :to="{ name: 'scan.show', params: { id: finding.scan.id } }"
           class="hover:text-primary transition-colors text-muted-foreground"
         >
           #scan-{{ finding.scan.scanNumber }}
         </RouterLink>
-        <span v-if="finding?.scan">/</span>
+        <span v-if="finding?.scan" aria-hidden="true">/</span>
         <span class="text-primary truncate max-w-[180px]">{{ finding?.type }}</span>
       </nav>
     </div>
@@ -186,7 +232,7 @@ async function copyCommitSha(): Promise<void> {
       <ErrorState
         title="Vulnerability Finding Unavailable"
         :message="errorMessage"
-        :retry="false"
+        @retry="reload"
       >
         <template #extra-actions>
           <button
@@ -242,7 +288,6 @@ async function copyCommitSha(): Promise<void> {
 
       <div class="grid gap-6 lg:grid-cols-3">
         <div class="space-y-6 lg:col-span-2">
-          <!-- Metadata grid -->
           <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
             <div
               v-for="m in meta"
@@ -268,7 +313,6 @@ async function copyCommitSha(): Promise<void> {
             </div>
           </div>
 
-          <!-- Git Context Strip -->
           <div
             v-if="effectiveCommitSha || finding.scan?.branch"
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/60 p-3.5 text-xs"
@@ -284,13 +328,14 @@ async function copyCommitSha(): Promise<void> {
                   rel="noopener noreferrer"
                   class="font-semibold text-foreground hover:underline"
                 >
-                  {{ effectiveCommitSha.slice(0, 7) }}
+                  {{ formatCommitSha(effectiveCommitSha) }}
                 </a>
-                <span v-else class="font-semibold text-foreground">{{ effectiveCommitSha.slice(0, 7) }}</span>
+                <span v-else class="font-semibold text-foreground">{{ formatCommitSha(effectiveCommitSha) }}</span>
                 <button
                   type="button"
                   class="ml-1 text-muted-foreground hover:text-foreground"
                   title="Copy full commit SHA"
+                  aria-label="Copy full commit SHA"
                   @click="copyCommitSha"
                 >
                   <Check v-if="copiedSha" class="size-3 text-emerald-500" />
@@ -310,7 +355,6 @@ async function copyCommitSha(): Promise<void> {
             </span>
           </div>
 
-          <!-- Code Snippet Inspector -->
           <div class="space-y-2">
             <h2 class="font-mono text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               VULNERABILITY LOCATION & CODE CONTEXT
@@ -322,7 +366,6 @@ async function copyCommitSha(): Promise<void> {
             />
           </div>
 
-          <!-- Threat & Impact Analysis -->
           <div class="rounded-lg border border-border bg-card p-5">
             <div class="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
               <ShieldAlert class="size-4 text-high" />
@@ -333,22 +376,24 @@ async function copyCommitSha(): Promise<void> {
             </p>
           </div>
 
-          <!-- Description -->
           <div class="rounded-lg border border-border bg-card p-5">
             <div class="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
               <Info class="size-4 text-muted-foreground" />
               Scanner Diagnostic
             </div>
-            <p class="text-sm leading-relaxed text-muted-foreground">{{ finding.description }}</p>
+            <p class="text-sm leading-relaxed text-muted-foreground">
+              {{ finding.description || 'The scanner did not provide a description for this finding.' }}
+            </p>
           </div>
 
-          <!-- Remediation Guide -->
           <div class="rounded-lg border border-primary/30 bg-primary/5 p-5">
             <div class="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
               <Lightbulb class="size-4 text-primary" />
               Remediation Guidance
             </div>
-            <p class="text-sm leading-relaxed text-foreground">{{ finding.recommendation }}</p>
+            <p v-if="finding.recommendation" class="text-sm leading-relaxed text-foreground">
+              {{ finding.recommendation }}
+            </p>
 
             <ul v-if="intel?.remediationSteps && intel.remediationSteps.length > 0" class="mt-3.5 space-y-1.5 text-xs text-foreground/90">
               <li v-for="(step, idx) in intel.remediationSteps" :key="idx" class="flex items-start gap-2">
@@ -357,7 +402,6 @@ async function copyCommitSha(): Promise<void> {
               </li>
             </ul>
 
-            <!-- Before & After Code Fix -->
             <div v-if="intel?.codeDiff" class="mt-5 space-y-3">
               <p class="font-mono text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Code Remediation Example (Before & After)
@@ -386,23 +430,10 @@ async function copyCommitSha(): Promise<void> {
           </div>
         </div>
 
-        <!-- Terminal inspector sidebar -->
         <div class="lg:col-span-1">
           <TerminalWindow
             title="zsh - codesentinel"
-            :lines="[
-              [{ text: '$ ', tone: 'prompt' }, { text: `codesentinel inspect ${finding.id}`, tone: 'default' }],
-              [],
-              [{ text: `[${(finding.severity ?? 'unclassified').toUpperCase()}] ${finding.type}`, tone: (finding.severity as any) ?? 'dim' }],
-              [{ text: `Project: ${finding.scan?.project?.name ?? 'Unassigned'}`, tone: 'default' }],
-              [{ text: `CWE: ${intel?.cwe ?? 'N/A'}`, tone: 'default' }],
-              [{ text: `Tool: ${finding.sourceTool}`, tone: 'dim' }],
-              [{ text: `File: ${finding.filePath ?? '-'}`, tone: 'cyan' }],
-              [{ text: `Line: ${finding.line ?? '-'}`, tone: 'cyan' }],
-              ...(effectiveCommitSha ? [[{ text: `Commit: ${effectiveCommitSha.slice(0, 7)}`, tone: 'default' as const }]] : []),
-              [],
-              [{ text: 'Status: Open', tone: 'high' }],
-            ]"
+            :lines="terminalLines"
           />
         </div>
       </div>

@@ -9,8 +9,9 @@ import * as bcrypt from 'bcrypt';
 
 import { ProjectsService } from '../projects/projects.service';
 import { Scan } from '../scans/scan.entity';
-import { User, UserRole } from '../users/entities/user.entity';
+import { PublicUser, UserRole } from '../users/entities/user.entity';
 import { Report } from './entities/report.entity';
+import { encryptReportPayload } from './report-crypto';
 import { ReportsService } from './reports.service';
 
 describe('ReportsService', (): void => {
@@ -27,14 +28,12 @@ describe('ReportsService', (): void => {
     getAccessibleProjectIds: jest.Mock;
   };
 
-  const analyst: Omit<User, 'passwordHash'> = {
+  const analyst: PublicUser = {
     id: 'user-1',
     email: 'analyst@sentinel.local',
     name: 'Analyst User',
     role: UserRole.ANALYST,
-    isActive: true,
     createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   const sampleScan: Partial<Scan> = {
@@ -43,8 +42,7 @@ describe('ReportsService', (): void => {
     status: 'completed',
     scanNumber: 1,
     tools: ['SAST', 'Secret Scanner'],
-    createdAt: new Date(),
-    completedAt: new Date(),
+    date: new Date(),
     project: {
       id: 'proj-1',
       name: 'Sentinel Core',
@@ -69,15 +67,13 @@ describe('ReportsService', (): void => {
     reportRepo = {
       findOne: jest.fn(),
       create: jest.fn().mockImplementation((dto: Partial<Report>) => ({
-        id: 'rep-1',
         ...dto,
+        id: 'rep-1',
         createdAt: new Date(),
       })),
       save: jest
         .fn()
-        .mockImplementation((rep: Report) =>
-          Promise.resolve({ id: 'rep-1', ...rep }),
-        ),
+        .mockImplementation((rep: Report) => Promise.resolve({ ...rep })),
     };
 
     scanRepo = {
@@ -149,8 +145,12 @@ describe('ReportsService', (): void => {
       expect(result.id).toBe('rep-1');
       expect(result.scanId).toBe('scan-123');
       expect(result.projectId).toBe('proj-1');
-      expect((result as Record<string, unknown>).password).toBeUndefined();
-      expect((result as Record<string, unknown>).passwordHash).toBeUndefined();
+      expect(
+        (result as unknown as Record<string, unknown>).password,
+      ).toBeUndefined();
+      expect(
+        (result as unknown as Record<string, unknown>).passwordHash,
+      ).toBeUndefined();
 
       expect(reportRepo.save).toHaveBeenCalled();
       const savedArg = (
@@ -213,7 +213,7 @@ describe('ReportsService', (): void => {
       const password = 'my-report-password';
       const passwordHash = await bcrypt.hash(password, 4);
       const reportData = { title: 'Test Report', findings: [] };
-      const encryptedBundle = service.encryptPayload(reportData, password);
+      const encryptedBundle = await encryptReportPayload(reportData, password);
 
       const mockReport: Partial<Report> = {
         id: 'rep-1',
@@ -239,6 +239,27 @@ describe('ReportsService', (): void => {
   });
 
   describe('exportScanReport (RF-034 direct)', (): void => {
+    it('escapes the project name in the HTML title', async (): Promise<void> => {
+      scanRepo.findOne.mockResolvedValueOnce({
+        ...sampleScan,
+        project: {
+          id: 'proj-1',
+          name: '<script>alert(1)</script>',
+          repo: 'repo',
+        } as unknown as Scan['project'],
+      });
+      projectsService.getAccessibleProjectIds.mockResolvedValueOnce(['proj-1']);
+
+      const result = await service.exportScanReport(
+        'scan-123',
+        { password: 'export-password' },
+        analyst,
+      );
+
+      expect(result.content).not.toContain('<script>alert(1)</script>');
+      expect(result.content).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    });
+
     it('generates self-contained encrypted HTML report bundle', async (): Promise<void> => {
       scanRepo.findOne.mockResolvedValueOnce(sampleScan);
       projectsService.getAccessibleProjectIds.mockResolvedValueOnce(['proj-1']);

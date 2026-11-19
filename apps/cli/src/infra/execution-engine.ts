@@ -20,18 +20,18 @@ export type EngineMode = 'auto' | 'native' | 'docker';
 
 export const ENGINE_MODES: readonly EngineMode[] = ['auto', 'native', 'docker'];
 
-/** Cómo encontrar y ejecutar una herramienta en cada motor. */
+/** How to locate and run a tool with each engine. */
 export interface ToolDefinition {
   sourceTool: string;
-  /** Variable de entorno con la ruta explícita del binario. */
+  /** Environment variable holding an explicit binary path. */
   binaryEnvVar: string;
-  /** Binarios aceptados en el PATH, en orden de preferencia. */
+  /** Binaries accepted from PATH, in order of preference. */
   pathCandidates: readonly string[];
   managedTool: ManagedToolId;
   image: string;
-  /** Comando dentro de la imagen; vacío si el ENTRYPOINT ya es la herramienta. */
+  /** Command inside the image; empty when the ENTRYPOINT already is the tool. */
   containerCommand: readonly string[];
-  /** Binario que corre dentro de la imagen (define los flags soportados). */
+  /** Binary that runs inside the image (determines the supported flags). */
   containerBinaryName: string;
 }
 
@@ -49,7 +49,7 @@ export function isEngineMode(value: string): value is EngineMode {
   return (ENGINE_MODES as readonly string[]).includes(value);
 }
 
-/** Bind mount es nativo en Linux; en Docker Desktop (Windows/macOS) copiar es más rápido. */
+/** Bind mounts are native on Linux; on Docker Desktop (Windows/macOS) copying is much faster. */
 export function defaultMountStrategy(platform: NodeJS.Platform = process.platform): MountStrategy {
   return platform === 'linux' ? 'bind' : 'copy';
 }
@@ -70,7 +70,7 @@ export function engineSettingsFromEnv(
   };
 }
 
-/** Busca un ejecutable en el PATH sin lanzar procesos (en Windows solo `.exe`). */
+/** Looks up an executable on PATH without spawning processes (only `.exe` on Windows). */
 export function findOnPath(name: string, env: NodeJS.ProcessEnv = process.env): string | null {
   const pathValue = env.PATH ?? env.Path ?? '';
   const fileName = process.platform === 'win32' ? `${name}.exe` : name;
@@ -80,7 +80,7 @@ export function findOnPath(name: string, env: NodeJS.ProcessEnv = process.env): 
     try {
       if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
     } catch {
-      // directorio inaccesible del PATH: se ignora
+      // Unreadable PATH entry: skip it.
     }
   }
   return null;
@@ -93,10 +93,10 @@ function binaryNameOf(binaryPath: string): string {
 }
 
 /**
- * Resuelve el ejecutor de cada herramienta según el modo:
- * - `native`: binario explícito → PATH → instalado por el CLI → descarga verificada.
- * - `docker`: solo contenedor.
- * - `auto`: binario local si existe; si no, contenedor; si no hay runtime, descarga verificada.
+ * Resolves the executor for each tool according to the mode:
+ * - `native`: explicit binary -> PATH -> installed by the CLI -> verified download.
+ * - `docker`: containers only.
+ * - `auto`: local binary if present; otherwise a container; without a runtime, a verified download.
  */
 export class ExecutionEngine {
   private containerCheck: Promise<boolean> | null = null;
@@ -178,7 +178,7 @@ export class ExecutionEngine {
     return this.containerCheck;
   }
 
-  /** Descarga la imagen una sola vez, mostrando el progreso en lugar de parecer colgado. */
+  /** Pulls each image at most once, streaming progress so the CLI does not look stuck. */
   ensureImage(image: string): Promise<void> {
     let check = this.imageChecks.get(image);
     if (!check) {

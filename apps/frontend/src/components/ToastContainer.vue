@@ -1,11 +1,12 @@
-<!-- apps/frontend/src/components/ToastContainer.vue -->
 <script setup lang="ts">
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-vue-next'
+import type { Component } from 'vue'
+
 import { useToastStore, type ToastType } from '@/stores/toastStore'
 
 const toastStore = useToastStore()
 
-function getIcon(type: ToastType) {
+function getIcon(type: ToastType): Component {
   switch (type) {
     case 'success':
       return CheckCircle2

@@ -28,6 +28,10 @@ services:
       DB_NAME: ${POSTGRES_DB:-code_sentinel}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      # The image runs with NODE_ENV=production; there are no migrations yet,
+      # so schema auto-sync must stay explicitly enabled.
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
     depends_on:
       db:
         condition: service_healthy
