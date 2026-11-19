@@ -66,6 +66,10 @@ describe('Code Sentinel CLI main', () => {
       user: { email: 'dev@example.com', name: 'Dev User', role: 'admin' },
       savedAt: '2026-11-17T00:00:00Z',
     });
+    vi.spyOn(credentialsModule, 'validateTokenWithBackend').mockResolvedValue({
+      valid: true,
+      user: { email: 'dev@example.com', name: 'Dev User', role: 'admin' },
+    });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const exitCode = await runCli(['whoami']);
     expect(exitCode).toBe(0);
